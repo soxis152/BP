@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Radar & BLE Vizualizace v Reálném Čase</title>
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+        canvas {
+            background-color: #2d2d2d;
+            border: 2px solid #555;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            margin-top: 20px;
+        }
+        .status {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .status.disconnected {
+            color: #F44336;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Senzorová Fúze: Radar + BLE</h1>
+    <p>Stav připojení: <span id="status" class="status disconnected">Odpojeno</span></p>
+
+    <canvas id="radarCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('radarCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusSpan = document.getElementById('status');
+
+        // Nastavení měřítka místnosti (kolik pixelů je 1 metr)
+        // Předpokládáme místnost např. 6x6 metrů
+        const PIXELS_PER_METER = 100;
+
+        // Střed plátna bude odpovídat souřadnicím [0, 0]
+        const offsetX = canvas.width / 2;
+        const offsetY = canvas.height / 2;
+
+        function drawMap() {
+            // Vymazání plátna v každém snímku
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Kreslení mřížky a středového kříže
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 1;
+
+            ctx.beginPath();
+            ctx.moveTo(0, offsetY);
+            ctx.lineTo(canvas.width, offsetY);
+            ctx.moveTo(offsetX, 0);
+            ctx.lineTo(offsetX, canvas.height);
+            ctx.stroke();
+        }
+
+        function drawObjects(objects) {
+            drawMap(); // Překreslit pozadí
+
+            objects.forEach(obj => {
+                // Převod globálních souřadnic (metry) na pixely na plátně
+                // Předpokládáme, že X jde doprava a Y jde "nahoru" (proto mínus u Y)
+                const px = offsetX + (obj.x * PIXELS_PER_METER);
+                const py = offsetY - (obj.y * PIXELS_PER_METER);
+
+                // Vykreslení bodu (kruh)
+                ctx.beginPath();
+                ctx.arc(px, py, 10, 0, 2 * Math.PI, false);
+
+                // Barva podle toho, zda známe Tag ID (fúze úspěšná) nebo ne
+                if (obj.tag_id && obj.tag_id !== "unknown") {
+                    ctx.fillStyle = '#4CAF50'; // Zelená = spárované s BLE
+                } else {
+                    ctx.fillStyle = '#2196F3'; // Modrá = jen Radar
+                }
+
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#fff';
+                ctx.stroke();
+
+                // Vykreslení textu (Tag ID nad bodem)
+                ctx.fillStyle = '#fff';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(obj.tag_id !== "unknown" ? obj.tag_id : "Radar Cíl", px, py - 15);
+            });
+        }
+
+        // --- WebSocket Připojení ---
+        function connect() {
+            const ws = new WebSocket(`ws://${window.location.host}/ws`);
+
+            ws.onopen = function() {
+                statusSpan.textContent = "Připojeno (Live)";
+                statusSpan.className = "status";
+                drawMap();
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === "update") {
+                    drawObjects(data.objects);
+                }
+            };
+
+            ws.onclose = function() {
+                statusSpan.textContent = "Odpojeno - Pokus o znovupřipojení...";
+                statusSpan.className = "status disconnected";
+                setTimeout(connect, 2000); // Automatický reconnect
+            };
+        }
+
+        // Spustit aplikaci
+        connect();
+    </script>
+</body>
+</html>
