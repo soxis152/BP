@@ -52,8 +52,9 @@ def ingestion_thread() -> None:
 
 def fusion_thread() -> None:
     print("[thread-2] Starting fusion loop")
-    # OPRAVA: perform_fusion() je asynchronní, musíme ji spustit přes asyncio.run()
-    asyncio.run(fusion.perform_fusion())
+    # ZMĚNA PRO MQTT ARCHITEKTURU:
+    # Voláme novou funkci main_fusion(), která obsluhuje naslouchání i výpočet
+    asyncio.run(fusion.main_fusion())
 
 
 def api_thread() -> None:
