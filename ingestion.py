@@ -3,9 +3,11 @@ import json
 import threading
 import time
 import math
+from pathlib import Path
 import serial
 import re
 import asyncio  # Přidán import asyncio
+
 from queue import Queue
 
 # Změněn import - používáme pouze asynchronní db_handler
@@ -41,7 +43,8 @@ BLE_CONFIGS = [
     }
 ]
 
-RADAR_CONFIG_FILE = r"C:\Users\kabup\OneDrive\Plocha\BP_\KÓD\Four\radar\tdm\AWR294X_profile_2025_11_07T16_27_59_226 copy1.cfg"
+BASE_DIR = Path(__file__).resolve().parent
+RADAR_CONFIG_FILE = BASE_DIR / "radar" / "tdm" / "AWR294X_profile_2025_11_07T16_27_59_226 copy1.cfg"
 
 RADAR_CONFIGS = [
     {

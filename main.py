@@ -1,14 +1,15 @@
-"""Main entrypoint with 3 top-level threads."""
+"""Main entrypoint with top-level threads."""
 
-import threading
-import time
 import asyncio
 import sys
+import threading
+import time
+
 import uvicorn
 
-# Windows FIX: Zabránění chybám s event loopem ve více vláknech na Windows
-if sys.platform == 'win32':
+if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 
 try:
     import app as web_app
@@ -23,8 +24,6 @@ except ImportError:
 def ingestion_thread() -> None:
     print("[thread-1] Starting ingestion workers")
 
-    # Poznámka: ingestion.init_db() jsme smazali.
-    # Tabulky se vytvoří asynchronně uvnitř db_workeru.
     threading.Thread(target=ingestion.db_worker, daemon=True, name="db_worker").start()
 
     for cfg in ingestion.RADAR_CONFIGS:
@@ -52,20 +51,23 @@ def ingestion_thread() -> None:
 
 def fusion_thread() -> None:
     print("[thread-2] Starting fusion loop")
-    # ZMĚNA PRO MQTT ARCHITEKTURU:
-    # Voláme novou funkci main_fusion(), která obsluhuje naslouchání i výpočet
-    asyncio.run(fusion.main_fusion())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(fusion.main_fusion())
 
 
 def api_thread() -> None:
     print("[thread-3] Starting FastAPI server on http://127.0.0.1:8000")
-    # Zde máte správně reload=False, v běžícím vlákně uvicorn reload nepodporuje
-    uvicorn.run(web_app.app, host="127.0.0.1", port=8000, reload=False)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    config = uvicorn.Config(web_app.app, host="127.0.0.1", port=8000, reload=False, loop="asyncio")
+    server = uvicorn.Server(config)
+    loop.run_until_complete(server.serve())
 
 
 def main() -> None:
     threads = [
-        threading.Thread(target=ingestion_thread, name="ingestion_thread", daemon=True),
+        # threading.Thread(target=ingestion_thread, name="ingestion_thread", daemon=True),
         threading.Thread(target=fusion_thread, name="fusion_thread", daemon=True),
         threading.Thread(target=api_thread, name="api_thread", daemon=True),
     ]

@@ -1,4 +1,3 @@
-import asyncio
 import asyncpg
 
 DB_CONFIG = {
