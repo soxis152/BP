@@ -48,14 +48,14 @@ RADAR_CONFIGS = [
         "id": "radar_1",
         "cfg_port": "COM11",
         "dat_port": "COM12",
-        "pos_x": 2.5, "pos_y": 0.0, "pos_z": 0.7,
+        "pos_x": 1.5, "pos_y": 0.0, "pos_z": 0.7,
         "rotation": 90
     },
     {
         "id": "radar_2",
         "cfg_port": "COM13",
         "dat_port": "COM14",
-        "pos_x": 0.0, "pos_y": 3.0, "pos_z": 0.7,
+        "pos_x": 0.0, "pos_y": 1.5, "pos_z": 0.7,
         "rotation": 0
     }
 ]

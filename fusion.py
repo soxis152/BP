@@ -12,8 +12,8 @@ from db_handler import db_handler
 
 # --- KONFIGURACE (Sjednoceno s ingestion.py) ---
 SENSORS = {
-    "ble_1": {"x": 2.5, "y": 0.0, "z": 0.7, "rotation": 90},
-    "ble_2": {"x": 0.0, "y": 3.0, "z": 0.7, "rotation": 0}
+    "ble_1": {"x": 1.5, "y": 0.0, "z": 0.7, "rotation": 90},
+    "ble_2": {"x": 0.0, "y": 1.5, "z": 0.7, "rotation": 0}
 }
 
 active_tracks = {}

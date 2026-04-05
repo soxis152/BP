@@ -2,127 +2,597 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Radar & BLE Vizualizace v Reálném Čase</title>
+    <title>Senzorová Fúze: Průmyslový Dashboard</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
     <style>
+        /* --- PRŮMYSLOVÝ SVĚTLÝ MOTIV (INDUSTRIAL LIGHT MODE) --- */
+        :root {
+            --bg-page: #e2e8f0;       /* Ocelově šedé pozadí mimo panely */
+            --bg-panel: #ffffff;      /* Čistě bílé panely */
+            --text-main: #0f172a;     /* Téměř černá pro maximální kontrast */
+            --text-muted: #64748b;    /* Tmavě šedá pro popisky */
+            --border: #cbd5e1;        /* Pevné šedé ohraničení */
+            --color-radar: #2563eb;   /* Signální modrá (pouze radar) */
+            --color-fused: #dc2626;   /* Signální červená (fúze s BLE) */
+            --color-sensor: #475569;  /* Tmavá ocelová (senzory) */
+            --axis-x: #ef4444;        /* Osa X */
+            --axis-y: #10b981;        /* Osa Y */
+            --axis-z: #3b82f6;        /* Osa Z (výška) */
+        }
+
         body {
-            background-color: #1e1e1e;
-            color: #ffffff;
-            font-family: Arial, sans-serif;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* Hlavička jako horní lišta panelu */
+        .header-panel {
+            width: 100%;
+            max-width: 1000px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-bottom: 3px solid var(--color-sensor);
+            padding: 15px 25px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            border-radius: 4px;
+        }
+
+        .header-panel h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .status-container {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .status { color: #16a34a; background: #dcfce7; padding: 4px 8px; border: 1px solid #bbf7d0; border-radius: 2px; }
+        .status.disconnected { color: #dc2626; background: #fee2e2; border: 1px solid #fecaca; }
+
+        /* Ostrá průmyslová tlačítka */
+        .view-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+        .view-controls button {
+            background-color: var(--bg-panel);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .view-controls button:hover { background-color: #f8fafc; border-color: #94a3b8; }
+        .view-controls button.active {
+            background-color: var(--color-sensor);
+            color: white;
+            border-color: var(--color-sensor);
+        }
+
+        .dashboard {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            justify-content: center;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        /* Zobrazení mapy - ostrý rámeček */
+        .view-container {
+            position: relative;
+            width: 600px;
+            height: 600px;
+            flex-shrink: 0;
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+
+        #radarCanvas { position: absolute; top: 0; left: 0; }
+        #view3d { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; }
+
+        .hint-3d {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.9);
+            border: 1px solid var(--border);
+            padding: 5px 10px;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 2px;
+            pointer-events: none;
+            z-index: 10;
+            display: none;
+        }
+
+        /* Průmyslové informační karty */
+        .tiles-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 360px;
+            max-height: 600px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        .tile {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-left: 6px solid var(--color-radar);
+            border-radius: 4px;
+            padding: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .tile.fused { border-left-color: var(--color-fused); }
+
+        .tile h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            text-transform: uppercase;
+            color: var(--text-main);
+            border-bottom: 1px dashed var(--border);
+            padding-bottom: 6px;
+        }
+
+        /* Tabular-nums zarovná čísla přesně pod sebe jako v tabulce */
+        .tile .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        .tile .data-row strong {
+            color: var(--text-main);
+            font-family: 'Consolas', 'Courier New', monospace; /* Technický font pro hodnoty */
+            font-size: 15px;
+        }
+
+        .empty-message {
+            color: var(--text-muted);
+            font-style: italic;
+            text-align: center;
             margin-top: 20px;
+            background: var(--bg-panel);
+            padding: 15px;
+            border: 1px dashed var(--border);
+            border-radius: 4px;
         }
-        canvas {
-            background-color: #2d2d2d;
-            border: 2px solid #555;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-            margin-top: 20px;
-        }
-        .status {
-            color: #4CAF50;
-            font-weight: bold;
-        }
-        .status.disconnected {
-            color: #F44336;
-        }
+
+        .tiles-container::-webkit-scrollbar { width: 6px; }
+        .tiles-container::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+        .tiles-container::-webkit-scrollbar-track { background: transparent; }
     </style>
 </head>
 <body>
 
-    <h1>Senzorová Fúze: Radar + BLE</h1>
-    <p>Stav připojení: <span id="status" class="status disconnected">Odpojeno</span></p>
+    <div class="header-panel">
+        <h1>Dashboard Fúze Senzorů</h1>
+        <div class="status-container">
+            LINK: <span id="status" class="status disconnected">OFFLINE</span>
+        </div>
+    </div>
 
-    <canvas id="radarCanvas" width="800" height="600"></canvas>
+    <div class="view-controls">
+        <button id="btn2d" class="active" onclick="switchView('2d')">2D Monitor</button>
+        <button id="btn3d" onclick="switchView('3d')">3D Vizualizace</button>
+    </div>
+
+    <div class="dashboard">
+        <div class="view-container">
+            <canvas id="radarCanvas" width="600" height="600"></canvas>
+            <div id="view3d"></div>
+            <div id="hint3d" class="hint-3d">KAMERA: Levý klik (Rotace) | Pravý klik (Posun) | Kolečko (Zoom)</div>
+        </div>
+
+        <div id="tiles-container" class="tiles-container">
+            <div class="empty-message">Čekám na data ze senzorů...</div>
+        </div>
+    </div>
 
     <script>
+        // --- BAREVNÁ PALETA ---
+        const COLOR_RADAR = '#2563eb';  // Modrá
+        const COLOR_FUSED = '#dc2626';  // Červená
+        const COLOR_SENSOR = '#475569'; // Tmavě ocelová
+        const COLOR_GRID = '#cbd5e1';   // Šedá pro mřížku
+
+        // --- BARVY OS ---
+        const COLOR_AXIS_X = '#ef4444';
+        const COLOR_AXIS_Y = '#10b981';
+        const COLOR_AXIS_Z = '#3b82f6';
+
+        // --- ROZLOŽENÍ SENZORŮ ---
+        const SENSOR_NODES = [
+            { id: "S1", x: 1.5, y: 0.0, z: 0.7 },
+            { id: "S2", x: 0.0, y: 1.5, z: 0.7 }
+        ];
+
+        let currentMode = '2d';
+        let latestObjects = [];
+
+        const btn2d = document.getElementById('btn2d');
+        const btn3d = document.getElementById('btn3d');
         const canvas = document.getElementById('radarCanvas');
+        const view3d = document.getElementById('view3d');
+        const hint3d = document.getElementById('hint3d');
         const ctx = canvas.getContext('2d');
         const statusSpan = document.getElementById('status');
+        const tilesContainer = document.getElementById('tiles-container');
 
-        // Nastavení měřítka místnosti (kolik pixelů je 1 metr)
-        // Předpokládáme místnost např. 6x6 metrů
-        const PIXELS_PER_METER = 100;
-
-        // Střed plátna bude odpovídat souřadnicím [0, 0]
-        const offsetX = canvas.width / 2;
-        const offsetY = canvas.height / 2;
-
-        function drawMap() {
-            // Vymazání plátna v každém snímku
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Kreslení mřížky a středového kříže
-            ctx.strokeStyle = '#444';
-            ctx.lineWidth = 1;
-
-            ctx.beginPath();
-            ctx.moveTo(0, offsetY);
-            ctx.lineTo(canvas.width, offsetY);
-            ctx.moveTo(offsetX, 0);
-            ctx.lineTo(offsetX, canvas.height);
-            ctx.stroke();
+        function switchView(mode) {
+            currentMode = mode;
+            if (mode === '2d') {
+                btn2d.classList.add('active');
+                btn3d.classList.remove('active');
+                canvas.style.display = 'block';
+                view3d.style.display = 'none';
+                hint3d.style.display = 'none';
+                drawObjects2D(latestObjects);
+            } else {
+                btn3d.classList.add('active');
+                btn2d.classList.remove('active');
+                canvas.style.display = 'none';
+                view3d.style.display = 'block';
+                hint3d.style.display = 'block';
+                updateObjects3D(latestObjects);
+            }
         }
 
-        function drawObjects(objects) {
-            drawMap(); // Překreslit pozadí
+        // ==========================================
+        //        1. LOGIKA PRO 2D PLÁTNO
+        // ==========================================
+        const PIXELS_PER_METER = 170;
+        const PADDING_LEFT = 45;
+        const PADDING_BOTTOM = 45;
+        const originX = PADDING_LEFT;
+        const originY = canvas.height - PADDING_BOTTOM;
 
-            objects.forEach(obj => {
-                // Převod globálních souřadnic (metry) na pixely na plátně
-                // Předpokládáme, že X jde doprava a Y jde "nahoru" (proto mínus u Y)
-                const px = offsetX + (obj.x * PIXELS_PER_METER);
-                const py = offsetY - (obj.y * PIXELS_PER_METER);
+        function drawMap2D() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                // Vykreslení bodu (kruh)
-                ctx.beginPath();
-                ctx.arc(px, py, 10, 0, 2 * Math.PI, false);
+            // Technická mřížka (ostrá, tenká)
+            ctx.strokeStyle = COLOR_GRID;
+            ctx.lineWidth = 1;
+            for (let x = 1; x <= 3; x++) {
+                let px = originX + (x * PIXELS_PER_METER);
+                ctx.beginPath(); ctx.moveTo(px, originY); ctx.lineTo(px, originY - (3 * PIXELS_PER_METER)); ctx.stroke();
+            }
+            for (let y = 1; y <= 3; y++) {
+                let py = originY - (y * PIXELS_PER_METER);
+                ctx.beginPath(); ctx.moveTo(originX, py); ctx.lineTo(originX + (3 * PIXELS_PER_METER), py); ctx.stroke();
+            }
 
-                // Barva podle toho, zda známe Tag ID (fúze úspěšná) nebo ne
-                if (obj.tag_id && obj.tag_id !== "unknown") {
-                    ctx.fillStyle = '#4CAF50'; // Zelená = spárované s BLE
-                } else {
-                    ctx.fillStyle = '#2196F3'; // Modrá = jen Radar
-                }
+            // Pevná hranice prostoru
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(originX, originY - (3 * PIXELS_PER_METER), 3 * PIXELS_PER_METER, 3 * PIXELS_PER_METER);
 
-                ctx.fill();
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = '#fff';
-                ctx.stroke();
+            // Barevné osy
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = COLOR_AXIS_X;
+            ctx.beginPath(); ctx.moveTo(originX, originY); ctx.lineTo(originX + (3 * PIXELS_PER_METER) + 20, originY); ctx.stroke();
 
-                // Vykreslení textu (Tag ID nad bodem)
-                ctx.fillStyle = '#fff';
-                ctx.font = '14px Arial';
+            ctx.strokeStyle = COLOR_AXIS_Y;
+            ctx.beginPath(); ctx.moveTo(originX, originY); ctx.lineTo(originX, originY - (3 * PIXELS_PER_METER) - 20); ctx.stroke();
+
+            // Texty os
+            ctx.fillStyle = '#64748b';
+            ctx.font = '12px "Segoe UI", Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            for (let i = 0; i <= 3; i++) ctx.fillText(i + 'm', originX + (i * PIXELS_PER_METER), originY + 8);
+
+            ctx.fillStyle = COLOR_AXIS_X;
+            ctx.font = 'bold 12px "Segoe UI", Arial';
+            ctx.fillText('X', originX + (3 * PIXELS_PER_METER) + 15, originY + 8);
+
+            ctx.fillStyle = '#64748b';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let i = 0; i <= 3; i++) ctx.fillText(i + 'm', originX - 8, originY - (i * PIXELS_PER_METER));
+
+            ctx.fillStyle = COLOR_AXIS_Y;
+            ctx.font = 'bold 12px "Segoe UI", Arial';
+            ctx.fillText('Y', originX - 8, originY - (3 * PIXELS_PER_METER) - 15);
+
+            // Senzory na 2D (Ostré čtverce)
+            SENSOR_NODES.forEach(sensor => {
+                const px = originX + (sensor.x * PIXELS_PER_METER);
+                const py = originY - (sensor.y * PIXELS_PER_METER);
+
+                ctx.fillStyle = COLOR_SENSOR;
+                ctx.fillRect(px - 12, py - 12, 24, 24);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 11px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText(obj.tag_id !== "unknown" ? obj.tag_id : "Radar Cíl", px, py - 15);
+                ctx.textBaseline = 'middle';
+                ctx.fillText(sensor.id, px, py);
             });
         }
 
-        // --- WebSocket Připojení ---
+        function drawObjects2D(objects) {
+            drawMap2D();
+            if (!objects) return;
+
+            objects.forEach(obj => {
+                const px = originX + (obj.x * PIXELS_PER_METER);
+                const py = originY - (obj.y * PIXELS_PER_METER);
+
+                const isFused = (obj.tag_id && obj.tag_id !== "unknown");
+                const color = isFused ? COLOR_FUSED : COLOR_RADAR;
+
+                // Zaměřovač (kruh s tečkou uvnitř pro větší technický vzhled)
+                ctx.beginPath();
+                ctx.arc(px, py, 8, 0, 2 * Math.PI, false);
+                ctx.fillStyle = color;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(px, py, 14, 0, 2 * Math.PI, false);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = color;
+                ctx.stroke();
+
+                // Text nad objektem
+                ctx.fillStyle = '#0f172a';
+                ctx.font = 'bold 12px "Segoe UI", Arial';
+                ctx.textAlign = 'center';
+                const tagIdText = isFused ? obj.tag_id : "TRG";
+                ctx.fillText(tagIdText, px, py - 22);
+            });
+        }
+
+        // ==========================================
+        //        2. LOGIKA PRO 3D PROSTOR
+        // ==========================================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#ffffff'); // Čistě bílé pozadí
+
+        const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+        camera.position.set(4, 4, 5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(600, 600);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        view3d.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(1.5, 0, -1.5);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.update();
+
+        // Ostrá průmyslová mřížka
+        const gridHelper = new THREE.GridHelper(3, 3, 0x94a3b8, 0xe2e8f0);
+        gridHelper.position.set(1.5, 0.01, -1.5);
+        scene.add(gridHelper);
+
+        const floorGeo = new THREE.PlaneGeometry(3, 3);
+        const floorMat = new THREE.MeshLambertMaterial({color: 0xf8fafc});
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.set(1.5, 0, -1.5);
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // Vlastní barevné osy
+        function create3DAxis(colorHex, length, posX, posY, posZ, rotX, rotY, rotZ) {
+            const geo = new THREE.CylinderGeometry(0.01, 0.01, length, 8);
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+            const cylinder = new THREE.Mesh(geo, mat);
+            cylinder.position.set(posX, posY, posZ);
+            cylinder.rotation.set(rotX, rotY, rotZ);
+            return cylinder;
+        }
+
+        scene.add(create3DAxis(COLOR_AXIS_X, 3.5, 1.75, 0.01, 0, 0, 0, -Math.PI / 2));
+        scene.add(create3DAxis(COLOR_AXIS_Y, 3.5, 0, 0.01, -1.75, Math.PI / 2, 0, 0));
+        scene.add(create3DAxis(COLOR_AXIS_Z, 2.0, 0, 1.0, 0, 0, 0, 0));
+
+        // Technické nasvícení (méně ambientního světla, silnější směrové pro ostré stíny)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
+        directionalLight.position.set(4, 8, 4);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 1024;
+        directionalLight.shadow.mapSize.height = 1024;
+        scene.add(directionalLight);
+
+        // Vykreslení 3D senzorů (Ostré krychle)
+        SENSOR_NODES.forEach(sensor => {
+            const geom = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+            const mat = new THREE.MeshLambertMaterial({ color: COLOR_SENSOR });
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.castShadow = true;
+            mesh.position.set(sensor.x, sensor.z, -sensor.y);
+            scene.add(mesh);
+
+            // Silnější, techničtější stativ
+            const poleGeom = new THREE.CylinderGeometry(0.03, 0.03, sensor.z);
+            const poleMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
+            const pole = new THREE.Mesh(poleGeom, poleMat);
+            pole.castShadow = true;
+            pole.position.set(sensor.x, sensor.z / 2, -sensor.y);
+            scene.add(pole);
+        });
+
+        let meshes3D = {};
+
+        function updateObjects3D(objects) {
+            if (!objects) return;
+            const currentIds = new Set();
+
+            objects.forEach((obj, idx) => {
+                const id = (obj.tag_id && obj.tag_id !== "unknown") ? obj.tag_id : `radar_${idx}`;
+                currentIds.add(id);
+
+                const isFused = (obj.tag_id && obj.tag_id !== "unknown");
+                const colorHex = isFused ? COLOR_FUSED : COLOR_RADAR;
+
+                if (!meshes3D[id]) {
+                    const group = new THREE.Group();
+
+                    const geometry = new THREE.SphereGeometry(0.1, 32, 32);
+                    const material = new THREE.MeshLambertMaterial({ color: colorHex });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    mesh.castShadow = true;
+                    mesh.name = "sphere";
+                    group.add(mesh);
+
+                    // Plná, neprůhledná vodící čára k zemi (jako zaměřovací laser)
+                    const lineGeo = new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(0, 0, 0),
+                        new THREE.Vector3(0, -1, 0)
+                    ]);
+                    const lineMat = new THREE.LineBasicMaterial({ color: colorHex, linewidth: 2 });
+                    const line = new THREE.Line(lineGeo, lineMat);
+                    line.name = "line";
+                    group.add(line);
+
+                    scene.add(group);
+                    meshes3D[id] = group;
+                }
+
+                const heightZ = (obj.z !== undefined && obj.z !== null) ? obj.z : 0.5;
+                const group = meshes3D[id];
+
+                group.position.set(obj.x, heightZ, -obj.y);
+
+                const sphere = group.getObjectByName("sphere");
+                if (sphere) sphere.material.color.set(colorHex);
+
+                const line = group.getObjectByName("line");
+                if (line) {
+                    line.material.color.set(colorHex);
+                    line.scale.y = heightZ;
+                }
+            });
+
+            Object.keys(meshes3D).forEach(id => {
+                if (!currentIds.has(id)) {
+                    scene.remove(meshes3D[id]);
+                    delete meshes3D[id];
+                }
+            });
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            if (currentMode === '3d') {
+                controls.update();
+                renderer.render(scene, camera);
+            }
+        }
+        animate3D();
+
+        // ==========================================
+        //        3. DLAŽDICE A WEBSOCKET
+        // ==========================================
+        function renderTiles(objects) {
+            if (!objects || objects.length === 0) {
+                tilesContainer.innerHTML = '<div class="empty-message">Žádný cíl nedetekován.</div>';
+                return;
+            }
+            tilesContainer.innerHTML = '';
+
+            objects.forEach((obj, index) => {
+                const isFused = (obj.tag_id && obj.tag_id !== "unknown");
+                const tileClass = isFused ? 'tile fused' : 'tile';
+                const title = isFused ? `ID TAGU: ${obj.tag_id}` : `TRG: NEZNÁMÝ CÍL #${index + 1}`;
+
+                const xVal = obj.x.toFixed(2);
+                const yVal = obj.y.toFixed(2);
+                const zVal = (obj.z !== undefined && obj.z !== null) ? obj.z.toFixed(2) : "0.00";
+                const confVal = obj.confidence ? (obj.confidence * 100).toFixed(0) + '%' : 'N/A';
+
+                const colorText = isFused ? COLOR_FUSED : COLOR_RADAR;
+                const typeText = isFused ? 'FÚZE: AKTIVNÍ (RADAR+BLE)' : 'ZDROJ: POUZE RADAR';
+
+                const tileHTML = `
+                    <div class="${tileClass}">
+                        <h3>${title}</h3>
+                        <div class="data-row"><span>POS X:</span> <strong>${xVal} m</strong></div>
+                        <div class="data-row"><span>POS Y:</span> <strong>${yVal} m</strong></div>
+                        <div class="data-row"><span>POS Z:</span> <strong>${zVal} m</strong></div>
+                        <div class="data-row" style="margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 10px;">
+                            <span style="color: ${colorText}; font-weight: 700; font-size: 12px; letter-spacing: 0.5px;">
+                                ${typeText}
+                            </span>
+                            <span style="font-size: 12px; font-weight: 600;">CONF: ${confVal}</span>
+                        </div>
+                    </div>
+                `;
+                tilesContainer.insertAdjacentHTML('beforeend', tileHTML);
+            });
+        }
+
         function connect() {
             const ws = new WebSocket(`ws://${window.location.host}/ws`);
 
             ws.onopen = function() {
-                statusSpan.textContent = "Připojeno (Live)";
+                statusSpan.textContent = "ONLINE / SNÍMÁNÍ";
                 statusSpan.className = "status";
-                drawMap();
+                if (currentMode === '2d') drawMap2D();
             };
 
             ws.onmessage = function(event) {
                 const data = JSON.parse(event.data);
                 if (data.type === "update") {
-                    drawObjects(data.objects);
+                    latestObjects = data.objects;
+
+                    if (currentMode === '2d') drawObjects2D(latestObjects);
+                    if (currentMode === '3d') updateObjects3D(latestObjects);
+
+                    renderTiles(latestObjects);
                 }
             };
 
             ws.onclose = function() {
-                statusSpan.textContent = "Odpojeno - Pokus o znovupřipojení...";
+                statusSpan.textContent = "OFFLINE / SPOJENÍ PŘERUŠENO";
                 statusSpan.className = "status disconnected";
-                setTimeout(connect, 2000); // Automatický reconnect
+                if (currentMode === '2d') drawMap2D();
+                tilesContainer.innerHTML = '<div class="empty-message">Spojení se serverem ztraceno. Obnovuji...</div>';
+
+                setTimeout(connect, 2000);
             };
         }
 
-        // Spustit aplikaci
+        drawMap2D();
         connect();
     </script>
 </body>
