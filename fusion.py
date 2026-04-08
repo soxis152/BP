@@ -59,7 +59,7 @@ def calculate_expected_angle(obj_x, obj_y, sensor_id):
 
 
 def find_matching_tag(center_x, center_y, ble_data_1, ble_data_2):
-    threshold = 15.0
+    threshold = 35.0
     found_candidates = []
 
     exp_1 = calculate_expected_angle(center_x, center_y, "ble_1")
@@ -118,8 +118,10 @@ async def perform_fusion_loop():
                     async with buffer_lock:
                         r1 = [(d["x"], d["y"], d["z"]) for d in sensor_buffers["radar_1"]]
                         r2 = [(d["x"], d["y"], d["z"]) for d in sensor_buffers["radar_2"]]
-                        b1 = [(0, d["timestamp"], d.get("tag_id", "unknown"), d["rssi"], d["azimuth"]) for d in sensor_buffers["ble_1"]]
-                        b2 = [(0, d["timestamp"], d.get("tag_id", "unknown"), d["rssi"], d["azimuth"]) for d in sensor_buffers["ble_2"]]
+                        b1 = [(0, d["timestamp"], d.get("tag_id", "unknown"), d["rssi"], d["azimuth"]) for d in
+                              sensor_buffers["ble_1"]]
+                        b2 = [(0, d["timestamp"], d.get("tag_id", "unknown"), d["rssi"], d["azimuth"]) for d in
+                              sensor_buffers["ble_2"]]
 
                         for key in sensor_buffers:
                             sensor_buffers[key].clear()
@@ -128,9 +130,16 @@ async def perform_fusion_loop():
                     final_fused_batch = []
                     fused_output_for_web = []
 
+                    # KROK 1: Všechny aktivní stopy posuneme dopředu (predikce filtru)
+                    for track in active_tracks.values():
+                        track.predict()
+
+                    # KROK 2: Analýza radarových dat
                     if len(all_radar_points) >= 3:
                         coords_xy = np.array([[p[0], p[1]] for p in all_radar_points])
                         coords_z = np.array([p[2] for p in all_radar_points])
+
+                        # ZVÝŠENO eps=0.8 (z 0.4), aby člověk netvořil víc shluků
                         db = DBSCAN(eps=0.4, min_samples=3).fit(coords_xy)
 
                         for cluster_id in set(db.labels_):
@@ -141,27 +150,49 @@ async def perform_fusion_loop():
                             raw_x, raw_y = np.mean(coords_xy[mask], axis=0)
                             raw_z = np.mean(coords_z[mask])
 
+                            # Pokus o párování s BLE
                             tag_id, confidence, _ = find_matching_tag(raw_x, raw_y, b1, b2)
 
+                            # NOVÁ LOGIKA: Pokud BLE selhalo, zkusíme najít nejbližší už sledovaný objekt
+                            if tag_id == "unknown":
+                                closest_id = None
+                                min_dist = 1.0  # Hledáme v okruhu max 1 metr
+                                for tid, track in active_tracks.items():
+                                    dist = math.hypot(track.state[0] - raw_x, track.state[1] - raw_y)
+                                    if dist < min_dist:
+                                        min_dist = dist
+                                        closest_id = tid
+
+                                if closest_id:
+                                    tag_id = closest_id  # BLE sice nevíme, ale je to pořád ta samá osoba
+                                else:
+                                    # Je to úplně nový člověk bez tagu
+                                    tag_id = f"unknown_{int(time.time() * 1000)}"
+
+                            # Přidání nového cíle, pokud ještě neexistuje
                             if tag_id not in active_tracks:
                                 active_tracks[tag_id] = KalmanObject(raw_x, raw_y, dt=0.15)
 
-                            active_tracks[tag_id].predict()
+                            # KROK 3: Aktualizace filtru skutečnou naměřenou hodnotou
                             active_tracks[tag_id].update(raw_x, raw_y)
 
                             smooth_x = float(active_tracks[tag_id].state[0])
                             smooth_y = float(active_tracks[tag_id].state[1])
 
-                            final_fused_batch.append((time.time(), tag_id, smooth_x, smooth_y, float(raw_z), confidence))
-                            fused_output_for_web.append(
-                                {
-                                    "tag_id": tag_id,
-                                    "x": smooth_x,
-                                    "y": smooth_y,
-                                    "z": float(raw_z),
-                                    "confidence": confidence,
-                                }
-                            )
+                            final_fused_batch.append(
+                                (time.time(), tag_id, smooth_x, smooth_y, float(raw_z), confidence))
+                            fused_output_for_web.append({
+                                "tag_id": tag_id,
+                                "x": smooth_x,
+                                "y": smooth_y,
+                                "z": float(raw_z),
+                                "confidence": confidence,
+                            })
+
+                    # KROK 4: Smazání "mrtvých" stop (objekt odešel)
+                    stale_ids = [tid for tid, track in active_tracks.items() if track.age > 2.0]
+                    for tid in stale_ids:
+                        del active_tracks[tid]
 
                     if fused_output_for_web:
                         payload = json.dumps({"type": "update", "objects": fused_output_for_web})
@@ -169,7 +200,6 @@ async def perform_fusion_loop():
 
                     if final_fused_batch and db_handler.pool:
                         await db_handler.insert_batch("fused_data", final_fused_batch)
-
         except aiomqtt.MqttError:
             print("Fusion loop: MQTT connection lost, retrying in 2s...")
             await asyncio.sleep(2)

@@ -11,7 +11,7 @@ from Four.db_handler import db_handler
 
 MQTT_HOST = "127.0.0.1"
 MQTT_PORT = 1883
-PUBLISH_PERIOD_SECONDS = 0.5
+PUBLISH_PERIOD_SECONDS = 0.15
 
 RADAR_CONFIGS = [
     {"id": "radar_1", "pos_x": 1.5, "pos_y": 0.0, "pos_z": 0.7, "rotation": 90},
