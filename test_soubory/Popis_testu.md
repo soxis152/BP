@@ -1,97 +1,176 @@
-# Testovací scénáře sledování pohybu (IMPLEMENTAČNÍ VERZE)
+# Testovací scénáře sledování pohybu
 
 ## 1. Lineární průchod (Linear Pass)
 
 **Popis:**  
-Objekt se pohybuje konstantní rychlostí v ose X zleva doprava (~0.18 m/s), s fixní pozicí Y a Z. Po dosažení hranice prostoru (x > 3.2) je resetován zpět na začátek.
+Objekt se pohybuje konstantní rychlostí v ose X zleva doprava, s fixní pozicí v osách Y a Z. Po dosažení hranice prostoru je resetován na začátek.
 
 **Co to testuje:**
-- Stabilitu trackingu při konstantním pohybu
-- Predikční schopnost Kalmanova filtru (lineární model)
-- Chování systému při resetu pozice (edge case)
-- Robustnost vůči opakovanému spawn/despawn cyklu
+- Základní funkčnost trackingu
+- Stabilitu Kalmanova filtru při lineárním pohybu
+- Chování při spawn/despawn (reset pozice)
 
 **Očekávaný výsledek:**
 - Hladká lineární trajektorie bez jitteru
 - Konzistentní ID během průchodu
-- Žádné „ghost objekty“ po resetu
+- Žádné ghost objekty
 
 ---
 
 ## 2. Kruhový pohyb (Circular Motion)
 
 **Popis:**  
-Objekt se pohybuje po eliptické trajektorii kolem středu (1.5, 1.5) pomocí funkcí cos/sin. V ose Z je malá sinusová oscilace.
+Objekt se pohybuje po eliptické trajektorii pomocí sinusových funkcí. Současně dochází k malé oscilaci v ose Z.
 
 **Co to testuje:**
-- Nelineární pohyb (změna směru v každém kroku)
-- Schopnost Kalman filtru aproximovat zakřivené trajektorie
-- Stabilitu fúze dat při změně orientace vůči senzorům
-- Přesnost v ose Z
+- Nelineární pohyb
+- Schopnost filtru reagovat na změnu směru
+- Stabilitu 3D fúze dat
 
 **Očekávaný výsledek:**
-- Plynulá eliptická trajektorie
-- Minimální deformace trajektorie
-- Stabilní ID bez výpadků
+- Plynulá trajektorie bez ostrých lomů
+- Stabilní ID
+- Minimální zkreslení trajektorie
 
 ---
 
-## 3. Stop & Go v trojúhelníku (Triangle Stop-Go)
+## 3. Stop & Go (Trojuhelník)
 
 **Popis:**  
-Objekt se pohybuje mezi třemi body (trojúhelník). V každém vrcholu se zastaví (čekání), poté pokračuje lineární interpolací k dalšímu bodu.
+Objekt se pohybuje mezi třemi body (trojúhelník), přičemž v každém bodě se na určitou dobu zastaví.
 
 **Co to testuje:**
-- Stabilitu systému při nulové rychlosti
-- DBSCAN clustering při nehybném objektu
+- Stabilitu při nulové rychlosti
+- Chování clusteringu při statickém objektu
 - Přechody mezi pohybem a zastavením
-- Chování při waypoint-based pohybu
 
 **Očekávaný výsledek:**
-- Stabilní pozice během zastavení (bez driftu)
+- Stabilní pozice během zastavení
 - Plynulé přechody mezi body
-- Konzistentní ID po celou dobu
+- Konzistentní ID
 
 ---
 
 ## 4. Křížení drah (X-Pattern)
 
 **Popis:**  
-Dva objekty se pohybují diagonálně proti sobě a kříží se uprostřed prostoru. Po dosažení hranice se resetují na výchozí pozice.
+Dva objekty se pohybují proti sobě diagonálně a kříží se uprostřed prostoru. Po dosažení hranice se resetují.
 
 **Co to testuje:**
-- Separaci objektů při minimální vzdálenosti
-- Data association (přiřazení měření ke tracku)
+- Separaci objektů
+- Data association
 - Prevence ID switch
-- Stabilitu při symetrickém pohybu
 
 **Očekávaný výsledek:**
-- Dva oddělené objekty po celou dobu
-- Konzistentní ID pro oba objekty
-- Žádné prohození ID při křížení
+- Dva oddělené tracky
+- Stabilní ID pro oba objekty
+- Žádné prohození ID
 
 ---
 
 ## 5. Dynamický stress test (ZigZag + změny rychlosti)
 
 **Popis:**  
-Objekt se pohybuje mezi waypointy s různou rychlostí (0 až ~4 m/s), včetně:
-- pomalého pohybu
-- náhlého zrychlení
-- prudkých změn směru
-- úplného zastavení
-
-Používá se inerční model (plynulá změna rychlosti) a odrazy od hranic prostoru.
+Objekt se pohybuje mezi waypointy s různou rychlostí, včetně náhlých změn směru, zastavení a odrazů od hranic.
 
 **Co to testuje:**
 - Adaptivitu Kalmanova filtru
-- Latenci systému (backend → MQTT → frontend)
 - Reakci na náhlé změny pohybu
-- Stabilitu při extrémních podmínkách
-- Boundary handling (odrazy)
+- Stabilitu systému při extrémních podmínkách
 
 **Očekávaný výsledek:**
-- Trajektorie odpovídající waypointům
-- Rychlá reakce na změny směru
+- Plynulá trajektorie odpovídající pohybu
 - Minimální overshoot
-- Stabilní ID i při chaotickém pohybu
+- Stabilní ID
+
+---
+
+## 6. Occlusion / výpadky senzorů
+
+**Popis:**  
+Objekt se pohybuje lineárně, přičemž dochází k:
+- výpadku radaru
+- krátkému úplnému výpadku (radar + BLE)
+- následnému návratu detekce
+
+**Co to testuje:**
+- Robustnost při částečné a úplné ztrátě dat
+- Predikci bez měření
+- Re-identifikaci objektu
+
+**Očekávaný výsledek:**
+- Trajektorie pokračuje během výpadku
+- Po návratu dat plynulé navázání
+- Zachování ID
+
+---
+
+## 7. Noise Injection (Šum v datech)
+
+**Popis:**  
+Objekt se pohybuje po stejné trajektorii, ale postupně se zvyšuje úroveň šumu v radarových i BLE datech.
+
+**Co to testuje:**
+- Odolnost vůči šumu
+- Stabilitu clusteringu
+- Vyhlazování trajektorie
+
+**Očekávaný výsledek:**
+- Stabilní trajektorie i při vyšším šumu
+- Žádný rozpad tracku
+- Bez náhodných skoků
+
+---
+
+## 8. ID Recovery (Znovunalezení objektu)
+
+**Popis:**  
+Objekt se pohybuje, následně úplně zmizí (výpadek všech senzorů) a po čase se znovu objeví.
+
+**Co to testuje:**
+- Re-identifikaci objektu
+- Track management (timeouty)
+- Data association po výpadku
+
+**Očekávaný výsledek:**
+- Krátký výpadek → zachování ID
+- Delší výpadek → kontrolované nové ID
+- Bez duplicitních tracků
+
+---
+
+## 9. Vertikální pohyb (3D Vertical Motion)
+
+**Popis:**  
+Objekt mění pozici nejen v X-Y, ale i v ose Z:
+- stoupání
+- pohyb ve výšce
+- klesání
+- návrat
+
+**Co to testuje:**
+- Správné zpracování osy Z
+- 3D tracking
+- Přesnost vertikálního pohybu
+
+**Očekávaný výsledek:**
+- Plynulá změna výšky
+- Bez skoků v Z
+- Stabilní ID
+
+---
+
+## 10. Spirálový pohyb (3D Spiral Motion)
+
+**Popis:**  
+Objekt se pohybuje po spirále — kombinace kruhového pohybu v X-Y a lineárního růstu v Z.
+
+**Co to testuje:**
+- Plně 3D trajektorii
+- Současnou změnu směru i výšky
+- Stabilitu trackingu při komplexním pohybu
+
+**Očekávaný výsledek:**
+- Plynulá spirálová trajektorie
+- Stabilní tracking bez jitteru
+- Konzistentní ID
