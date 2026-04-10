@@ -19,8 +19,8 @@ RADAR_CONFIGS = [
 ]
 
 BLE_CONFIGS = [
-    {"id": "ble_1", "pos_x": 2.5, "pos_y": 0.0, "pos_z": 0.7, "rotation": 90},
-    {"id": "ble_2", "pos_x": 0.0, "pos_y": 3.0, "pos_z": 0.7, "rotation": 0},
+    {"id": "ble_1", "pos_x": 1.5, "pos_y": 0.0, "pos_z": 0.7, "rotation": 90},
+    {"id": "ble_2", "pos_x": 0.0, "pos_y": 1.5, "pos_z": 0.7, "rotation": 0},
 ]
 
 
@@ -32,6 +32,12 @@ class ObjectState:
         self.z = z
         self.vx = vx
         self.vy = vy
+        self.radar_visible = True
+        self.ble_visible = True
+        self.radar_noise_xy = 0.0
+        self.radar_noise_z = 0.0
+        self.ble_azimuth_noise = 0.0
+        self.ble_rssi_noise = 0.0
 
 
 def transform_to_global(x_loc, y_loc, z_loc, cfg):
@@ -59,6 +65,9 @@ def build_radar_records(objects, cfg, timestamp):
     records = []
 
     for obj in objects:
+        if not obj.radar_visible:
+            continue
+
         x_loc, y_loc, z_loc = transform_to_local(obj.x, obj.y, obj.z, cfg)
         distance = math.sqrt(x_loc ** 2 + y_loc ** 2 + z_loc ** 2)
         azimuth_local = math.degrees(math.atan2(y_loc, x_loc))
@@ -68,9 +77,9 @@ def build_radar_records(objects, cfg, timestamp):
 
         cluster_size = random.randint(3, 5)
         for _ in range(cluster_size):
-            point_x_loc = x_loc + random.uniform(-0.12, 0.12)
-            point_y_loc = y_loc + random.uniform(-0.12, 0.12)
-            point_z_loc = z_loc + random.uniform(-0.04, 0.04)
+            point_x_loc = x_loc + random.uniform(-0.12, 0.12) + random.gauss(0.0, obj.radar_noise_xy)
+            point_y_loc = y_loc + random.uniform(-0.12, 0.12) + random.gauss(0.0, obj.radar_noise_xy)
+            point_z_loc = z_loc + random.uniform(-0.04, 0.04) + random.gauss(0.0, obj.radar_noise_z)
             point_x_glob, point_y_glob, point_z_glob = transform_to_global(point_x_loc, point_y_loc, point_z_loc, cfg)
             snr = max(7.0, 23.0 - distance * 2.6 + random.uniform(-1.8, 1.8))
             records.append(
@@ -90,6 +99,9 @@ def build_ble_records(objects, cfg, timestamp):
     records = []
 
     for obj in objects:
+        if not obj.ble_visible:
+            continue
+
         dx = obj.x - cfg["pos_x"]
         dy = obj.y - cfg["pos_y"]
         dz = obj.z - cfg["pos_z"]
@@ -103,8 +115,8 @@ def build_ble_records(objects, cfg, timestamp):
         cluster_size = random.randint(3, 5)
         expected_rssi = -45.0 - distance * 9.0
         for _ in range(cluster_size):
-            azimuth = relative_azimuth + random.uniform(-3.5, 3.5)
-            rssi = int(round(expected_rssi + random.uniform(-2.0, 2.0)))
+            azimuth = relative_azimuth + random.uniform(-3.5, 3.5) + random.gauss(0.0, obj.ble_azimuth_noise)
+            rssi = int(round(expected_rssi + random.uniform(-2.0, 2.0) + random.gauss(0.0, obj.ble_rssi_noise)))
             records.append((timestamp, obj.tag_id, rssi, round(azimuth, 2)))
 
     return records

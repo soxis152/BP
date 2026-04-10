@@ -58,34 +58,73 @@ def calculate_expected_angle(obj_x, obj_y, sensor_id):
     return (angle_deg - cfg["rotation"] + 360) % 360
 
 
+def average_angles(angles_deg):
+    """Vypočítá průměr úhlů s ohledem na kruhový přechod přes 360 stupňů."""
+    if not angles_deg:
+        return None
+    sin_sum = sum(math.sin(math.radians(a)) for a in angles_deg)
+    cos_sum = sum(math.cos(math.radians(a)) for a in angles_deg)
+    return (math.degrees(math.atan2(sin_sum, cos_sum)) + 360) % 360
+
+
 def find_matching_tag(center_x, center_y, ble_data_1, ble_data_2, active_tracks_keys):
-    threshold = 35.0
-    found_candidates = []
+    # 1. Agregace dat (posbíráme všechny přijaté úhly za poslední 1 sekundu)
+    tag_azimuths = {}
+
+    for row in ble_data_1:
+        tag = row[2]
+        if tag not in tag_azimuths:
+            tag_azimuths[tag] = {'az1': [], 'az2': []}
+        tag_azimuths[tag]['az1'].append(row[4])
+
+    for row in ble_data_2:
+        tag = row[2]
+        if tag not in tag_azimuths:
+            tag_azimuths[tag] = {'az1': [], 'az2': []}
+        tag_azimuths[tag]['az2'].append(row[4])
 
     exp_1 = calculate_expected_angle(center_x, center_y, "ble_1")
-    for row in ble_data_1:
-        diff = abs((row[4] - exp_1 + 180) % 360 - 180)
-        if diff < threshold:
-            found_candidates.append({"tag": row[2], "rssi": row[3], "azimuth": row[4]})
-
     exp_2 = calculate_expected_angle(center_x, center_y, "ble_2")
-    for row in ble_data_2:
-        diff = abs((row[4] - exp_2 + 180) % 360 - 180)
-        if diff < threshold:
-            found_candidates.append({"tag": row[2], "rssi": row[3], "azimuth": row[4]})
 
-    if not found_candidates:
+    candidates = []
+
+    # 2. Zprůměrování úhlů a výpočet odchylek
+    for tag, az_data in tag_azimuths.items():
+        if tag in active_tracks_keys:
+            continue  # Objekt už je spolehlivě sledován jinde
+
+        diff1 = 0
+        diff2 = 0
+        count = 0
+
+        # Zprůměrovaný úhel z BLE kotvy 1
+        avg_az1 = average_angles(az_data['az1'])
+        if avg_az1 is not None:
+            diff1 = abs((avg_az1 - exp_1 + 180) % 360 - 180)
+            count += 1
+
+        # Zprůměrovaný úhel z BLE kotvy 2
+        avg_az2 = average_angles(az_data['az2'])
+        if avg_az2 is not None:
+            diff2 = abs((avg_az2 - exp_2 + 180) % 360 - 180)
+            count += 1
+
+        if count == 0:
+            continue
+
+        # Celková průměrná odchylka ze všech dostupných senzorů
+        avg_diff = (diff1 + diff2) / count
+
+        # Pokud je průměrná odchylka do 35 stupňů, je to kandidát
+        if avg_diff < 35.0:
+            candidates.append({"tag": tag, "diff": avg_diff})
+
+    if not candidates:
         return "unknown", 0.5, None
 
-    # Odstranit z kandidátů ty, kteří už jsou aktivně sledováni
-    valid_candidates = [c for c in found_candidates if c["tag"] not in active_tracks_keys]
-
-    if not valid_candidates:
-        return "unknown", 0.5, None
-
-    valid_candidates.sort(key=lambda x: x["rssi"], reverse=True)
-    return valid_candidates[0]["tag"], 0.9, valid_candidates
-
+    # 3. Vybereme tag, jehož TĚŽIŠTĚ ukazuje nejpřesněji na tuto tečku
+    candidates.sort(key=lambda x: x["diff"])
+    return candidates[0]["tag"], 0.9, candidates
 
 async def listen_raw_sensors():
     while True:
@@ -164,6 +203,11 @@ async def perform_fusion_loop():
                                 coasting_tracks.add(track_ids[i])
                                 coasting_tracks.add(track_ids[j])
 
+                    # --- OPRAVA VYBLEDNUTÍ: Křížení není výpadek ---
+                    # Zastavíme stárnutí u objektů, které se právě kříží
+                    for tid in coasting_tracks:
+                        active_tracks[tid].age = 0.0
+
                     # KROK 2: Analýza radarových dat (Vytvoření seznamu shluků)
                     clusters = []
                     if len(all_radar_points) >= 3:
@@ -187,7 +231,7 @@ async def perform_fusion_loop():
 
                     for tid, track in active_tracks.items():
                         best_idx = -1
-                        min_dist = 0.8
+                        min_dist = 1.5
 
                         for i, (rx, ry, rz) in enumerate(clusters):
                             if i in matched_clusters:
@@ -237,11 +281,15 @@ async def perform_fusion_loop():
                     for tid, track in active_tracks.items():
                         smooth_x = float(track.state[0])
                         smooth_y = float(track.state[1])
-
                         smooth_z = getattr(track, "current_z", 0.92)
 
-                        # Pokud objekt letí naslepo (coasting), snížíme mu confidence
+                        # Pokud objekt letí naslepo (coasting při křížení), snížíme mu confidence
                         conf = 0.5 if tid in coasting_tracks else 0.9
+
+                        # --- NOVÉ: Výpočet vyblednutí (Opacity) ---
+                        # track.age roste s každým krokem bez dat.
+                        # Během 4 vteřin klesne opacity z 1.0 (plně viditelný) na 0.0 (zcela průhledný).
+                        opacity = max(0.0, 1.0 - (track.age / 4.0))
 
                         final_fused_batch.append((time.time(), tid, smooth_x, smooth_y, smooth_z, conf))
                         fused_output_for_web.append({
@@ -250,16 +298,19 @@ async def perform_fusion_loop():
                             "y": smooth_y,
                             "z": smooth_z,
                             "confidence": conf,
+                            "opacity": opacity  # Posíláme průhlednost na frontend
                         })
 
                     # KROK 6: Smazání "mrtvých" stop
-                    stale_ids = [tid for tid, track in active_tracks.items() if track.age > 2.0]
+                    # Zvýšili jsme přežití stopy na 4.0 vteřiny, aby stihla na monitoru plynule vyblednout a zmizet
+                    stale_ids = [tid for tid, track in active_tracks.items() if track.age > 4.0]
                     for tid in stale_ids:
                         del active_tracks[tid]
 
-                    if fused_output_for_web:
-                        payload = json.dumps({"type": "update", "objects": fused_output_for_web})
-                        await mqtt_client.publish("sensors/fused", payload)
+                    # --- OPRAVA ZAMRZÁNÍ ---
+                    # Odebrali jsme slovíčko 'if' - backend teď posílá data neustále, i když je místnost prázdná
+                    payload = json.dumps({"type": "update", "objects": fused_output_for_web})
+                    await mqtt_client.publish("sensors/fused", payload)
 
                     if final_fused_batch and db_handler.pool:
                         await db_handler.insert_batch("fused_data", final_fused_batch)

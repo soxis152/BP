@@ -1,45 +1,62 @@
 import asyncio
 from Four.test_soubory.scenario_common import ObjectState, run_scenario
 
+# Definujeme body (waypoints), mezi kterými bude objekt létat
+WAYPOINTS = [
+    (1.5, 1.5, 0.5),  # 1. Pomalu do středu (x, y, rychlost v m/s)
+    (2.5, 2.5, 3.0),  # 2. Sprint do pravého horního rohu
+    (2.5, 0.5, 4.0),  # 3. Extrémní úskok dolů
+    (2.5, 0.5, 0.0),  # 4. Tvrdé zastavení na místě (pauza)
+    (0.5, 2.5, 2.5),  # 5. Rychlý přesun do levého horního
+    (0.5, 0.5, 1.5),  # 6. Přesun do levého dolního
+]
+
+
 def update_dynamic_stress_test(step_index, objects, dt):
     obj = objects[0]
-    # Celý cyklus má 60 kroků pro komplexnější manévry
-    phase = step_index % 60
 
-    if phase < 15:
-        # 1. POMALÁ CHŮZE: Lineární pohyb vpřed (středem)
-        obj.x += 0.3 * dt
-        obj.y += 0.1 * dt
-    elif phase < 20:
-        # 2. NÁHLÉ ZRYCHLENÍ: Sprint směrem k pravému hornímu rohu
-        obj.x += 2.5 * dt
-        obj.y += 1.8 * dt
-    elif phase < 25:
-        # 3. ÚSKOK DO STRANY: Prudká změna v ose X, osa Y stojí
-        obj.x -= 2.0 * dt
-        obj.y += 0.0
-    elif phase < 35:
-        # 4. OSTRÉ ZASTAVENÍ: Objekt stojí na místě (testuje latenci a klidovou polohu)
-        pass
-    elif phase < 45:
-        # 5. OTOČKA O 180° A RYCHLÝ NÁVRAT: Pohyb přímo zpět k počátku
-        obj.x -= 1.5 * dt
-        obj.y -= 1.5 * dt
+    # Fáze se mění každých 15 kroků simulace (7.5 vteřiny)
+    phase = (step_index // 15) % len(WAYPOINTS)
+
+    target_x, target_y, target_speed = WAYPOINTS[phase]
+
+    # Vypočítáme vektor k cíli
+    dx = target_x - obj.x
+    dy = target_y - obj.y
+    distance = (dx ** 2 + dy ** 2) ** 0.5
+
+    if distance > 0.1:
+        # Normalizujeme vektor a vynásobíme cílovou rychlostí
+        tvx = (dx / distance) * target_speed
+        tvy = (dy / distance) * target_speed
     else:
-        # 6. DOJEZD: Pomalé srovnání do výchozí pozice
-        obj.x = obj.x * 0.9 + 0.5 * 0.1
-        obj.y = obj.y * 0.9 + 0.5 * 0.1
+        # Jsme v cíli, zastavíme
+        tvx = 0.0
+        tvy = 0.0
 
-    # --- HRANICE 3x3m S RESETEM ---
-    if obj.x < 0.1 or obj.x > 2.9 or obj.y < 0.1 or obj.y > 2.9:
-        obj.x = 0.5
-        obj.y = 0.5
+    # Aplikace setrvačnosti (aby to Kalman filtr zvládl "chytit")
+    # Změna rychlosti není okamžitá, ale plynulá
+    obj.vx = obj.vx * 0.6 + tvx * 0.4
+    obj.vy = obj.vy * 0.6 + tvy * 0.4
+
+    # Ochrana proti vyletění mimo mapu 3x3 metry (náraz do zdi)
+    next_x = obj.x + obj.vx * dt
+    next_y = obj.y + obj.vy * dt
+
+    if next_x < 0.1 or next_x > 2.9:
+        obj.vx *= -0.5  # Odraz a zpomalení
+    if next_y < 0.1 or next_y > 2.9:
+        obj.vy *= -0.5
+
+    obj.x += obj.vx * dt
+    obj.y += obj.vy * dt
+
 
 async def main():
-    # Začínáme v dolní části, aby bylo místo na "sprint" nahoru
     objects = [ObjectState("STRESS_TEST_OBJ", x=0.5, y=0.5)]
-    print("Spouštím Dynamický Stress Test: Cik-cak, zrychlení a stop.")
-    await run_scenario("dynamic_stress_v1", objects, update_dynamic_stress_test)
+    print("Spouštím Vyladěný Stress Test: Waypointy a limity.")
+    await run_scenario("dynamic_stress_v2", objects, update_dynamic_stress_test)
+
 
 if __name__ == "__main__":
     try:

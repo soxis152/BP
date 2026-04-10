@@ -10,17 +10,17 @@
     <style>
         /* --- PRŮMYSLOVÝ SVĚTLÝ MOTIV (INDUSTRIAL LIGHT MODE) --- */
         :root {
-            --bg-page: #e2e8f0;       /* Ocelově šedé pozadí mimo panely */
-            --bg-panel: #ffffff;      /* Čistě bílé panely */
-            --text-main: #0f172a;     /* Téměř černá pro maximální kontrast */
-            --text-muted: #64748b;    /* Tmavě šedá pro popisky */
-            --border: #cbd5e1;        /* Pevné šedé ohraničení */
-            --color-radar: #2563eb;   /* Signální modrá (pouze radar) */
-            --color-fused: #dc2626;   /* Signální červená (fúze s BLE) */
-            --color-sensor: #475569;  /* Tmavá ocelová (senzory) */
-            --axis-x: #ef4444;        /* Osa X */
-            --axis-y: #10b981;        /* Osa Y */
-            --axis-z: #3b82f6;        /* Osa Z (výška) */
+            --bg-page: #e2e8f0;
+            --bg-panel: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #cbd5e1;
+            --color-radar: #2563eb;
+            --color-fused: #dc2626;
+            --color-sensor: #475569;
+            --axis-x: #ef4444;
+            --axis-y: #10b981;
+            --axis-z: #3b82f6;
         }
 
         body {
@@ -164,7 +164,6 @@
             padding-bottom: 6px;
         }
 
-        /* Tabular-nums zarovná čísla přesně pod sebe jako v tabulce */
         .tile .data-row {
             display: flex;
             justify-content: space-between;
@@ -174,7 +173,7 @@
         }
         .tile .data-row strong {
             color: var(--text-main);
-            font-family: 'Consolas', 'Courier New', monospace; /* Technický font pro hodnoty */
+            font-family: 'Consolas', 'Courier New', monospace;
             font-size: 15px;
         }
 
@@ -222,12 +221,10 @@
 
     <script>
         // --- BAREVNÁ PALETA ---
-        const COLOR_RADAR = '#2563eb';  // Modrá
-        const COLOR_FUSED = '#dc2626';  // Červená
-        const COLOR_SENSOR = '#475569'; // Tmavě ocelová
-        const COLOR_GRID = '#cbd5e1';   // Šedá pro mřížku
-
-        // --- BARVY OS ---
+        const COLOR_RADAR = '#2563eb';
+        const COLOR_FUSED = '#dc2626';
+        const COLOR_SENSOR = '#475569';
+        const COLOR_GRID = '#cbd5e1';
         const COLOR_AXIS_X = '#ef4444';
         const COLOR_AXIS_Y = '#10b981';
         const COLOR_AXIS_Z = '#3b82f6';
@@ -240,6 +237,7 @@
 
         let currentMode = '2d';
         let latestObjects = [];
+        let lastUpdateTime = Date.now(); // STOPKY PRO WATCHDOG
 
         const btn2d = document.getElementById('btn2d');
         const btn3d = document.getElementById('btn3d');
@@ -281,7 +279,6 @@
         function drawMap2D() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Technická mřížka (ostrá, tenká)
             ctx.strokeStyle = COLOR_GRID;
             ctx.lineWidth = 1;
             for (let x = 1; x <= 3; x++) {
@@ -293,12 +290,10 @@
                 ctx.beginPath(); ctx.moveTo(originX, py); ctx.lineTo(originX + (3 * PIXELS_PER_METER), py); ctx.stroke();
             }
 
-            // Pevná hranice prostoru
             ctx.strokeStyle = '#94a3b8';
             ctx.lineWidth = 2;
             ctx.strokeRect(originX, originY - (3 * PIXELS_PER_METER), 3 * PIXELS_PER_METER, 3 * PIXELS_PER_METER);
 
-            // Barevné osy
             ctx.lineWidth = 3;
             ctx.strokeStyle = COLOR_AXIS_X;
             ctx.beginPath(); ctx.moveTo(originX, originY); ctx.lineTo(originX + (3 * PIXELS_PER_METER) + 20, originY); ctx.stroke();
@@ -306,7 +301,6 @@
             ctx.strokeStyle = COLOR_AXIS_Y;
             ctx.beginPath(); ctx.moveTo(originX, originY); ctx.lineTo(originX, originY - (3 * PIXELS_PER_METER) - 20); ctx.stroke();
 
-            // Texty os
             ctx.fillStyle = '#64748b';
             ctx.font = '12px "Segoe UI", Arial';
             ctx.textAlign = 'center';
@@ -326,7 +320,6 @@
             ctx.font = 'bold 12px "Segoe UI", Arial';
             ctx.fillText('Y', originX - 8, originY - (3 * PIXELS_PER_METER) - 15);
 
-            // Senzory na 2D (Ostré čtverce)
             SENSOR_NODES.forEach(sensor => {
                 const px = originX + (sensor.x * PIXELS_PER_METER);
                 const py = originY - (sensor.y * PIXELS_PER_METER);
@@ -353,7 +346,11 @@
                 const isFused = (obj.tag_id && obj.tag_id !== "unknown");
                 const color = isFused ? COLOR_FUSED : COLOR_RADAR;
 
-                // Zaměřovač (kruh s tečkou uvnitř pro větší technický vzhled)
+                // Načtení opacity z backendu pro efekt vyblednutí
+                const opacity = (obj.opacity !== undefined) ? obj.opacity : 1.0;
+                ctx.globalAlpha = opacity;
+
+                // Zaměřovač
                 ctx.beginPath();
                 ctx.arc(px, py, 8, 0, 2 * Math.PI, false);
                 ctx.fillStyle = color;
@@ -365,12 +362,13 @@
                 ctx.strokeStyle = color;
                 ctx.stroke();
 
-                // Text nad objektem
                 ctx.fillStyle = '#0f172a';
                 ctx.font = 'bold 12px "Segoe UI", Arial';
                 ctx.textAlign = 'center';
                 const tagIdText = isFused ? obj.tag_id : "TRG";
                 ctx.fillText(tagIdText, px, py - 22);
+
+                ctx.globalAlpha = 1.0; // Reset průhlednosti
             });
         }
 
@@ -378,7 +376,7 @@
         //        2. LOGIKA PRO 3D PROSTOR
         // ==========================================
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color('#ffffff'); // Čistě bílé pozadí
+        scene.background = new THREE.Color('#ffffff');
 
         const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
         camera.position.set(4, 4, 5);
@@ -395,7 +393,6 @@
         controls.dampingFactor = 0.05;
         controls.update();
 
-        // Ostrá průmyslová mřížka
         const gridHelper = new THREE.GridHelper(3, 3, 0x94a3b8, 0xe2e8f0);
         gridHelper.position.set(1.5, 0.01, -1.5);
         scene.add(gridHelper);
@@ -408,7 +405,6 @@
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // Vlastní barevné osy
         function create3DAxis(colorHex, length, posX, posY, posZ, rotX, rotY, rotZ) {
             const geo = new THREE.CylinderGeometry(0.01, 0.01, length, 8);
             const mat = new THREE.MeshBasicMaterial({ color: colorHex });
@@ -422,7 +418,6 @@
         scene.add(create3DAxis(COLOR_AXIS_Y, 3.5, 0, 0.01, -1.75, Math.PI / 2, 0, 0));
         scene.add(create3DAxis(COLOR_AXIS_Z, 2.0, 0, 1.0, 0, 0, 0, 0));
 
-        // Technické nasvícení (méně ambientního světla, silnější směrové pro ostré stíny)
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         scene.add(ambientLight);
 
@@ -433,7 +428,6 @@
         directionalLight.shadow.mapSize.height = 1024;
         scene.add(directionalLight);
 
-        // Vykreslení 3D senzorů (Ostré krychle)
         SENSOR_NODES.forEach(sensor => {
             const geom = new THREE.BoxGeometry(0.2, 0.2, 0.2);
             const mat = new THREE.MeshLambertMaterial({ color: COLOR_SENSOR });
@@ -442,7 +436,6 @@
             mesh.position.set(sensor.x, sensor.z, -sensor.y);
             scene.add(mesh);
 
-            // Silnější, techničtější stativ
             const poleGeom = new THREE.CylinderGeometry(0.03, 0.03, sensor.z);
             const poleMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
             const pole = new THREE.Mesh(poleGeom, poleMat);
@@ -463,23 +456,24 @@
 
                 const isFused = (obj.tag_id && obj.tag_id !== "unknown");
                 const colorHex = isFused ? COLOR_FUSED : COLOR_RADAR;
+                const opacity = (obj.opacity !== undefined) ? obj.opacity : 1.0;
 
                 if (!meshes3D[id]) {
                     const group = new THREE.Group();
 
+                    // Povolení průhlednosti u materiálů
                     const geometry = new THREE.SphereGeometry(0.1, 32, 32);
-                    const material = new THREE.MeshLambertMaterial({ color: colorHex });
+                    const material = new THREE.MeshLambertMaterial({ color: colorHex, transparent: true });
                     const mesh = new THREE.Mesh(geometry, material);
                     mesh.castShadow = true;
                     mesh.name = "sphere";
                     group.add(mesh);
 
-                    // Plná, neprůhledná vodící čára k zemi (jako zaměřovací laser)
                     const lineGeo = new THREE.BufferGeometry().setFromPoints([
                         new THREE.Vector3(0, 0, 0),
                         new THREE.Vector3(0, -1, 0)
                     ]);
-                    const lineMat = new THREE.LineBasicMaterial({ color: colorHex, linewidth: 2 });
+                    const lineMat = new THREE.LineBasicMaterial({ color: colorHex, linewidth: 2, transparent: true });
                     const line = new THREE.Line(lineGeo, lineMat);
                     line.name = "line";
                     group.add(line);
@@ -494,11 +488,15 @@
                 group.position.set(obj.x, heightZ, -obj.y);
 
                 const sphere = group.getObjectByName("sphere");
-                if (sphere) sphere.material.color.set(colorHex);
+                if (sphere) {
+                    sphere.material.color.set(colorHex);
+                    sphere.material.opacity = opacity;
+                }
 
                 const line = group.getObjectByName("line");
                 if (line) {
                     line.material.color.set(colorHex);
+                    line.material.opacity = opacity;
                     line.scale.y = heightZ;
                 }
             });
@@ -532,6 +530,9 @@
 
             objects.forEach((obj, index) => {
                 const isFused = (obj.tag_id && obj.tag_id !== "unknown");
+                const opacity = (obj.opacity !== undefined) ? obj.opacity : 1.0;
+                const isFading = opacity < 0.95; // Detekce výpadku dat
+
                 const tileClass = isFused ? 'tile fused' : 'tile';
                 const title = isFused ? `ID TAGU: ${obj.tag_id}` : `TRG: NEZNÁMÝ CÍL #${index + 1}`;
 
@@ -540,11 +541,12 @@
                 const zVal = (obj.z !== undefined && obj.z !== null) ? obj.z.toFixed(2) : "0.00";
                 const confVal = obj.confidence ? (obj.confidence * 100).toFixed(0) + '%' : 'N/A';
 
-                const colorText = isFused ? COLOR_FUSED : COLOR_RADAR;
-                const typeText = isFused ? 'FÚZE: AKTIVNÍ (RADAR+BLE)' : 'ZDROJ: POUZE RADAR';
+                // Barva a text podle toho, zda se jedná o výpadek (predikci)
+                const typeText = isFading ? 'VÝPADEK: PREDIKCE TRASY' : (isFused ? 'FÚZE: AKTIVNÍ (RADAR+BLE)' : 'ZDROJ: POUZE RADAR');
+                const colorText = isFading ? '#eab308' : (isFused ? COLOR_FUSED : COLOR_RADAR);
 
                 const tileHTML = `
-                    <div class="${tileClass}">
+                    <div class="${tileClass}" style="opacity: ${Math.max(0.4, opacity)}; transition: opacity 0.2s;">
                         <h3>${title}</h3>
                         <div class="data-row"><span>POS X:</span> <strong>${xVal} m</strong></div>
                         <div class="data-row"><span>POS Y:</span> <strong>${yVal} m</strong></div>
@@ -571,13 +573,14 @@
             };
 
             ws.onmessage = function(event) {
+                lastUpdateTime = Date.now(); // RESET WATCHDOG STOPEK
+
                 const data = JSON.parse(event.data);
                 if (data.type === "update") {
                     latestObjects = data.objects;
 
                     if (currentMode === '2d') drawObjects2D(latestObjects);
                     if (currentMode === '3d') updateObjects3D(latestObjects);
-
                     renderTiles(latestObjects);
                 }
             };
@@ -587,10 +590,19 @@
                 statusSpan.className = "status disconnected";
                 if (currentMode === '2d') drawMap2D();
                 tilesContainer.innerHTML = '<div class="empty-message">Spojení se serverem ztraceno. Obnovuji...</div>';
-
                 setTimeout(connect, 2000);
             };
         }
+
+        // --- WATCHDOG PROTI ZAMRZÁNÍ ---
+        setInterval(() => {
+            if (Date.now() - lastUpdateTime > 1000 && latestObjects.length > 0) {
+                latestObjects = [];
+                if (currentMode === '2d') drawObjects2D(latestObjects);
+                if (currentMode === '3d') updateObjects3D(latestObjects);
+                renderTiles(latestObjects);
+            }
+        }, 500);
 
         drawMap2D();
         connect();
