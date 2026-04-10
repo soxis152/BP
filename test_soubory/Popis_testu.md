@@ -105,20 +105,23 @@ Objekt se pohybuje lineárně, přičemž dochází k:
 
 ---
 
-## 7. Noise Injection (Šum v datech)
+## 7. Noise Injection Levels (Tři paralelní průchody)
 
-**Popis:**  
-Objekt se pohybuje po stejné trajektorii, ale postupně se zvyšuje úroveň šumu v radarových i BLE datech.
+**Popis:**
+Tři objekty se pohybují současně po stejné trajektorii tam a zpět. Každý má jinou úroveň šumu (low, mid, high) a pevnou pozici na ose Y, takže vzniknou tři paralelní průchody.
 
 **Co to testuje:**
-- Odolnost vůči šumu
-- Stabilitu clusteringu
-- Vyhlazování trajektorie
+- Odolnost vůči různým úrovním šumu
+- Stabilitu Kalmanova filtru
+- Robustnost clusteringu při paralelních trajektoriích
+- Konzistenci ID
 
 **Očekávaný výsledek:**
-- Stabilní trajektorie i při vyšším šumu
+- Tři oddělené trajektorie bez slévání
+- Stabilní průběh i při vyšším šumu
 - Žádný rozpad tracku
-- Bez náhodných skoků
+- Bez přepínání ID mezi objekty
+- Minimální náhodné skoky
 
 ---
 
