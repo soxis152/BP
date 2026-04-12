@@ -68,19 +68,23 @@ def average_angles(angles_deg):
 
 
 def find_matching_tag(center_x, center_y, ble_data_1, ble_data_2, active_tracks_keys):
-    # 1. Agregace dat (posbíráme všechny přijaté úhly za poslední 1 sekundu)
+    # Pomocná funkce pro průměrování úhlů
+    def avg_angles(angles):
+        if not angles: return None
+        sin_sum = sum(math.sin(math.radians(a)) for a in angles)
+        cos_sum = sum(math.cos(math.radians(a)) for a in angles)
+        return (math.degrees(math.atan2(sin_sum, cos_sum)) + 360) % 360
+
     tag_azimuths = {}
 
     for row in ble_data_1:
         tag = row[2]
-        if tag not in tag_azimuths:
-            tag_azimuths[tag] = {'az1': [], 'az2': []}
+        if tag not in tag_azimuths: tag_azimuths[tag] = {'az1': [], 'az2': []}
         tag_azimuths[tag]['az1'].append(row[4])
 
     for row in ble_data_2:
         tag = row[2]
-        if tag not in tag_azimuths:
-            tag_azimuths[tag] = {'az1': [], 'az2': []}
+        if tag not in tag_azimuths: tag_azimuths[tag] = {'az1': [], 'az2': []}
         tag_azimuths[tag]['az2'].append(row[4])
 
     exp_1 = calculate_expected_angle(center_x, center_y, "ble_1")
@@ -88,23 +92,30 @@ def find_matching_tag(center_x, center_y, ble_data_1, ble_data_2, active_tracks_
 
     candidates = []
 
-    # 2. Zprůměrování úhlů a výpočet odchylek
     for tag, az_data in tag_azimuths.items():
         if tag in active_tracks_keys:
-            continue  # Objekt už je spolehlivě sledován jinde
+            continue
+
+        avg_az1 = avg_angles(az_data['az1'])
+        avg_az2 = avg_angles(az_data['az2'])
+
+        # --- NOVÉ: Triangulace a kontrola fyzické vzdálenosti ---
+        if avg_az1 is not None and avg_az2 is not None:
+            tag_pos = triangulate_ble(avg_az1, avg_az2)
+            if tag_pos:
+                dist = math.hypot(center_x - tag_pos[0], center_y - tag_pos[1])
+                # Pokud je tag fyzicky dál než 0.3 metru od osoby, JEDNOZNAČNĚ TO ZAMÍTNOUT!
+                if dist > 1.0:
+                    continue
 
         diff1 = 0
         diff2 = 0
         count = 0
 
-        # Zprůměrovaný úhel z BLE kotvy 1
-        avg_az1 = average_angles(az_data['az1'])
         if avg_az1 is not None:
             diff1 = abs((avg_az1 - exp_1 + 180) % 360 - 180)
             count += 1
 
-        # Zprůměrovaný úhel z BLE kotvy 2
-        avg_az2 = average_angles(az_data['az2'])
         if avg_az2 is not None:
             diff2 = abs((avg_az2 - exp_2 + 180) % 360 - 180)
             count += 1
@@ -112,17 +123,16 @@ def find_matching_tag(center_x, center_y, ble_data_1, ble_data_2, active_tracks_
         if count == 0:
             continue
 
-        # Celková průměrná odchylka ze všech dostupných senzorů
         avg_diff = (diff1 + diff2) / count
 
-        # Pokud je průměrná odchylka do 35 stupňů, je to kandidát
-        if avg_diff < 35.0:
+        # Pokud prošel vzdáleností, stačí mu volnější úhel 80 stupňů (kvůli šumu z rychlého pohybu)
+        if avg_diff < 80.0:
             candidates.append({"tag": tag, "diff": avg_diff})
 
     if not candidates:
         return "unknown", 0.5, None
 
-    # 3. Vybereme tag, jehož TĚŽIŠTĚ ukazuje nejpřesněji na tuto tečku
+    # Vybereme tag, jehož těžiště ukazuje nejpřesněji
     candidates.sort(key=lambda x: x["diff"])
     return candidates[0]["tag"], 0.9, candidates
 
@@ -251,11 +261,51 @@ async def perform_fusion_loop():
                                 track.update(rx, ry)
                                 track.current_z = float(rz)
 
-                            # Pokus o upgrade identity z 'unknown' na reálný BLE tag
-                            if str(tid).startswith("unknown"):
-                                new_tag_id, conf, _ = find_matching_tag(rx, ry, b1, b2, active_tracks.keys())
-                                if new_tag_id != "unknown" and new_tag_id not in renames.values():
-                                    renames[tid] = new_tag_id
+                                # Pokus o upgrade identity z 'unknown' na reálný BLE tag
+                                if str(tid).startswith("unknown"):
+                                    new_tag_id, conf, _ = find_matching_tag(rx, ry, b1, b2, active_tracks.keys())
+                                    if new_tag_id != "unknown" and new_tag_id not in renames.values():
+                                        renames[tid] = new_tag_id
+
+                                    # --- OPRAVENÉ: Detekce zahozeného tagu pomocí VZDÁLENOSTI ---
+                                else:
+                                        my_b1_angles = [r[4] for r in b1 if r[2] == tid]
+                                        my_b2_angles = [r[4] for r in b2 if r[2] == tid]
+
+                                        def avg_angles(angles):
+                                            if not angles: return None
+                                            sin_sum = sum(math.sin(math.radians(a)) for a in angles)
+                                            cos_sum = sum(math.cos(math.radians(a)) for a in angles)
+                                            return (math.degrees(math.atan2(sin_sum, cos_sum)) + 360) % 360
+
+                                        avg_1 = avg_angles(my_b1_angles)
+                                        avg_2 = avg_angles(my_b2_angles)
+
+                                        dropped = False
+
+                                        # Hlavní metoda: Triangulace (výpočet fyzické vzdálenosti v metrech)
+                                        if avg_1 is not None and avg_2 is not None:
+                                            tag_pos = triangulate_ble(avg_1, avg_2)
+                                            if tag_pos:
+                                                tx, ty = tag_pos
+                                                # Vzdálenost mezi radarovou tečkou a fyzickým místem tagu
+                                                dist = math.hypot(rx - tx, ry - ty)
+                                                # Zahozeno, pokud je tag fyzicky dál než 1.0 metru od osoby
+                                                if dist > 1.0:
+                                                    dropped = True
+                                        else:
+                                            # Záložní metoda: Pokud tag vidí jen jeden senzor (slepý úhel), kontrolujeme úhel
+                                            exp_1 = calculate_expected_angle(rx, ry, "ble_1")
+                                            exp_2 = calculate_expected_angle(rx, ry, "ble_2")
+                                            diff_1 = abs((avg_1 - exp_1 + 180) % 360 - 180) if avg_1 is not None else 0
+                                            diff_2 = abs((avg_2 - exp_2 + 180) % 360 - 180) if avg_2 is not None else 0
+
+                                            if (avg_1 is not None and diff_1 > 45.0) or (
+                                                    avg_2 is not None and diff_2 > 45.0):
+                                                dropped = True
+
+                                        if dropped:
+                                            renames[tid] = f"unknown_{int(time.time() * 1000)}_drop"
 
                     # Aplikace přejmenování (upgrade jména za běhu)
                     for old_tid, new_tid in renames.items():
