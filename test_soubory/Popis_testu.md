@@ -177,3 +177,59 @@ Objekt se pohybuje po spirále — kombinace kruhového pohybu v X-Y a lineárn�
 - Plynulá spirálová trajektorie
 - Stabilní tracking bez jitteru
 - Konzistentní ID
+
+## 11. Detached Tag (Odložený BLE tag)
+
+**Popis:**
+Osoba s BLE tagem přijde k místu (např. věšáku), kde tag odloží. Tag zůstane na místě, zatímco osoba odchází dál bez BLE signálu. Radar stále detekuje pohyb osoby, ale BLE signál zůstává na původní pozici.
+
+**Co to testuje:**
+
+- Chování systému při oddělení radarové a BLE detekce
+- Robustnost fúze senzorů (radar + BLE)
+- Schopnost systému správně reagovat na statický BLE tag
+- Stabilitu tracku při ztrátě BLE signálu
+
+**Očekávaný výsledek:**
+
+- BLE tag zůstane stabilně lokalizovaný na místě
+- Radarový track osoby pokračuje bez BLE
+- Nedojde ke kolapsu tracku nebo jeho náhodnému přeskakování
+- Systém nespojí odcházející osobu s visícím tagem
+
+## 12. Shift Change Crowd (Shluk lidí při střídání směn)
+
+**Popis:**
+Pět osob vstoupí do prostoru z různých směrů a shromáždí se v malé oblasti přibližně 1×1 metr uprostřed místnosti. Krátce stojí velmi blízko sebe a poté se rozcházejí do různých směrů.
+
+**Co to testuje:**
+
+- Schopnost clusteringu rozlišit více objektů ve velmi malé vzdálenosti
+- Stabilitu trackingu při vysoké hustotě objektů
+- Riziko přepínání ID při těsném kontaktu osob
+- Chování systému při rozdělení shluku na více trajektorií
+
+**Očekávaný výsledek:**
+
+- Systém udrží pět samostatných objektů
+- Nedochází k prohození ID během shluknutí
+- Po rozchodu objekty pokračují se svými původními ID
+- Trajektorie zůstávají stabilní bez náhodných skoků
+
+## 13. Forklift Brake (Rychlý průjezd a ostré zastavení)
+
+**Popis:**  
+Objekt simuluje vysokozdvižný vozík, který nejprve krátce akceleruje při vjezdu do hlavní dráhy, poté rychle projede středem prostoru a následně prudce zastaví na pevném bodě. Po delším setrvání na místě se pomalu vrací zpět na výchozí pozici, aby mohl začít další cyklus. Pohyb probíhá v konstantní výšce a po celou dobu jsou radar i BLE aktivní. :contentReference[oaicite:0]{index=0}
+
+**Co to testuje:**
+- Reakci trackingu na rychlý přímočarý pohyb
+- Chování Kalmanova filtru při náhlém zabrzdění
+- Overshoot trajektorie po prudkém zastavení
+- Stabilitu objektu při delším stání na místě
+- Plynulý přechod mezi rychlým pohybem, zastavením a pomalým návratem
+
+**Očekávaný výsledek:**
+- Objekt se při rychlém průjezdu pohybuje plynule bez ztráty tracku
+- Po zastavení nedochází k výraznému přestřelení odhadované pozice
+- Během stání zůstává trajektorie stabilní bez driftu
+- Po návratu zpět nevzniká nové ID ani ghost track
