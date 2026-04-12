@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class KalmanObject:
     def __init__(self, x, y, dt=0.15):
         # Stavový vektor [x, y, vx, vy] - pozice a rychlost
@@ -19,10 +20,18 @@ class KalmanObject:
             [1, 0, 0, 0],
             [0, 1, 0, 0]
         ])
+
+        # --- ZMĚNĚNÉ NASTAVENÍ PRO STRESS TEST ---
         # Šum procesu (jak moc se může měnit rychlost sama od sebe)
-        self.Q = np.eye(4) * 0.01
+        # Zvýšeno na 0.02 - filtr nyní bleskově reaguje na změny rychlosti a směru
+        self.Q = np.eye(4) * 0.05
+
         # Šum měření (jak moc věříme radaru - menší číslo = větší důvěra)
+        # Zvýšeno na 0.04 - kompromis pro vyhlazení drobných chyb radaru
         self.R = np.eye(2) * 0.05
+
+        # Sledování "věku" stopy (jak dlouho nedostala reálná data)
+        self.age = 0.0
 
     def predict(self):
         """Předpoví polohu objektu v příštím kroku."""
@@ -38,3 +47,5 @@ class KalmanObject:
         K = self.P @ self.H.T @ np.linalg.inv(S)
         self.state = self.state + K @ y
         self.P = (np.eye(4) - K @ self.H) @ self.P
+
+        self.age = 0.0  # Reset věku, stopa byla právě viděna

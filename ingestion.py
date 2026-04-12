@@ -1,9 +1,13 @@
+import paho.mqtt.client as mqtt
+import json
 import threading
 import time
 import math
+from pathlib import Path
 import serial
 import re
 import asyncio  # Přidán import asyncio
+
 from queue import Queue
 
 # Změněn import - používáme pouze asynchronní db_handler
@@ -39,21 +43,22 @@ BLE_CONFIGS = [
     }
 ]
 
-RADAR_CONFIG_FILE = r"C:\Users\kabup\OneDrive\Plocha\BP_\KÓD\Four\radar\tdm\AWR294X_profile_2025_11_07T16_27_59_226 copy1.cfg"
+BASE_DIR = Path(__file__).resolve().parent
+RADAR_CONFIG_FILE = BASE_DIR / "radar" / "tdm" / "AWR294X_profile_2025_11_07T16_27_59_226 copy1.cfg"
 
 RADAR_CONFIGS = [
     {
         "id": "radar_1",
         "cfg_port": "COM11",
         "dat_port": "COM12",
-        "pos_x": 2.5, "pos_y": 0.0, "pos_z": 0.7,
+        "pos_x": 1.5, "pos_y": 0.0, "pos_z": 0.7,
         "rotation": 90
     },
     {
         "id": "radar_2",
         "cfg_port": "COM13",
         "dat_port": "COM14",
-        "pos_x": 0.0, "pos_y": 3.0, "pos_z": 0.7,
+        "pos_x": 0.0, "pos_y": 1.5, "pos_z": 0.7,
         "rotation": 0
     }
 ]
@@ -121,10 +126,16 @@ def db_worker():
 
 def radar_worker(cfg):
     send_radar_config(cfg)
+
+    # Připojení k MQTT brokeru
+    mqtt_client = mqtt.Client(client_id=f"ingest_{cfg['id']}")
+    mqtt_client.connect("127.0.0.1", 1883)
+    mqtt_client.loop_start()  # Stará se o automatický reconnect na pozadí
+
     while True:
         try:
             radar = RadarInterface(port=cfg["dat_port"], baudrate=921600)
-            print(f"Radar {cfg['id']}: Připojen na {cfg['dat_port']}.")
+            print(f"Radar {cfg['id']}: Připojen.")
 
             while True:
                 raw_data = radar.read_data()
@@ -135,6 +146,12 @@ def radar_worker(cfg):
                             x_l, y_l, z_l = parsed[7][i], parsed[8][i], parsed[9][i]
                             snr = parsed[14][i]
                             x_g, y_g, z_g = transform_to_global(x_l, y_l, z_l, cfg)
+
+                            # 1. Zápis do MQTT (pro real-time fúzi)
+                            payload = {"timestamp": time.time(), "x": x_g, "y": y_g, "z": z_g, "snr": snr}
+                            mqtt_client.publish(f"sensors/raw/{cfg['id']}", json.dumps(payload))
+
+                            # 2. Zápis do DB fronty (pro historii)
                             db_queue.put((cfg["id"], (time.time(), x_g, y_g, z_g, snr)))
         except Exception as e:
             print(f"Radar {cfg['id']} Error: {e}. Restart za 5s...")
@@ -142,15 +159,25 @@ def radar_worker(cfg):
 
 
 def ble_worker(cfg):
+    mqtt_client = mqtt.Client(client_id=f"ingest_{cfg['id']}")
+    mqtt_client.connect("127.0.0.1", 1883)
+    mqtt_client.loop_start()
+
     while True:
         try:
             with serial.Serial(cfg["port"], cfg["baud"], timeout=1) as ser:
-                print(f"BLE {cfg['id']}: Připojen na {cfg['port']}.")
+                print(f"BLE {cfg['id']}: Připojen.")
                 while True:
                     line = ser.readline().decode('utf-8', errors='ignore').strip()
                     match = AZIMUTH_PATTERN.match(line)
                     if match:
                         tag_id, rssi, azimuth = match.group(1), int(match.group(2)), int(match.group(3))
+
+                        # 1. Zápis do MQTT
+                        payload = {"timestamp": time.time(), "tag_id": tag_id, "rssi": rssi, "azimuth": azimuth}
+                        mqtt_client.publish(f"sensors/raw/{cfg['id']}", json.dumps(payload))
+
+                        # 2. Zápis do DB fronty
                         db_queue.put((cfg["id"], (time.time(), tag_id, rssi, azimuth)))
         except Exception as e:
             print(f"BLE {cfg['id']} Error: {e}. Restart za 5s...")
