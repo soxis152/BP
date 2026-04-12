@@ -33,7 +33,7 @@ MEETING_POINTS = [
 
 
 def update_shift_change_crowd(step_index, objects, dt):
-    phase = step_index % 120
+    phase = step_index % 210
 
     for index, obj in enumerate(objects):
         obj.z = 0.92
@@ -44,25 +44,37 @@ def update_shift_change_crowd(step_index, objects, dt):
         meet_x, meet_y = MEETING_POINTS[index]
         exit_x, exit_y = EXIT_POINTS[index]
 
-        # 0-29: pet lidi se sbihha do prostoru 1x1 m kolem stredu.
-        if phase < 30:
-            progress = phase / 30.0
+        # 0-19: vsichni stoji na vychozich pozicich.
+        if phase < 20:
+            obj.x = entry_x
+            obj.y = entry_y
+        # 20-49: pet lidi se sbihha do prostoru 1x1 m kolem stredu.
+        elif phase < 50:
+            progress = (phase - 20) / 30.0
             obj.x = _lerp(entry_x, meet_x, progress)
             obj.y = _lerp(entry_y, meet_y, progress)
-        # 30-59: vsichni stoji natlaceni u sebe.
-        elif phase < 60:
+        # 50-79: vsichni stoji natlaceni u sebe ve stredu.
+        elif phase < 80:
             obj.x = meet_x
             obj.y = meet_y
-        # 60-99: rozchod do peti ruznych smeru.
-        elif phase < 100:
-            progress = (phase - 60) / 40.0
+        # 80-119: rozchod do peti ruznych smeru.
+        elif phase < 120:
+            progress = (phase - 80) / 40.0
             obj.x = _lerp(meet_x, exit_x, progress)
             obj.y = _lerp(meet_y, exit_y, progress)
-        # 100-119: kratky navrat do vychozich smeru, aby cyklus navazoval.
-        else:
-            progress = (phase - 100) / 20.0
+        # 120-149: vsichni stoji v cilovych bodech po rozchodu.
+        elif phase < 150:
+            obj.x = exit_x
+            obj.y = exit_y
+        # 150-179: navrat do vychozich pozic.
+        elif phase < 180:
+            progress = (phase - 150) / 30.0
             obj.x = _lerp(exit_x, entry_x, progress)
             obj.y = _lerp(exit_y, entry_y, progress)
+        # 180-209: delsi pauza na vychozich pozicich pred dalsim cyklem.
+        else:
+            obj.x = entry_x
+            obj.y = entry_y
 
 
 async def main():

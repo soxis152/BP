@@ -23,12 +23,12 @@ class KalmanObject:
 
         # --- ZMĚNĚNÉ NASTAVENÍ PRO STRESS TEST ---
         # Šum procesu (jak moc se může měnit rychlost sama od sebe)
-        # Zvýšeno na 0.05 - filtr nyní bleskově reaguje na změny rychlosti a směru
-        self.Q = np.eye(4) * 0.001
+        # Zvýšeno na 0.02 - filtr nyní bleskově reaguje na změny rychlosti a směru
+        self.Q = np.eye(4) * 0.05
 
         # Šum měření (jak moc věříme radaru - menší číslo = větší důvěra)
-        # Zvýšeno na 0.05 - kompromis pro vyhlazení drobných chyb radaru
-        self.R = np.eye(2) * 0.02
+        # Zvýšeno na 0.04 - kompromis pro vyhlazení drobných chyb radaru
+        self.R = np.eye(2) * 0.05
 
         # Sledování "věku" stopy (jak dlouho nedostala reálná data)
         self.age = 0.0

@@ -202,38 +202,47 @@ async def perform_fusion_loop():
                         track.predict()
                         track.age += 0.15  # Správné dt pro stárnutí stop
 
-                    # Detekce křížení (vzdálenost < 0.4 m)
-                    for i in range(len(track_ids)):
-                        for j in range(i + 1, len(track_ids)):
-                            t1 = active_tracks[track_ids[i]]
-                            t2 = active_tracks[track_ids[j]]
-                            dist = math.hypot(t1.state[0] - t2.state[0], t1.state[1] - t2.state[1])
-
-                            if dist < 0.4:
-                                coasting_tracks.add(track_ids[i])
-                                coasting_tracks.add(track_ids[j])
-
-                    # --- OPRAVA VYBLEDNUTÍ: Křížení není výpadek ---
-                    # Zastavíme stárnutí u objektů, které se právě kříží
-                    for tid in coasting_tracks:
-                        active_tracks[tid].age = 0.0
-
                     # KROK 2: Analýza radarových dat (Vytvoření seznamu shluků)
                     clusters = []
                     if len(all_radar_points) >= 3:
-                        coords_xy = np.array([[p[0], p[1]] for p in all_radar_points])
-                        coords_z = np.array([p[2] for p in all_radar_points])
+                        radar_points = np.array(all_radar_points, dtype=float)
+                        clustering = DBSCAN(eps=0.5, min_samples=2).fit(radar_points)
+                        labels = clustering.labels_
+                        unique_labels = set(labels)
+                        for k in unique_labels:
+                            if k != -1:
+                                class_member_mask = (labels == k)
+                                xyz = radar_points[class_member_mask]
+                                cx, cy, cz = np.mean(xyz, axis=0)
+                                clusters.append((cx, cy, cz))
 
-                        db = DBSCAN(eps=0.4, min_samples=3).fit(coords_xy)
+                    matched_clusters = set()
+                    matched_tids = set()
 
-                        for cluster_id in set(db.labels_):
-                            if cluster_id == -1:
+                    for tid, track in active_tracks.items():
+                        best_idx = -1
+                        min_dist = 0.8
+
+                        for i, (rx, ry, rz) in enumerate(clusters):
+                            if i in matched_clusters:
                                 continue
+                            dist = math.hypot(track.state[0] - rx, track.state[1] - ry)
+                            if dist < min_dist:
+                                min_dist = dist
+                                best_idx = i
 
-                            mask = db.labels_ == cluster_id
-                            raw_x, raw_y = np.mean(coords_xy[mask], axis=0)
-                            raw_z = np.mean(coords_z[mask])
-                            clusters.append((raw_x, raw_y, raw_z))
+                        if best_idx != -1:
+                            matched_clusters.add(best_idx)
+                            matched_tids.add(tid)
+                            track.update(clusters[best_idx][0], clusters[best_idx][1])
+                            track.current_z = clusters[best_idx][2]
+                            track.age = 0.0
+                        else:
+                            # --- NOVÉ: TŘENÍ ---
+                            # Pokud stopa zrovna nemá svůj radar (např. v chumlu 5 lidí),
+                            # rychle zabrzdí, aby neuletěla jako duch ze scény.
+                            track.state[2] *= 0.5  # Zpomalení osy X
+                            track.state[3] *= 0.5  # Zpomalení osy Y
 
                     # KROK 3: Přiřazení shluků k existujícím stopám (Podle VZDÁLENOSTI)
                     matched_clusters = set()
@@ -327,18 +336,13 @@ async def perform_fusion_loop():
                             active_tracks[tag_id].update(rx, ry)
                             active_tracks[tag_id].current_z = float(rz)
 
-                    # KROK 5: Příprava dat pro Web a DB (Nezávisle na tom, zda radar viděl nebo ne)
+                    # KROK 5: Příprava dat pro Web a DB
                     for tid, track in active_tracks.items():
                         smooth_x = float(track.state[0])
                         smooth_y = float(track.state[1])
                         smooth_z = getattr(track, "current_z", 0.92)
 
-                        # Pokud objekt letí naslepo (coasting při křížení), snížíme mu confidence
-                        conf = 0.5 if tid in coasting_tracks else 0.9
-
-                        # --- NOVÉ: Výpočet vyblednutí (Opacity) ---
-                        # track.age roste s každým krokem bez dat.
-                        # Během 4 vteřin klesne opacity z 1.0 (plně viditelný) na 0.0 (zcela průhledný).
+                        conf = 0.9 if track.age == 0.0 else 0.5
                         opacity = max(0.0, 1.0 - (track.age / 4.0))
 
                         final_fused_batch.append((time.time(), tid, smooth_x, smooth_y, smooth_z, conf))
@@ -348,7 +352,7 @@ async def perform_fusion_loop():
                             "y": smooth_y,
                             "z": smooth_z,
                             "confidence": conf,
-                            "opacity": opacity  # Posíláme průhlednost na frontend
+                            "opacity": opacity
                         })
 
                     # KROK 6: Smazání "mrtvých" stop
