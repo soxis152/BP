@@ -6,39 +6,32 @@ import math
 from pathlib import Path
 import serial
 import re
-import asyncio  # Přidán import asyncio
+import asyncio
 
 from queue import Queue
 
-# Změněn import - používáme pouze asynchronní db_handler
-from db_handler import db_handler
+from db_handler_1 import db_handler
 from radar.radar_interface import RadarInterface
 
-# Globální fronta pro předávání dat mezi senzory a databázovým workerem
 db_queue = Queue()
 
-# Regulární výraz pro parsování UUDF zpráv z u-blox BLE kotev
 AZIMUTH_PATTERN = re.compile(
     r'\+UUDF:([0-9A-Fa-f]{12}),(-?\d+),(-?\d+),(-?\d+),(\d+),(\d+),"([0-9A-Fa-f]{12})","",(\d+),(\d+)'
 )
 
 # ==========================================
-#  --- KONFIGURACE SYSTÉMU ---
+#  --- KONFIGURACE SYSTÉMU (ZAŘÍZENÍ 2) ---
 # ==========================================
+# ZDE DOPLŇTE SKUTEČNOU IP ADRESU ZAŘÍZENÍ 1 V SÍTI (např. "192.168.1.50")
+MQTT_BROKER_IP = "192.168.X.X"
 
+# Původní parametry pro ble_2 zachovány
 BLE_CONFIGS = [
     {
-        "id": "ble_1",
-        "port": "COM38",
-        "baud": 115200,
-        "pos_x": 2.5, "pos_y": 0.0, "pos_z": 0.7,
-        "rotation": 90
-    },
-    {
         "id": "ble_2",
-        "port": "COM34",
+        "port": "/dev/ttyUSB0",  # ZDE DOPLŇTE SPRÁVNÝ PORT PRO UBUNTU
         "baud": 115200,
-        "pos_x": 0.0, "pos_y": 3.0, "pos_z": 0.7,
+        "pos_x": 0.0, "pos_y": 1.5, "pos_z": 0.7,
         "rotation": 0
     }
 ]
@@ -46,18 +39,12 @@ BLE_CONFIGS = [
 BASE_DIR = Path(__file__).resolve().parent
 RADAR_CONFIG_FILE = BASE_DIR / "radar" / "tdm" / "AWR294X_profile_2025_11_07T16_27_59_226 copy1.cfg"
 
+# Původní parametry pro radar_2 zachovány
 RADAR_CONFIGS = [
     {
-        "id": "radar_1",
-        "cfg_port": "COM11",
-        "dat_port": "COM12",
-        "pos_x": 1.5, "pos_y": 0.0, "pos_z": 0.7,
-        "rotation": 90
-    },
-    {
         "id": "radar_2",
-        "cfg_port": "COM13",
-        "dat_port": "COM14",
+        "cfg_port": "/dev/ttyUSB1",  # ZDE DOPLŇTE SPRÁVNÝ PORT PRO UBUNTU
+        "dat_port": "/dev/ttyUSB2",  # ZDE DOPLŇTE SPRÁVNÝ PORT PRO UBUNTU
         "pos_x": 0.0, "pos_y": 1.5, "pos_z": 0.7,
         "rotation": 0
     }
@@ -98,14 +85,11 @@ def db_worker():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    # 1. Vytvoříme spojení do DB (Connection Pool)
     loop.run_until_complete(db_handler.connect())
-
-    # 2. NOVÉ: Asynchronní vytvoření tabulek (nahrazuje starý init_db)
     loop.run_until_complete(db_handler.init_tables())
 
     buffers = {"ble_1": [], "ble_2": [], "radar_1": [], "radar_2": []}
-    print("DB Worker: Připraven k asynchronnímu zápisu.")
+    print(f"DB Worker (Zařízení 2): Připraven k asynchronnímu zápisu na IP {MQTT_BROKER_IP}.")
 
     while True:
         table_name, data = db_queue.get()
@@ -113,7 +97,6 @@ def db_worker():
         if table_name in buffers:
             buffers[table_name].append(data)
 
-            # Zápis při 50 kusech nebo když je prázdná fronta
             if len(buffers[table_name]) >= 50 or db_queue.empty():
                 try:
                     loop.run_until_complete(db_handler.insert_batch(table_name, buffers[table_name]))
@@ -127,10 +110,9 @@ def db_worker():
 def radar_worker(cfg):
     send_radar_config(cfg)
 
-    # Připojení k MQTT brokeru
     mqtt_client = mqtt.Client(client_id=f"ingest_{cfg['id']}")
-    mqtt_client.connect("127.0.0.1", 1883)
-    mqtt_client.loop_start()  # Stará se o automatický reconnect na pozadí
+    mqtt_client.connect(MQTT_BROKER_IP, 1883)
+    mqtt_client.loop_start()
 
     while True:
         try:
@@ -147,11 +129,9 @@ def radar_worker(cfg):
                             snr = parsed[14][i]
                             x_g, y_g, z_g = transform_to_global(x_l, y_l, z_l, cfg)
 
-                            # 1. Zápis do MQTT (pro real-time fúzi)
                             payload = {"timestamp": time.time(), "x": x_g, "y": y_g, "z": z_g, "snr": snr}
                             mqtt_client.publish(f"sensors/raw/{cfg['id']}", json.dumps(payload))
 
-                            # 2. Zápis do DB fronty (pro historii)
                             db_queue.put((cfg["id"], (time.time(), x_g, y_g, z_g, snr)))
         except Exception as e:
             print(f"Radar {cfg['id']} Error: {e}. Restart za 5s...")
@@ -160,7 +140,7 @@ def radar_worker(cfg):
 
 def ble_worker(cfg):
     mqtt_client = mqtt.Client(client_id=f"ingest_{cfg['id']}")
-    mqtt_client.connect("127.0.0.1", 1883)
+    mqtt_client.connect(MQTT_BROKER_IP, 1883)
     mqtt_client.loop_start()
 
     while True:
@@ -173,11 +153,9 @@ def ble_worker(cfg):
                     if match:
                         tag_id, rssi, azimuth = match.group(1), int(match.group(2)), int(match.group(3))
 
-                        # 1. Zápis do MQTT
                         payload = {"timestamp": time.time(), "tag_id": tag_id, "rssi": rssi, "azimuth": azimuth}
                         mqtt_client.publish(f"sensors/raw/{cfg['id']}", json.dumps(payload))
 
-                        # 2. Zápis do DB fronty
                         db_queue.put((cfg["id"], (time.time(), tag_id, rssi, azimuth)))
         except Exception as e:
             print(f"BLE {cfg['id']} Error: {e}. Restart za 5s...")
@@ -189,19 +167,15 @@ def ble_worker(cfg):
 # ==========================================
 
 if __name__ == "__main__":
-
-    # Spuštění workeru pro zápis dat na pozadí
     threading.Thread(target=db_worker, daemon=True).start()
 
-    # Spuštění obsluhy pro všechny radary
     for cfg in RADAR_CONFIGS:
         threading.Thread(target=radar_worker, args=(cfg,), daemon=True).start()
 
-    # Spuštění obsluhy pro všechny BLE kotvy
     for cfg in BLE_CONFIGS:
         threading.Thread(target=ble_worker, args=(cfg,), daemon=True).start()
 
-    print("Sběr dat spuštěn. Ukončete pomocí Ctrl+C.")
+    print("Zařízení 2: Sběr dat spuštěn. Odesílám na centrálu. Ukončete pomocí Ctrl+C.")
     try:
         while True:
             time.sleep(1)
