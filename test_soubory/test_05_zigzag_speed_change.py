@@ -1,6 +1,9 @@
 import asyncio
 from Four.test_soubory.scenario_common import ObjectState, run_scenario
 
+# Agresivní stress scénář se střídáním waypointů, prudkých změn směru a změn rychlosti.
+# Je určený pro ladění Kalmanova filtru a celkové stability fusion logiky při nepohodlném pohybu.
+
 # Definujeme body (waypoints), mezi kterými bude objekt létat
 WAYPOINTS = [
     (1.5, 1.5, 0.5),  # 1. Pomalu do středu (x, y, rychlost v m/s)
@@ -14,6 +17,8 @@ WAYPOINTS = [
 
 def update_dynamic_stress_test(step_index, objects, dt):
     obj = objects[0]
+    # Objekt v každém kroku míří na aktuální waypoint a plynule přizpůsobuje rychlost,
+    # takže trajektorie není jen lomená, ale i dynamicky "živá".
 
     # Fáze se mění každých 15 kroků simulace (7.5 vteřiny)
     phase = (step_index // 15) % len(WAYPOINTS)

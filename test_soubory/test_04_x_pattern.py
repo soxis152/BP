@@ -2,6 +2,9 @@ import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario
 
+# Dva objekty jedou po protilehlých diagonálách a kříží se uprostřed.
+# Tento scénář je důležitý pro kontrolu, zda se při křížení neprohazují identity.
+
 
 def update_x_pattern(step_index, objects, dt):
     obj_a, obj_b = objects

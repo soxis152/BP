@@ -220,6 +220,10 @@
     </div>
 
     <script>
+        // Tento skript má tři hlavní úkoly:
+        // 1. vykreslit scénu místnosti ve 2D,
+        // 2. vykreslit stejná fused data ve 3D,
+        // 3. udržovat obě zobrazení synchronní podle websocket aktualizací ze serveru.
         // --- BAREVNÁ PALETA ---
         const COLOR_RADAR = '#2563eb';
         const COLOR_FUSED = '#dc2626';
@@ -249,6 +253,9 @@
         const tilesContainer = document.getElementById('tiles-container');
 
         function switchView(mode) {
+            // Přepínání zobrazení nemění data, pouze způsob jejich vizualizace.
+            // Backend stále posílá stejný snapshot objektů, jen ho jednou kreslíme na 2D canvas
+            // a podruhé do 3D scény přes Three.js.
             currentMode = mode;
             if (mode === '2d') {
                 btn2d.classList.add('active');
@@ -277,6 +284,13 @@
         const originY = canvas.height - PADDING_BOTTOM;
 
         function drawMap2D() {
+            // drawMap2D kreslí statickou kostru mapy:
+            // - půdorys 3x3 m,
+            // - mřížku po metrech,
+            // - osy X a Y,
+            // - pevné pozice senzorů.
+            //
+            // Tato část se nemění podle dat. Je to pouze referenční podklad.
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             ctx.strokeStyle = COLOR_GRID;
@@ -336,6 +350,12 @@
         }
 
         function drawObjects2D(objects) {
+            // drawObjects2D kreslí nad statickou mapu aktuální objekty ze snapshotu fusion vrstvy.
+            //
+            // Každý objekt:
+            // - má barvu podle toho, zda jde o pojmenovaný fused track nebo radar-only cíl,
+            // - používá opacity z backendu,
+            // - má krátký textový popisek nad bodem.
             drawMap2D();
             if (!objects) return;
 
@@ -406,6 +426,8 @@
         scene.add(floor);
 
         function create3DAxis(colorHex, length, posX, posY, posZ, rotX, rotY, rotZ) {
+            // Pomocná funkce pro vytvoření 3D osy.
+            // Válec je v této scéně čitelnější než tenká čára, hlavně při otáčení kamery.
             const geo = new THREE.CylinderGeometry(0.01, 0.01, length, 8);
             const mat = new THREE.MeshBasicMaterial({ color: colorHex });
             const cylinder = new THREE.Mesh(geo, mat);
@@ -447,6 +469,11 @@
         let meshes3D = {};
 
         function updateObjects3D(objects) {
+            // updateObjects3D převádí fused snapshot do 3D reprezentace.
+            //
+            // Každý logický objekt vlastní jednu Three.js group:
+            // - kouli v aktuální poloze,
+            // - svislou linku k podlaze, aby byla lépe čitelná výška Z.
             if (!objects) return;
             const currentIds = new Set();
 
@@ -459,6 +486,9 @@
                 const opacity = (obj.opacity !== undefined) ? obj.opacity : 1.0;
 
                 if (!meshes3D[id]) {
+                    // Mesh vytváříme až při prvním výskytu objektu.
+                    // Další snímky už jen aktualizují pozici, barvu a průhlednost,
+                    // což je levnější než vše vytvářet znovu v každém kroku.
                     const group = new THREE.Group();
 
                     // Povolení průhlednosti u materiálů
@@ -510,6 +540,9 @@
         }
 
         function animate3D() {
+            // 3D render smyčka běží pořád dokola.
+            // Samotné souřadnice objektů se ale mění jen ve chvíli,
+            // kdy přes websocket přijde nový snapshot z backendu.
             requestAnimationFrame(animate3D);
             if (currentMode === '3d') {
                 controls.update();
@@ -522,6 +555,9 @@
         //        3. DLAŽDICE A WEBSOCKET
         // ==========================================
         function renderTiles(objects) {
+            // Boční dlaždice doplňují grafické zobrazení o přesné numerické hodnoty.
+            // To je důležité hlavně při ladění testů:
+            // uživatel nemusí odhadovat polohu nebo stav jen "od oka" z canvasu.
             if (!objects || objects.length === 0) {
                 tilesContainer.innerHTML = '<div class="empty-message">Žádný cíl nedetekován.</div>';
                 return;
@@ -564,6 +600,8 @@
         }
 
         function connect() {
+            // Websocket je jediný živý kanál mezi backendem a dashboardem.
+            // Veškeré aktualizace poloh, identity, confidence i opacity jdou právě tudy.
             const ws = new WebSocket(`ws://${window.location.host}/ws`);
 
             ws.onopen = function() {
@@ -577,6 +615,8 @@
 
                 const data = JSON.parse(event.data);
                 if (data.type === "update") {
+                    // Jeden fused snapshot aktualizuje všechny části UI najednou:
+                    // 2D mapu, 3D scénu i boční dlaždice.
                     latestObjects = data.objects;
 
                     if (currentMode === '2d') drawObjects2D(latestObjects);
@@ -596,6 +636,9 @@
 
         // --- WATCHDOG PROTI ZAMRZÁNÍ ---
         setInterval(() => {
+            // Watchdog chrání frontend proti "zamrznutí" posledních známých objektů.
+            // Pokud dlouho nepřijde update, scénu raději vyprázdníme,
+            // aby uživatel neviděl neaktuální data jako živý stav.
             if (Date.now() - lastUpdateTime > 1000 && latestObjects.length > 0) {
                 latestObjects = [];
                 if (currentMode === '2d') drawObjects2D(latestObjects);

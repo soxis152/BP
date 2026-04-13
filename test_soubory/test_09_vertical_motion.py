@@ -2,6 +2,10 @@ import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario
 
+# Vertikální 3D scénář:
+# objekt mění nejen polohu v X a Y, ale i výšku Z.
+# Je určený pro kontrolu práce systému s osou Z a 3D vizualizací.
+
 
 def _lerp(start, end, progress):
     return start + (end - start) * progress

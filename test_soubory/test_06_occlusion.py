@@ -2,6 +2,12 @@ import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario
 
+# Scénář simulující zakrytí objektu:
+# - normální průjezd,
+# - radar-only occlusion,
+# - krátký total dropout,
+# - znovuobjevení objektu v další části trasy.
+
 
 def _lerp(start, end, progress):
     return start + (end - start) * progress

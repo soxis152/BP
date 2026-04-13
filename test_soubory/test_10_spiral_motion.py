@@ -3,6 +3,9 @@ import math
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario
 
+# Prostorová spirála kombinuje kroužení v XY a souběžnou změnu výšky Z.
+# Scénář je náročnější než čistě 2D kružnice a dobře odhalí nestabilitu ve 3D pohybu.
+
 
 def update_spiral_motion(step_index, objects, dt):
     obj = objects[0]

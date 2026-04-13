@@ -2,6 +2,9 @@ import asyncio
 import math
 from Four.test_soubory.scenario_common import ObjectState, run_scenario
 
+# Objekt se pohybuje po trojúhelníku a v každém vrcholu zastaví.
+# Testuje se hlavně přechod mezi klidem a pohybem a stabilita tracku v rozích trajektorie.
+
 
 def update_triangle_stop(step_index, objects, dt):
     obj = objects[0]

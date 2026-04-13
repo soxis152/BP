@@ -2,6 +2,10 @@ import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario
 
+# Nejjednodušší referenční scénář:
+# jeden objekt plynule projíždí napříč mapou a po opuštění prostoru se vrací na start.
+# Hodí se pro první ověření, že celý řetězec MQTT -> fusion -> frontend vůbec běží.
+
 
 def update_linear_pass(step_index, objects, dt):
     obj = objects[0]

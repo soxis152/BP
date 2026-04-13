@@ -3,6 +3,9 @@ import math
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario
 
+# Objekt obíhá kolem středu po hladké křivce.
+# Scénář je vhodný pro ověření, že filtr zvládá plynulou změnu směru bez lomené trajektorie.
+
 
 def update_circular_motion(step_index, objects, dt):
     obj = objects[0]

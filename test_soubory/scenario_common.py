@@ -8,11 +8,25 @@ import paho.mqtt.client as mqtt
 
 from Four.db_handler import db_handler
 
+# Tento modul je společná testovací infrastruktura pro všechny scénáře ve složce test_soubory.
+#
+# Jeho úloha:
+# 1. držet "ground truth" stav simulovaných objektů,
+# 2. z této ground truth generovat syntetická radarová a BLE měření,
+# 3. publikovat tato měření do stejného MQTT rozhraní, které používá reálný systém,
+# 4. současně je ukládat do databáze, aby se testy daly později analyzovat.
+#
+# Díky tomu testovací scénáře nepíší přímo radarové body ani BLE věty.
+# Stačí jim definovat pohyb objektu v mapě a helper se postará o zbytek.
 
 MQTT_HOST = "127.0.0.1"
 MQTT_PORT = 1883
+
+# Publish period odpovídá periodě, s jakou se typicky očekává nový krok simulace i fusion.
 PUBLISH_PERIOD_SECONDS = 0.15
 
+# Geometrie senzorů v testech musí odpovídat hlavnímu systému, jinak by testy netestovaly
+# stejnou matematiku jako ostrý běh.
 RADAR_CONFIGS = [
     {"id": "radar_1", "pos_x": 1.5, "pos_y": 0.0, "pos_z": 0.7, "rotation": 90},
     {"id": "radar_2", "pos_x": 0.0, "pos_y": 1.5, "pos_z": 0.7, "rotation": 0},
@@ -25,6 +39,16 @@ BLE_CONFIGS = [
 
 
 class ObjectState:
+    """Stav jednoho simulovaného objektu.
+
+    Objekt reprezentuje ideální "pravdu" testu, tedy skutečnou polohu a případně rychlost.
+    Z tohoto stavu se teprve odvozují syntetická radarová a BLE měření.
+
+    Vedle polohy a rychlosti obsahuje i přepínače pro simulaci:
+    - viditelnosti pro radar a BLE,
+    - dodatečného šumu v jednotlivých senzorech.
+    """
+
     def __init__(self, tag_id, x, y, z=0.92, vx=0.0, vy=0.0):
         self.tag_id = tag_id
         self.x = x
@@ -32,8 +56,12 @@ class ObjectState:
         self.z = z
         self.vx = vx
         self.vy = vy
+
+        # Přepínače viditelnosti umožňují simulovat zakrytí nebo úplný dropout senzoru.
         self.radar_visible = True
         self.ble_visible = True
+
+        # Dodatečný šum slouží pro stress testy stability fusion logiky.
         self.radar_noise_xy = 0.0
         self.radar_noise_z = 0.0
         self.ble_azimuth_noise = 0.0
@@ -41,6 +69,7 @@ class ObjectState:
 
 
 def transform_to_global(x_loc, y_loc, z_loc, cfg):
+    """Převede lokální souřadnice senzoru do globální mapy místnosti."""
     angle_rad = math.radians(cfg["rotation"])
     x_glob = x_loc * math.cos(angle_rad) - y_loc * math.sin(angle_rad)
     y_glob = x_loc * math.sin(angle_rad) + y_loc * math.cos(angle_rad)
@@ -48,6 +77,7 @@ def transform_to_global(x_loc, y_loc, z_loc, cfg):
 
 
 def transform_to_local(x_glob, y_glob, z_glob, cfg):
+    """Převede globální souřadnice objektu do lokálního systému konkrétního senzoru."""
     dx = x_glob - cfg["pos_x"]
     dy = y_glob - cfg["pos_y"]
     dz = z_glob - cfg["pos_z"]
@@ -58,10 +88,22 @@ def transform_to_local(x_glob, y_glob, z_glob, cfg):
 
 
 def normalize_angle(angle_deg):
+    """Normalizuje úhel do intervalu <-180, 180> pro jednodušší práci s BLE azimutem."""
     return ((angle_deg + 180.0) % 360.0) - 180.0
 
 
 def build_radar_records(objects, cfg, timestamp):
+    """Vygeneruje syntetické radarové body pro jeden radar.
+
+    Princip:
+    - každý objekt se převede do lokálního systému radaru,
+    - zkontroluje se, zda je ve zorném poli,
+    - kolem skutečné polohy se vytvoří malý shluk bodů,
+    - každý bod dostane mírně odlišnou pozici a SNR.
+
+    Tím vzniká realistická simulace radaru:
+    radar nevidí ideální jediný bod, ale "mrak" odrazů kolem objektu.
+    """
     records = []
 
     for obj in objects:
@@ -69,9 +111,13 @@ def build_radar_records(objects, cfg, timestamp):
             continue
 
         x_loc, y_loc, z_loc = transform_to_local(obj.x, obj.y, obj.z, cfg)
-        distance = math.sqrt(x_loc ** 2 + y_loc ** 2 + z_loc ** 2)
+        distance = math.sqrt(x_loc**2 + y_loc**2 + z_loc**2)
         azimuth_local = math.degrees(math.atan2(y_loc, x_loc))
 
+        # Jednoduchý model viditelnosti radaru:
+        # - objekt musí být před radarem,
+        # - musí být v maximálním dosahu,
+        # - musí být v rozumném zorném poli.
         if x_loc <= 0.0 or distance > 5.0 or abs(azimuth_local) > 70.0:
             continue
 
@@ -81,7 +127,11 @@ def build_radar_records(objects, cfg, timestamp):
             point_y_loc = y_loc + random.uniform(-0.12, 0.12) + random.gauss(0.0, obj.radar_noise_xy)
             point_z_loc = z_loc + random.uniform(-0.04, 0.04) + random.gauss(0.0, obj.radar_noise_z)
             point_x_glob, point_y_glob, point_z_glob = transform_to_global(point_x_loc, point_y_loc, point_z_loc, cfg)
+
+            # SNR zde není přesný fyzikální model, ale dostatečně realistická aproximace:
+            # s rostoucí vzdáleností zpravidla klesá a zároveň lehce kolísá.
             snr = max(7.0, 23.0 - distance * 2.6 + random.uniform(-1.8, 1.8))
+
             records.append(
                 (
                     timestamp,
@@ -96,6 +146,17 @@ def build_radar_records(objects, cfg, timestamp):
 
 
 def build_ble_records(objects, cfg, timestamp):
+    """Vygeneruje syntetická BLE měření pro jednu kotvu.
+
+    BLE kotva zde nevrací přesnou polohu objektu.
+    Vrací:
+    - identitu tagu,
+    - RSSI,
+    - azimut.
+
+    Proto je BLE v testech vhodné hlavně jako zdroj identity
+    a hrubého směrového omezení, nikoli jako přesný zdroj polohy.
+    """
     records = []
 
     for obj in objects:
@@ -105,10 +166,11 @@ def build_ble_records(objects, cfg, timestamp):
         dx = obj.x - cfg["pos_x"]
         dy = obj.y - cfg["pos_y"]
         dz = obj.z - cfg["pos_z"]
-        distance = math.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
+        distance = math.sqrt(dx**2 + dy**2 + dz**2)
         world_angle = math.degrees(math.atan2(dy, dx))
         relative_azimuth = normalize_angle(world_angle - cfg["rotation"])
 
+        # Jednoduchý model viditelnosti BLE kotvy.
         if distance > 8.0 or abs(relative_azimuth) > 85.0:
             continue
 
@@ -123,6 +185,12 @@ def build_ble_records(objects, cfg, timestamp):
 
 
 async def publish_and_store(mqtt_client, sensor_name, records, is_radar):
+    """Publikuje syntetická měření do MQTT a zároveň je uloží do DB.
+
+    Testovací scénáře tak používají úplně stejnou vstupní cestu jako reálné senzory:
+    - fusion vrstva čte data z MQTT,
+    - historie testu se ukládá do databáze.
+    """
     for record in records:
         if is_radar:
             payload = {
@@ -147,6 +215,18 @@ async def publish_and_store(mqtt_client, sensor_name, records, is_radar):
 
 
 async def run_scenario(scenario_name, objects, update_fn):
+    """Spustí nekonečný testovací scénář.
+
+    `update_fn` v každém kroku upraví "ground truth" objektů.
+    Helper pak:
+    1. zaktualizuje stav objektů,
+    2. vygeneruje radarová a BLE měření,
+    3. publikuje je do MQTT,
+    4. uloží je do DB,
+    5. počká do dalšího kroku.
+
+    Díky tomu stačí jednotlivým testům definovat jen pohyb a případné dropout/noise podmínky.
+    """
     mqtt_client = mqtt.Client(client_id=f"scenario_{scenario_name}")
     mqtt_client.connect(MQTT_HOST, MQTT_PORT)
     mqtt_client.loop_start()
@@ -160,6 +240,8 @@ async def run_scenario(scenario_name, objects, update_fn):
     try:
         while True:
             cycle_started = time.time()
+
+            # update_fn je jediné místo, kde se mění ideální svět scénáře.
             update_fn(step_index, objects, PUBLISH_PERIOD_SECONDS)
 
             for cfg in RADAR_CONFIGS:

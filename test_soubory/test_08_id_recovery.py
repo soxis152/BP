@@ -2,6 +2,10 @@ import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario
 
+# Objekt se chvíli pohybuje normálně, pak úplně zmizí z obou senzorů
+# a později se vrací se stejným tag_id.
+# Scénář ověřuje continuity identity přes plný výpadek.
+
 
 def _lerp(start, end, progress):
     return start + (end - start) * progress

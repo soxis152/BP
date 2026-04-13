@@ -2,6 +2,9 @@ import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario
 
+# Rychlý průjezd a ostré zastavení v jedné přímce.
+# Typický scénář pro kontrolu, zda Kalmanův filtr po zabrzdění objekt "nepřestřelí".
+
 
 def _lerp(start, end, progress):
     return start + (end - start) * progress
