@@ -40,7 +40,7 @@ Před spuštěním ověřte COM porty v `ingestion.py` pro proměnné `BLE_CONFI
 
 ### 3. Spuštění
 ```bash
-python main.py
+python main_1.py
 ```
 ### 4. Vizualizace
 Po úspěšném startu všech 3 vláken otevřete v prohlížeči adresu: `http://127.0.0.1:8000`

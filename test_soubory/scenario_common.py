@@ -6,7 +6,7 @@ import time
 
 import paho.mqtt.client as mqtt
 
-from Four.db_handler import db_handler
+from Four.db_handler_1 import db_handler
 
 
 MQTT_HOST = "127.0.0.1"

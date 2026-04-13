@@ -14,37 +14,37 @@ if sys.platform == "win32":
 try:
     import app as web_app
     import fusion
-    import ingestion
+    import ingestion_1
 except ImportError:
     from . import app as web_app
     from . import fusion
-    from . import ingestion
+    from . import ingestion_1
 
 
-def ingestion_thread() -> None:
-    print("[thread-1] Starting ingestion workers")
+def ingestion_1_thread() -> None:
+    print("[thread-1] Starting ingestion_1 workers")
 
-    threading.Thread(target=ingestion.db_worker, daemon=True, name="db_worker").start()
+    threading.Thread(target=ingestion_1.db_worker, daemon=True, name="db_worker").start()
 
-    for cfg in ingestion.RADAR_CONFIGS:
+    for cfg in ingestion_1.RADAR_CONFIGS:
         print(f"[thread-1] Starting radar worker: {cfg['id']}")
         threading.Thread(
-            target=ingestion.radar_worker,
+            target=ingestion_1.radar_worker,
             args=(cfg,),
             daemon=True,
             name=f"{cfg['id']}_worker",
         ).start()
 
-    for cfg in ingestion.BLE_CONFIGS:
+    for cfg in ingestion_1.BLE_CONFIGS:
         print(f"[thread-1] Starting BLE worker: {cfg['id']}")
         threading.Thread(
-            target=ingestion.ble_worker,
+            target=ingestion_1.ble_worker,
             args=(cfg,),
             daemon=True,
             name=f"{cfg['id']}_worker",
         ).start()
 
-    print("[thread-1] Ingestion is running")
+    print("[thread-1] Ingestion_1 is running")
     while True:
         time.sleep(1)
 
@@ -67,7 +67,7 @@ def api_thread() -> None:
 
 def main() -> None:
     threads = [
-        # threading.Thread(target=ingestion_thread, name="ingestion_thread", daemon=True),
+        threading.Thread(target=ingestion_1_thread, name="ingestion_1_thread", daemon=True),
         threading.Thread(target=fusion_thread, name="fusion_thread", daemon=True),
         threading.Thread(target=api_thread, name="api_thread", daemon=True),
     ]
