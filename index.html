@@ -106,6 +106,7 @@
         .tile.source-radar { border-left-color: var(--source-radar); }
         .tile.source-radar-ble { border-left-color: var(--source-radar-ble); }
         .tile.source-ble-only { border-left-color: var(--source-ble-only); }
+        .tile.source-radar-cluster { border-left-color: #dc2626; }
 
         .tile-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
         .tile-title { font-size: 14px; font-weight: 800; margin: 0; line-height: 1.25; word-break: break-word; }
@@ -114,6 +115,7 @@
         .badge-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
         .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; border: 1px solid transparent; white-space: nowrap; }
         .badge-radar { color: #0369a1; background: #e0f2fe; border-color: #bae6fd; }
+        .badge-radar-cluster { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
         .badge-radar-ble { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
         .badge-ble-only { color: #854d0e; background: #fef3c7; border-color: #fde68a; }
         .badge-type { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }
@@ -169,7 +171,7 @@
     </div>
 
     <script>
-        const COLOR_SOURCE = { radar: '#0ea5e9', radar_raw: '#0ea5e9', radar_ble: '#ef4444', ble_only: '#eab308' };
+        const COLOR_SOURCE = { radar: '#0ea5e9', radar_raw: '#0ea5e9', radar_cluster: '#dc2626', radar_ble: '#ef4444', ble_only: '#eab308' };
         const SENSOR_NODES = [ { id: "S1", x: 1.5, y: 0.0, z: 0.8 }, { id: "S2", x: 0.0, y: 1.5, z: 0.8 } ];
 
         let currentMode = '2d';
@@ -233,6 +235,7 @@
             const id = String(obj.tag_id || '').toUpperCase();
 
             if (sourceRaw.includes('ble_only') || sourceRaw.includes('ble only')) return 'ble_only';
+            if (sourceRaw.includes('radar_cluster') || type === 'radar_cluster') return 'radar_cluster';
             if (sourceRaw.includes('radar_raw') || type === 'radar_raw') return 'radar_raw';
             if ((sourceRaw.includes('radar') && sourceRaw.includes('ble')) || sourceRaw.includes('radar+ble')) return 'radar_ble';
             if (sourceRaw.includes('ble') && !sourceRaw.includes('radar')) return 'ble_only';
@@ -245,6 +248,7 @@
 
         function getSourceLabel(obj) {
             const source = getSourceCategory(obj);
+            if (source === 'radar_cluster') return 'Radar cluster';
             if (source === 'radar_ble') return 'Radar + BLE';
             if (source === 'ble_only') return 'BLE only';
             return 'Radar only';
@@ -253,6 +257,7 @@
         function getTypeLabel(obj) {
             const type = getObjectType(obj);
             if (type === 'radar_raw') return 'Raw';
+            if (type === 'radar_cluster') return 'Cluster';
             if (type === 'tagged') return 'Tagged';
             if (type === 'ble_only') return 'BLE';
             return 'Track';
@@ -262,6 +267,7 @@
 
         function getSourceBadgeClass(obj) {
             const source = getSourceCategory(obj);
+            if (source === 'radar_cluster') return 'badge-radar-cluster';
             if (source === 'radar_ble') return 'badge-radar-ble';
             if (source === 'ble_only') return 'badge-ble-only';
             return 'badge-radar';
@@ -269,6 +275,7 @@
 
         function getTileClass(obj) {
             const source = getSourceCategory(obj);
+            if (source === 'radar_cluster') return 'source-radar-cluster';
             if (source === 'radar_ble') return 'source-radar-ble';
             if (source === 'ble_only') return 'source-ble-only';
             return 'source-radar';
@@ -370,19 +377,29 @@
                 const source = getSourceCategory(obj); const color = getSourceColor(obj);
                 const conf = Math.max(0.10, safeNum(obj.confidence, 1));
                 const rawRadar = isRadarRaw(obj);
-                const radius = rawRadar ? 8 : (source === 'ble_only' ? 15 : 11);
+                const isCluster = source === 'radar_cluster';
+                const radius = rawRadar ? 8 : (isCluster ? 17 : (source === 'ble_only' ? 15 : 11));
 
                 ctx.globalAlpha = conf;
                 ctx.beginPath(); ctx.arc(px, py, radius, 0, 2 * Math.PI);
                 ctx.fillStyle = color; ctx.fill();
 
-                ctx.lineWidth = rawRadar ? 2 : 3; ctx.strokeStyle = rawRadar ? 'rgba(255, 255, 255, 0.85)' : '#ffffff';
-                ctx.shadowColor = rawRadar ? 'rgba(14, 165, 233, 0.85)' : 'rgba(0, 0, 0, 0.35)';
-                ctx.shadowBlur = rawRadar ? 12 : 6; ctx.stroke();
+                ctx.lineWidth = rawRadar ? 2 : (isCluster ? 4 : 3);
+                ctx.strokeStyle = rawRadar ? 'rgba(255, 255, 255, 0.85)' : '#ffffff';
+                ctx.shadowColor = rawRadar ? 'rgba(14, 165, 233, 0.85)' : (isCluster ? 'rgba(220, 38, 38, 0.75)' : 'rgba(0, 0, 0, 0.35)');
+                ctx.shadowBlur = rawRadar ? 12 : (isCluster ? 14 : 6); ctx.stroke();
                 ctx.shadowColor = 'transparent';
                 ctx.shadowBlur = 0;
 
-                if (source !== 'radar' && !rawRadar) {
+                if (isCluster) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 11px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(String(obj.points ?? ''), px, py);
+                }
+
+                if (source !== 'radar' && !rawRadar && !isCluster) {
                     ctx.beginPath(); ctx.arc(px, py, source === 'ble_only' ? 22 : 18, 0, 2 * Math.PI);
                     ctx.lineWidth = 2; ctx.strokeStyle = source === 'ble_only' ? 'rgba(234, 179, 8, 0.55)' : 'rgba(239, 68, 68, 0.45)';
                     ctx.stroke();
@@ -487,6 +504,21 @@
                     }));
                 }
 
+                if (data.radar_clusters && Array.isArray(data.radar_clusters)) {
+                    data.radar_clusters.forEach(cluster => {
+                        combined.push({
+                            tag_id: cluster.id,
+                            object_type: 'radar_cluster',
+                            source: 'radar_cluster',
+                            x: cluster.x,
+                            y: cluster.y,
+                            z: cluster.z,
+                            points: cluster.points,
+                            confidence: Math.min(1.0, 0.45 + (cluster.points * 0.08))
+                        });
+                    });
+                }
+
                 // 2. Zpracování BLE dat
                 if (data.ble && Array.isArray(data.ble)) {
                     data.ble.forEach(b => {
@@ -528,6 +560,7 @@
                     <div class="tile-grid">
                         <div class="metric"><span class="metric-label">Radar nový</span><span class="metric-value">${latestStats?.new_radar_points ?? 0}</span></div>
                         <div class="metric"><span class="metric-label">Radar historie</span><span class="metric-value">${latestStats?.radar_history_points ?? 0}</span></div>
+                        <div class="metric"><span class="metric-label">Radar clustery</span><span class="metric-value">${latestStats?.radar_clusters ?? 0}</span></div>
                         <div class="metric"><span class="metric-label">BLE 1 tagy</span><span class="metric-value">${latestStats?.ble_1_tags ?? 0}</span></div>
                         <div class="metric"><span class="metric-label">BLE 2 tagy</span><span class="metric-value">${latestStats?.ble_2_tags ?? 0}</span></div>
                         <div class="metric"><span class="metric-label">Společné BLE</span><span class="metric-value">${latestStats?.common_ble_tags ?? 0}</span></div>

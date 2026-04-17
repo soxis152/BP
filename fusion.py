@@ -5,8 +5,10 @@ import time
 
 import aiomqtt
 
-RAW_RADAR_HISTORY_SECONDS = 3.0
+RAW_RADAR_HISTORY_SECONDS = 1.5
 MAX_RAW_RADAR_HISTORY_POINTS = 700
+RADAR_CLUSTER_DISTANCE = 0.45
+RADAR_CLUSTER_MIN_POINTS = 3
 
 # --- GEOMETRIE DLE INGESTION.PY ---
 SENSORS = {
@@ -58,6 +60,57 @@ def triangulate(tag_id):
     if -0.5 <= x <= 3.5 and -0.5 <= y <= 3.5:
         return (x, y)
     return None
+
+
+def cluster_radar_points(points):
+    """Seskupí blízké radarové body a vrátí jejich středy."""
+    valid_points = [
+        point
+        for point in points
+        if all(key in point for key in ("x", "y", "z"))
+    ]
+    visited = [False] * len(valid_points)
+    clusters = []
+
+    for start_index, _ in enumerate(valid_points):
+        if visited[start_index]:
+            continue
+
+        queue = [start_index]
+        visited[start_index] = True
+        cluster = []
+
+        while queue:
+            current_index = queue.pop()
+            current_point = valid_points[current_index]
+            cluster.append(current_point)
+
+            for next_index, next_point in enumerate(valid_points):
+                if visited[next_index]:
+                    continue
+
+                distance = math.hypot(
+                    current_point["x"] - next_point["x"],
+                    current_point["y"] - next_point["y"],
+                )
+                if distance <= RADAR_CLUSTER_DISTANCE:
+                    visited[next_index] = True
+                    queue.append(next_index)
+
+        if len(cluster) < RADAR_CLUSTER_MIN_POINTS:
+            continue
+
+        clusters.append(
+            {
+                "id": f"radar_cluster_{len(clusters) + 1}",
+                "x": sum(point["x"] for point in cluster) / len(cluster),
+                "y": sum(point["y"] for point in cluster) / len(cluster),
+                "z": sum(point["z"] for point in cluster) / len(cluster),
+                "points": len(cluster),
+            }
+        )
+
+    return clusters
 
 
 async def mqtt_listener():
@@ -125,15 +178,18 @@ async def fused_publisher():
                         {key: value for key, value in point.items() if key != "_seen_at"}
                         for point in radar_history
                     ]
+                    out_clusters = cluster_radar_points(out_radar)
 
                     payload = json.dumps(
                         {
                             "radar": out_radar,
+                            "radar_clusters": out_clusters,
                             "ble": out_ble,
                             "stats": {
                                 "timestamp": now,
                                 "new_radar_points": len(new_radar_points),
                                 "radar_history_points": len(out_radar),
+                                "radar_clusters": len(out_clusters),
                                 "ble_1_tags": ble_1_count,
                                 "ble_2_tags": ble_2_count,
                                 "common_ble_tags": len(common_tags),
