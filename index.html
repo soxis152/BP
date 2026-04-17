@@ -2,653 +2,614 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Senzorová Fúze: Průmyslový Dashboard</title>
+    <title>Senzorová fúze: profesionální dashboard</title>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
     <style>
-        /* --- PRŮMYSLOVÝ SVĚTLÝ MOTIV (INDUSTRIAL LIGHT MODE) --- */
         :root {
-            --bg-page: #e2e8f0;
-            --bg-panel: #ffffff;
+            --bg-page: #edf2f7;
+            --bg-card: #ffffff;
+            --bg-soft: #f8fafc;
             --text-main: #0f172a;
             --text-muted: #64748b;
-            --border: #cbd5e1;
-            --color-radar: #2563eb;
-            --color-fused: #dc2626;
-            --color-sensor: #475569;
-            --axis-x: #ef4444;
-            --axis-y: #10b981;
-            --axis-z: #3b82f6;
+            --border: #d8e1eb;
+            --accent: #334155;
+
+            --source-radar: #0ea5e9;
+            --source-radar-ble: #ef4444;
+            --source-ble-only: #eab308;
         }
+
+        * { box-sizing: border-box; }
 
         body {
-            background-color: var(--bg-page);
+            background:
+                radial-gradient(circle at 8% 10%, rgba(14, 165, 233, 0.10), transparent 28%),
+                radial-gradient(circle at 92% 92%, rgba(234, 179, 8, 0.12), transparent 28%),
+                var(--bg-page);
             color: var(--text-main);
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 0;
-            padding: 20px;
+            font-family: "Segoe UI", "Inter", system-ui, sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            margin: 0; padding: 20px;
         }
 
-        /* Hlavička jako horní lišta panelu */
         .header-panel {
-            width: 100%;
-            max-width: 1000px;
-            background: var(--bg-panel);
-            border: 1px solid var(--border);
-            border-bottom: 3px solid var(--color-sensor);
-            padding: 15px 25px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-sizing: border-box;
-            border-radius: 4px;
+            width: 100%; max-width: 1000px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-top: 4px solid var(--accent);
+            padding: 14px 20px; margin-bottom: 14px;
+            display: flex; justify-content: space-between; align-items: center;
+            border-radius: 12px; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+            gap: 12px; flex-wrap: wrap;
         }
 
-        .header-panel h1 {
-            margin: 0;
-            font-size: 22px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
+        .title-wrap h1 { margin: 0; font-size: 20px; letter-spacing: 0.2px; }
+        .title-wrap p { margin: 4px 0 0 0; color: var(--text-muted); font-size: 13px; }
+
+        .status-wrap {
+            display: flex; align-items: center; gap: 8px; font-size: 12px;
+            color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;
         }
 
-        .status-container {
-            font-size: 14px;
-            font-weight: 600;
+        .legend-row {
+            width: 100%; max-width: 1000px; display: flex; gap: 8px;
+            margin-bottom: 12px; flex-wrap: wrap;
         }
-        .status { color: #16a34a; background: #dcfce7; padding: 4px 8px; border: 1px solid #bbf7d0; border-radius: 2px; }
-        .status.disconnected { color: #dc2626; background: #fee2e2; border: 1px solid #fecaca; }
 
-        /* Ostrá průmyslová tlačítka */
+        .legend-chip {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 999px; padding: 6px 12px; font-size: 12px;
+            font-weight: 700; color: #334155;
+        }
+
+        .legend-dot { width: 10px; height: 10px; border-radius: 999px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7); }
+
         .view-controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            width: 100%;
-            max-width: 1000px;
+            display: flex; gap: 10px; margin-bottom: 16px; width: 100%; max-width: 1000px;
         }
+
         .view-controls button {
-            background-color: var(--bg-panel);
-            color: var(--text-muted);
-            border: 1px solid var(--border);
-            padding: 10px 20px;
-            font-size: 14px;
-            font-weight: 700;
-            text-transform: uppercase;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s;
+            background-color: var(--bg-card); border: 1px solid var(--border);
+            padding: 10px 18px; font-weight: 700; text-transform: uppercase;
+            border-radius: 8px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.03em;
         }
-        .view-controls button:hover { background-color: #f8fafc; border-color: #94a3b8; }
+
         .view-controls button.active {
-            background-color: var(--color-sensor);
-            color: white;
-            border-color: var(--color-sensor);
+            background-color: var(--accent); color: white; border-color: var(--accent);
+            box-shadow: 0 8px 22px rgba(51, 65, 85, 0.22);
         }
 
-        .dashboard {
-            display: flex;
-            flex-direction: row;
-            gap: 20px;
-            justify-content: center;
-            align-items: flex-start;
-            flex-wrap: wrap;
-            max-width: 1000px;
-            width: 100%;
-        }
+        .dashboard { display: flex; flex-direction: row; gap: 20px; justify-content: center; width: 100%; max-width: 1000px; }
 
-        /* Zobrazení mapy - ostrý rámeček */
         .view-container {
-            position: relative;
-            width: 600px;
-            height: 600px;
-            flex-shrink: 0;
-            background-color: var(--bg-panel);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-            overflow: hidden;
+            position: relative; width: 600px; height: 600px;
+            background-color: var(--bg-soft); border: 2px solid var(--border);
+            border-radius: 12px; overflow: hidden; box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
         }
 
         #radarCanvas { position: absolute; top: 0; left: 0; }
         #view3d { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; }
 
-        .hint-3d {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255,255,255,0.9);
-            border: 1px solid var(--border);
-            padding: 5px 10px;
-            color: var(--text-muted);
-            font-size: 11px;
-            font-weight: 600;
-            border-radius: 2px;
-            pointer-events: none;
-            z-index: 10;
-            display: none;
-        }
+        .tiles-container { display: flex; flex-direction: column; gap: 10px; width: 380px; max-height: 600px; overflow-y: auto; padding-right: 4px; }
+        .tiles-container::-webkit-scrollbar { width: 8px; }
+        .tiles-container::-webkit-scrollbar-thumb { background: #c7d2de; border-radius: 999px; }
 
-        /* Průmyslové informační karty */
-        .tiles-container {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            width: 360px;
-            max-height: 600px;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
+        .empty-state { background: var(--bg-card); border: 1px dashed var(--border); border-radius: 12px; color: var(--text-muted); padding: 16px; font-style: italic; }
+
         .tile {
-            background-color: var(--bg-panel);
-            border: 1px solid var(--border);
-            border-left: 6px solid var(--color-radar);
-            border-radius: 4px;
-            padding: 15px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+            box-shadow: 0 5px 14px rgba(15, 23, 42, 0.06); padding: 12px; border-left: 6px solid var(--source-radar);
         }
-        .tile.fused { border-left-color: var(--color-fused); }
+        .tile.source-radar { border-left-color: var(--source-radar); }
+        .tile.source-radar-ble { border-left-color: var(--source-radar-ble); }
+        .tile.source-ble-only { border-left-color: var(--source-ble-only); }
 
-        .tile h3 {
-            margin: 0 0 10px 0;
-            font-size: 16px;
-            text-transform: uppercase;
-            color: var(--text-main);
-            border-bottom: 1px dashed var(--border);
-            padding-bottom: 6px;
-        }
+        .tile-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
+        .tile-title { font-size: 14px; font-weight: 800; margin: 0; line-height: 1.25; word-break: break-word; }
+        .tile-sub { margin-top: 2px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 
-        .tile .data-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 4px 0;
-            font-size: 14px;
-            color: var(--text-muted);
-        }
-        .tile .data-row strong {
-            color: var(--text-main);
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 15px;
-        }
+        .badge-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+        .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; border: 1px solid transparent; white-space: nowrap; }
+        .badge-radar { color: #0369a1; background: #e0f2fe; border-color: #bae6fd; }
+        .badge-radar-ble { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
+        .badge-ble-only { color: #854d0e; background: #fef3c7; border-color: #fde68a; }
+        .badge-type { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }
 
-        .empty-message {
-            color: var(--text-muted);
-            font-style: italic;
-            text-align: center;
-            margin-top: 20px;
-            background: var(--bg-panel);
-            padding: 15px;
-            border: 1px dashed var(--border);
-            border-radius: 4px;
-        }
+        .tile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+        .metric { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 8px; }
+        .metric-label { display: block; font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+        .metric-value { font-size: 13px; font-weight: 700; color: #0f172a; }
 
-        .tiles-container::-webkit-scrollbar { width: 6px; }
-        .tiles-container::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
-        .tiles-container::-webkit-scrollbar-track { background: transparent; }
+        .conf-wrap { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .conf-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+        .conf-value { font-size: 12px; font-weight: 800; color: #0f172a; }
+        .conf-bar { width: 100%; height: 8px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+        .conf-fill { height: 100%; border-radius: 999px; width: 0; transition: width 120ms linear; background: linear-gradient(90deg, #ef4444 0%, #eab308 55%, #0ea5e9 100%); }
+
+        .status { color: #075985; font-weight: 800; background: #e0f2fe; padding: 4px 10px; border-radius: 999px; border: 1px solid #bae6fd; font-size: 12px; }
+        .status.disconnected { color: #b91c1c; background: #fee2e2; border-color: #fecaca; }
+
+        @media (max-width: 1100px) {
+            .dashboard { flex-direction: column; align-items: center; }
+            .view-container, .tiles-container { width: min(95vw, 700px); }
+            .tiles-container { max-height: none; }
+        }
     </style>
 </head>
 <body>
 
     <div class="header-panel">
-        <h1>Dashboard Fúze Senzorů</h1>
-        <div class="status-container">
-            LINK: <span id="status" class="status disconnected">OFFLINE</span>
+        <div class="title-wrap">
+            <h1>Senzorová fúze 3x3m</h1>
+            <p>Přehled tras a zdrojů: radar vs. radar+BLE vs. BLE-only</p>
         </div>
+        <div class="status-wrap">STATUS: <span id="status" class="status disconnected">OFFLINE</span></div>
+    </div>
+
+    <div class="legend-row">
+        <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar);"></span>Radar only</span>
+        <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar-ble);"></span>Radar + BLE</span>
+        <span class="legend-chip"><span class="legend-dot" style="background: var(--source-ble-only);"></span>BLE only</span>
     </div>
 
     <div class="view-controls">
-        <button id="btn2d" class="active" onclick="switchView('2d')">2D Monitor</button>
-        <button id="btn3d" onclick="switchView('3d')">3D Vizualizace</button>
+        <button id="btn2d" class="active" onclick="switchView('2d')">2D Pohled</button>
+        <button id="btn3d" onclick="switchView('3d')">3D Pohled</button>
     </div>
 
     <div class="dashboard">
         <div class="view-container">
             <canvas id="radarCanvas" width="600" height="600"></canvas>
             <div id="view3d"></div>
-            <div id="hint3d" class="hint-3d">KAMERA: Levý klik (Rotace) | Pravý klik (Posun) | Kolečko (Zoom)</div>
         </div>
-
-        <div id="tiles-container" class="tiles-container">
-            <div class="empty-message">Čekám na data ze senzorů...</div>
-        </div>
+        <div id="tiles-container" class="tiles-container"></div>
     </div>
 
     <script>
-        // Tento skript má tři hlavní úkoly:
-        // 1. vykreslit scénu místnosti ve 2D,
-        // 2. vykreslit stejná fused data ve 3D,
-        // 3. udržovat obě zobrazení synchronní podle websocket aktualizací ze serveru.
-        // --- BAREVNÁ PALETA ---
-        const COLOR_RADAR = '#2563eb';
-        const COLOR_FUSED = '#dc2626';
-        const COLOR_SENSOR = '#475569';
-        const COLOR_GRID = '#cbd5e1';
-        const COLOR_AXIS_X = '#ef4444';
-        const COLOR_AXIS_Y = '#10b981';
-        const COLOR_AXIS_Z = '#3b82f6';
-
-        // --- ROZLOŽENÍ SENZORŮ ---
-        const SENSOR_NODES = [
-            { id: "S1", x: 1.5, y: 0.0, z: 0.7 },
-            { id: "S2", x: 0.0, y: 1.5, z: 0.7 }
-        ];
+        const COLOR_SOURCE = { radar: '#0ea5e9', radar_raw: '#0ea5e9', radar_ble: '#ef4444', ble_only: '#eab308' };
+        const SENSOR_NODES = [ { id: "S1", x: 1.5, y: 0.0, z: 0.8 }, { id: "S2", x: 0.0, y: 1.5, z: 0.8 } ];
 
         let currentMode = '2d';
         let latestObjects = [];
-        let lastUpdateTime = Date.now(); // STOPKY PRO WATCHDOG
+        let latestStats = null;
+        let displayState = {};
+        let latestRadarPoints = [];
+        let lastAnimationTimeSec = performance.now() / 1000;
 
-        const btn2d = document.getElementById('btn2d');
-        const btn3d = document.getElementById('btn3d');
+        const TRACK_SMOOTH_SECONDS = 0.34;
+        const BLE_SMOOTH_SECONDS = 0.55;
+        const TRACK_MAX_VISUAL_SPEED_MPS = 1.10;
+        const BLE_MAX_VISUAL_SPEED_MPS = 0.55;
+        const VISUAL_HOLD_SECONDS = 1.6;
+
         const canvas = document.getElementById('radarCanvas');
-        const view3d = document.getElementById('view3d');
-        const hint3d = document.getElementById('hint3d');
         const ctx = canvas.getContext('2d');
-        const statusSpan = document.getElementById('status');
         const tilesContainer = document.getElementById('tiles-container');
 
+        const PIXELS_PER_METER = 180;
+        const OFFSET = 30;
+
         function switchView(mode) {
-            // Přepínání zobrazení nemění data, pouze způsob jejich vizualizace.
-            // Backend stále posílá stejný snapshot objektů, jen ho jednou kreslíme na 2D canvas
-            // a podruhé do 3D scény přes Three.js.
             currentMode = mode;
-            if (mode === '2d') {
-                btn2d.classList.add('active');
-                btn3d.classList.remove('active');
-                canvas.style.display = 'block';
-                view3d.style.display = 'none';
-                hint3d.style.display = 'none';
-                drawObjects2D(latestObjects);
-            } else {
-                btn3d.classList.add('active');
-                btn2d.classList.remove('active');
-                canvas.style.display = 'none';
-                view3d.style.display = 'block';
-                hint3d.style.display = 'block';
-                updateObjects3D(latestObjects);
+            document.getElementById('btn2d').classList.toggle('active', mode === '2d');
+            document.getElementById('btn3d').classList.toggle('active', mode === '3d');
+            canvas.style.display = mode === '2d' ? 'block' : 'none';
+            document.getElementById('view3d').style.display = mode === '3d' ? 'block' : 'none';
+        }
+
+        function normalizeTagId(tagId) {
+            if (tagId === null || tagId === undefined) return "";
+            return String(tagId).trim().toUpperCase().replace(/[^A-Z0-9_]/g, "");
+        }
+
+        function dedupeByTagId(objects) {
+            const bestById = new Map();
+            objects.forEach(obj => {
+                const id = normalizeTagId(obj.tag_id) || String(obj.tag_id ?? "");
+                if (!id) return;
+                const prev = bestById.get(id);
+                const prevConf = prev?.confidence ?? 0;
+                const newConf = obj.confidence ?? 0;
+                if (!prev || newConf > prevConf) bestById.set(id, obj);
+            });
+            return Array.from(bestById.values());
+        }
+
+        function getObjectType(obj) {
+            const type = String(obj.object_type || '').toLowerCase();
+            if (type) return type;
+            const id = String(obj.tag_id || '').toUpperCase();
+            if (id.startsWith('BLE_')) return 'ble_only';
+            if (id.startsWith('TAG_')) return 'tagged';
+            return 'untagged';
+        }
+
+        function getSourceCategory(obj) {
+            const sourceRaw = String(obj.source || '').toLowerCase();
+            const type = getObjectType(obj);
+            const id = String(obj.tag_id || '').toUpperCase();
+
+            if (sourceRaw.includes('ble_only') || sourceRaw.includes('ble only')) return 'ble_only';
+            if (sourceRaw.includes('radar_raw') || type === 'radar_raw') return 'radar_raw';
+            if ((sourceRaw.includes('radar') && sourceRaw.includes('ble')) || sourceRaw.includes('radar+ble')) return 'radar_ble';
+            if (sourceRaw.includes('ble') && !sourceRaw.includes('radar')) return 'ble_only';
+            if (sourceRaw.includes('radar')) return 'radar';
+
+            if (type === 'ble_only' || id.startsWith('BLE_')) return 'ble_only';
+            if (type === 'tagged' || id.startsWith('TAG_')) return 'radar_ble';
+            return 'radar';
+        }
+
+        function getSourceLabel(obj) {
+            const source = getSourceCategory(obj);
+            if (source === 'radar_ble') return 'Radar + BLE';
+            if (source === 'ble_only') return 'BLE only';
+            return 'Radar only';
+        }
+
+        function getTypeLabel(obj) {
+            const type = getObjectType(obj);
+            if (type === 'radar_raw') return 'Raw';
+            if (type === 'tagged') return 'Tagged';
+            if (type === 'ble_only') return 'BLE';
+            return 'Track';
+        }
+
+        function getSourceColor(obj) { return COLOR_SOURCE[getSourceCategory(obj)] || COLOR_SOURCE.radar; }
+
+        function getSourceBadgeClass(obj) {
+            const source = getSourceCategory(obj);
+            if (source === 'radar_ble') return 'badge-radar-ble';
+            if (source === 'ble_only') return 'badge-ble-only';
+            return 'badge-radar';
+        }
+
+        function getTileClass(obj) {
+            const source = getSourceCategory(obj);
+            if (source === 'radar_ble') return 'source-radar-ble';
+            if (source === 'ble_only') return 'source-ble-only';
+            return 'source-radar';
+        }
+
+        function isBLEOnly(obj) { return getSourceCategory(obj) === 'ble_only'; }
+
+        function isRadarRaw(obj) {
+            return String(obj.object_type || '').toLowerCase() === 'radar_raw' || String(obj.source || '').toLowerCase() === 'radar_raw';
+        }
+
+        function safeNum(value, fallback = 0) { const n = Number(value); return Number.isFinite(n) ? n : fallback; }
+
+        function smoothObjectPosition(displayObj, targetObj, dtSec) {
+            const isBle = isBLEOnly(targetObj);
+            if (isRadarRaw(targetObj)) {
+                // Surový radar se nevyhlazuje - okamžitý snap
+                displayObj.x = safeNum(targetObj.x, safeNum(displayObj.x));
+                displayObj.y = safeNum(targetObj.y, safeNum(displayObj.y));
+                if (targetObj.z !== undefined) displayObj.z = safeNum(targetObj.z, safeNum(displayObj.z));
+                return;
+            }
+
+            const smoothSeconds = isBle ? BLE_SMOOTH_SECONDS : TRACK_SMOOTH_SECONDS;
+            const maxSpeed = isBle ? BLE_MAX_VISUAL_SPEED_MPS : TRACK_MAX_VISUAL_SPEED_MPS;
+            const alpha = 1 - Math.exp(-Math.max(0.001, dtSec) / smoothSeconds);
+
+            const currentX = safeNum(displayObj.x, safeNum(targetObj.x));
+            const currentY = safeNum(displayObj.y, safeNum(targetObj.y));
+            const targetX = safeNum(targetObj.x, currentX);
+            const targetY = safeNum(targetObj.y, currentY);
+
+            let nextX = currentX + (targetX - currentX) * alpha;
+            let nextY = currentY + (targetY - currentY) * alpha;
+
+            const dx = nextX - currentX;
+            const dy = nextY - currentY;
+            const step = Math.hypot(dx, dy);
+            const maxStep = maxSpeed * Math.max(0.001, dtSec);
+
+            if (step > maxStep && step > 0) {
+                const scale = maxStep / step;
+                nextX = currentX + dx * scale;
+                nextY = currentY + dy * scale;
+            }
+
+            displayObj.x = nextX;
+            displayObj.y = nextY;
+            if (targetObj.z !== undefined) {
+                const currentZ = safeNum(displayObj.z, safeNum(targetObj.z));
+                displayObj.z = currentZ + (safeNum(targetObj.z) - currentZ) * alpha;
             }
         }
 
-        // ==========================================
-        //        1. LOGIKA PRO 2D PLÁTNO
-        // ==========================================
-        const PIXELS_PER_METER = 170;
-        const PADDING_LEFT = 45;
-        const PADDING_BOTTOM = 45;
-        const originX = PADDING_LEFT;
-        const originY = canvas.height - PADDING_BOTTOM;
+        function formatMeters(value) { return `${safeNum(value).toFixed(2)} m`; }
+        function formatConf(value) { return safeNum(value).toFixed(2); }
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function updateDebugPanel(stats) {
+            if (!stats) return;
+            latestStats = stats;
+        }
 
         function drawMap2D() {
-            // drawMap2D kreslí statickou kostru mapy:
-            // - půdorys 3x3 m,
-            // - mřížku po metrech,
-            // - osy X a Y,
-            // - pevné pozice senzorů.
-            //
-            // Tato část se nemění podle dat. Je to pouze referenční podklad.
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, 600, 600);
+            ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(OFFSET + 1.5 * PIXELS_PER_METER, OFFSET); ctx.lineTo(OFFSET + 1.5 * PIXELS_PER_METER, 600 - OFFSET);
+            ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(OFFSET, 600 - OFFSET - 1.5 * PIXELS_PER_METER); ctx.lineTo(600 - OFFSET, 600 - OFFSET - 1.5 * PIXELS_PER_METER); ctx.stroke();
 
-            ctx.strokeStyle = COLOR_GRID;
-            ctx.lineWidth = 1;
-            for (let x = 1; x <= 3; x++) {
-                let px = originX + (x * PIXELS_PER_METER);
-                ctx.beginPath(); ctx.moveTo(px, originY); ctx.lineTo(px, originY - (3 * PIXELS_PER_METER)); ctx.stroke();
-            }
-            for (let y = 1; y <= 3; y++) {
-                let py = originY - (y * PIXELS_PER_METER);
-                ctx.beginPath(); ctx.moveTo(originX, py); ctx.lineTo(originX + (3 * PIXELS_PER_METER), py); ctx.stroke();
+            ctx.lineWidth = 1; ctx.strokeStyle = '#cbd5e1';
+            for (let i = 0; i <= 3; i++) {
+                const p = OFFSET + (i * PIXELS_PER_METER);
+                ctx.beginPath(); ctx.moveTo(p, 600 - OFFSET); ctx.lineTo(p, 600 - OFFSET - 3 * PIXELS_PER_METER); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(OFFSET, 600 - p); ctx.lineTo(OFFSET + 3 * PIXELS_PER_METER, 600 - p); ctx.stroke();
+                ctx.fillStyle = '#475569'; ctx.font = '12px Arial'; ctx.fillText(`${i}m`, p - 8, 600 - 10); ctx.fillText(`${i}m`, 5, 600 - p + 4);
             }
 
-            ctx.strokeStyle = '#94a3b8';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(originX, originY - (3 * PIXELS_PER_METER), 3 * PIXELS_PER_METER, 3 * PIXELS_PER_METER);
+            ctx.strokeStyle = '#334155'; ctx.lineWidth = 2; ctx.strokeRect(OFFSET, OFFSET, 3 * PIXELS_PER_METER, 3 * PIXELS_PER_METER);
 
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = COLOR_AXIS_X;
-            ctx.beginPath(); ctx.moveTo(originX, originY); ctx.lineTo(originX + (3 * PIXELS_PER_METER) + 20, originY); ctx.stroke();
-
-            ctx.strokeStyle = COLOR_AXIS_Y;
-            ctx.beginPath(); ctx.moveTo(originX, originY); ctx.lineTo(originX, originY - (3 * PIXELS_PER_METER) - 20); ctx.stroke();
-
-            ctx.fillStyle = '#64748b';
-            ctx.font = '12px "Segoe UI", Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            for (let i = 0; i <= 3; i++) ctx.fillText(i + 'm', originX + (i * PIXELS_PER_METER), originY + 8);
-
-            ctx.fillStyle = COLOR_AXIS_X;
-            ctx.font = 'bold 12px "Segoe UI", Arial';
-            ctx.fillText('X', originX + (3 * PIXELS_PER_METER) + 15, originY + 8);
-
-            ctx.fillStyle = '#64748b';
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'middle';
-            for (let i = 0; i <= 3; i++) ctx.fillText(i + 'm', originX - 8, originY - (i * PIXELS_PER_METER));
-
-            ctx.fillStyle = COLOR_AXIS_Y;
-            ctx.font = 'bold 12px "Segoe UI", Arial';
-            ctx.fillText('Y', originX - 8, originY - (3 * PIXELS_PER_METER) - 15);
-
-            SENSOR_NODES.forEach(sensor => {
-                const px = originX + (sensor.x * PIXELS_PER_METER);
-                const py = originY - (sensor.y * PIXELS_PER_METER);
-
-                ctx.fillStyle = COLOR_SENSOR;
-                ctx.fillRect(px - 12, py - 12, 24, 24);
-
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 11px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(sensor.id, px, py);
+            SENSOR_NODES.forEach(s => {
+                const px = OFFSET + (s.x * PIXELS_PER_METER);
+                const py = (600 - OFFSET) - (s.y * PIXELS_PER_METER);
+                ctx.fillStyle = '#1e293b'; ctx.fillRect(px - 10, py - 10, 20, 20);
+                ctx.fillStyle = 'white'; ctx.font = 'bold 10px Arial'; ctx.fillText(s.id, px - 6, py + 4);
             });
         }
 
         function drawObjects2D(objects) {
-            // drawObjects2D kreslí nad statickou mapu aktuální objekty ze snapshotu fusion vrstvy.
-            //
-            // Každý objekt:
-            // - má barvu podle toho, zda jde o pojmenovaný fused track nebo radar-only cíl,
-            // - používá opacity z backendu,
-            // - má krátký textový popisek nad bodem.
             drawMap2D();
-            if (!objects) return;
+            const order = { radar: 0, radar_ble: 1, ble_only: 2 };
+            objects.sort((a, b) => (order[getSourceCategory(a)] ?? 0) - (order[getSourceCategory(b)] ?? 0));
 
             objects.forEach(obj => {
-                const px = originX + (obj.x * PIXELS_PER_METER);
-                const py = originY - (obj.y * PIXELS_PER_METER);
+                const x = safeNum(obj.x); const y = safeNum(obj.y);
+                const px = OFFSET + (x * PIXELS_PER_METER); const py = (600 - OFFSET) - (y * PIXELS_PER_METER);
+                const source = getSourceCategory(obj); const color = getSourceColor(obj);
+                const conf = Math.max(0.10, safeNum(obj.confidence, 1));
+                const rawRadar = isRadarRaw(obj);
+                const radius = rawRadar ? 8 : (source === 'ble_only' ? 15 : 11);
 
-                const isFused = (obj.tag_id && obj.tag_id !== "unknown");
-                const color = isFused ? COLOR_FUSED : COLOR_RADAR;
+                ctx.globalAlpha = conf;
+                ctx.beginPath(); ctx.arc(px, py, radius, 0, 2 * Math.PI);
+                ctx.fillStyle = color; ctx.fill();
 
-                // Načtení opacity z backendu pro efekt vyblednutí
-                const opacity = (obj.opacity !== undefined) ? obj.opacity : 1.0;
-                ctx.globalAlpha = opacity;
+                ctx.lineWidth = rawRadar ? 2 : 3; ctx.strokeStyle = rawRadar ? 'rgba(255, 255, 255, 0.85)' : '#ffffff';
+                ctx.shadowColor = rawRadar ? 'rgba(14, 165, 233, 0.85)' : 'rgba(0, 0, 0, 0.35)';
+                ctx.shadowBlur = rawRadar ? 12 : 6; ctx.stroke();
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
 
-                // Zaměřovač
-                ctx.beginPath();
-                ctx.arc(px, py, 8, 0, 2 * Math.PI, false);
-                ctx.fillStyle = color;
-                ctx.fill();
-
-                ctx.beginPath();
-                ctx.arc(px, py, 14, 0, 2 * Math.PI, false);
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = color;
-                ctx.stroke();
-
-                ctx.fillStyle = '#0f172a';
-                ctx.font = 'bold 12px "Segoe UI", Arial';
-                ctx.textAlign = 'center';
-                const tagIdText = isFused ? obj.tag_id : "TRG";
-                ctx.fillText(tagIdText, px, py - 22);
-
-                ctx.globalAlpha = 1.0; // Reset průhlednosti
+                if (source !== 'radar' && !rawRadar) {
+                    ctx.beginPath(); ctx.arc(px, py, source === 'ble_only' ? 22 : 18, 0, 2 * Math.PI);
+                    ctx.lineWidth = 2; ctx.strokeStyle = source === 'ble_only' ? 'rgba(234, 179, 8, 0.55)' : 'rgba(239, 68, 68, 0.45)';
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1.0;
             });
         }
 
-        // ==========================================
-        //        2. LOGIKA PRO 3D PROSTOR
-        // ==========================================
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color('#ffffff');
-
-        const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-        camera.position.set(4, 4, 5);
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(600, 600);
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        view3d.appendChild(renderer.domElement);
+        const scene = new THREE.Scene(); scene.background = new THREE.Color(0xf8fafc);
+        const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100); camera.position.set(3.9, 4.8, 4.2);
+        const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(600, 600);
+        renderer.setPixelRatio(window.devicePixelRatio || 1); renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+        document.getElementById('view3d').appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.target.set(1.5, 0, -1.5);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.update();
+        controls.target.set(1.5, 0, -1.5); controls.enableDamping = true; controls.dampingFactor = 0.08;
+        controls.maxPolarAngle = Math.PI * 0.49; controls.minDistance = 2.2; controls.maxDistance = 8.5;
 
-        const gridHelper = new THREE.GridHelper(3, 3, 0x94a3b8, 0xe2e8f0);
-        gridHelper.position.set(1.5, 0.01, -1.5);
-        scene.add(gridHelper);
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.95, metalness: 0.0 }));
+        floor.rotation.x = -Math.PI / 2; floor.position.set(1.5, 0, -1.5); scene.add(floor);
 
-        const floorGeo = new THREE.PlaneGeometry(3, 3);
-        const floorMat = new THREE.MeshLambertMaterial({color: 0xf8fafc});
-        const floor = new THREE.Mesh(floorGeo, floorMat);
-        floor.rotation.x = -Math.PI / 2;
-        floor.position.set(1.5, 0, -1.5);
-        floor.receiveShadow = true;
-        scene.add(floor);
+        const roomOutline = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, 0.01, 0), new THREE.Vector3(3, 0.01, 0), new THREE.Vector3(3, 0.01, -3), new THREE.Vector3(0, 0.01, -3), new THREE.Vector3(0, 0.01, 0)
+        ]);
+        scene.add(new THREE.Line(roomOutline, new THREE.LineBasicMaterial({ color: 0x334155 })));
+        const grid = new THREE.GridHelper(3, 12, 0x94a3b8, 0xdbe5ee); grid.position.set(1.5, 0.001, -1.5); scene.add(grid);
+        scene.add(new THREE.HemisphereLight(0xffffff, 0xe2e8f0, 0.72));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.65); dirLight.position.set(4.2, 8, 3.1); scene.add(dirLight);
 
-        function create3DAxis(colorHex, length, posX, posY, posZ, rotX, rotY, rotZ) {
-            // Pomocná funkce pro vytvoření 3D osy.
-            // Válec je v této scéně čitelnější než tenká čára, hlavně při otáčení kamery.
-            const geo = new THREE.CylinderGeometry(0.01, 0.01, length, 8);
-            const mat = new THREE.MeshBasicMaterial({ color: colorHex });
-            const cylinder = new THREE.Mesh(geo, mat);
-            cylinder.position.set(posX, posY, posZ);
-            cylinder.rotation.set(rotX, rotY, rotZ);
-            return cylinder;
+        const meshes3D = {};
+
+        function createTrackMesh(source) {
+            const isBleOnly = source === 'ble_only'; const isRawRadar = source === 'radar_raw';
+            const radius = isRawRadar ? 0.055 : (isBleOnly ? 0.17 : 0.13);
+            const colorHex = getSourceColor({ source, object_type: source === 'ble_only' ? 'ble_only' : 'tagged' });
+            const group = new THREE.Group();
+
+            const sphereGeo = new THREE.SphereGeometry(radius, 24, 24);
+            const sphereMat = new THREE.MeshStandardMaterial({ color: colorHex, emissive: colorHex, emissiveIntensity: isBleOnly ? 0.25 : 0.20, roughness: 0.28, metalness: 0.02, transparent: true });
+            const sphere = new THREE.Mesh(sphereGeo, sphereMat); group.add(sphere);
+
+            if (!isRawRadar) {
+                const ringRadius = isBleOnly ? 0.34 : 0.29;
+                const ring = new THREE.Mesh(new THREE.RingGeometry(ringRadius - 0.02, ringRadius, 40), new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, transparent: true, opacity: isBleOnly ? 0.58 : 0.50 }));
+                ring.rotation.x = -Math.PI / 2; ring.position.y = -radius + 0.02; group.add(ring);
+                if (!isBleOnly) {
+                    const outline = new THREE.LineSegments(new THREE.EdgesGeometry(sphereGeo), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.90 }));
+                    group.add(outline);
+                }
+                group.userData = { sphere, ring, source };
+            } else {
+                group.userData = { sphere, ring: null, source }; // Radar nemá velké prstence
+            }
+            return group;
         }
-
-        scene.add(create3DAxis(COLOR_AXIS_X, 3.5, 1.75, 0.01, 0, 0, 0, -Math.PI / 2));
-        scene.add(create3DAxis(COLOR_AXIS_Y, 3.5, 0, 0.01, -1.75, Math.PI / 2, 0, 0));
-        scene.add(create3DAxis(COLOR_AXIS_Z, 2.0, 0, 1.0, 0, 0, 0, 0));
-
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-        scene.add(ambientLight);
-
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
-        directionalLight.position.set(4, 8, 4);
-        directionalLight.castShadow = true;
-        directionalLight.shadow.mapSize.width = 1024;
-        directionalLight.shadow.mapSize.height = 1024;
-        scene.add(directionalLight);
-
-        SENSOR_NODES.forEach(sensor => {
-            const geom = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-            const mat = new THREE.MeshLambertMaterial({ color: COLOR_SENSOR });
-            const mesh = new THREE.Mesh(geom, mat);
-            mesh.castShadow = true;
-            mesh.position.set(sensor.x, sensor.z, -sensor.y);
-            scene.add(mesh);
-
-            const poleGeom = new THREE.CylinderGeometry(0.03, 0.03, sensor.z);
-            const poleMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
-            const pole = new THREE.Mesh(poleGeom, poleMat);
-            pole.castShadow = true;
-            pole.position.set(sensor.x, sensor.z / 2, -sensor.y);
-            scene.add(pole);
-        });
-
-        let meshes3D = {};
 
         function updateObjects3D(objects) {
-            // updateObjects3D převádí fused snapshot do 3D reprezentace.
-            //
-            // Každý logický objekt vlastní jednu Three.js group:
-            // - kouli v aktuální poloze,
-            // - svislou linku k podlaze, aby byla lépe čitelná výška Z.
-            if (!objects) return;
-            const currentIds = new Set();
-
-            objects.forEach((obj, idx) => {
-                const id = (obj.tag_id && obj.tag_id !== "unknown") ? obj.tag_id : `radar_${idx}`;
-                currentIds.add(id);
-
-                const isFused = (obj.tag_id && obj.tag_id !== "unknown");
-                const colorHex = isFused ? COLOR_FUSED : COLOR_RADAR;
-                const opacity = (obj.opacity !== undefined) ? obj.opacity : 1.0;
-
-                if (!meshes3D[id]) {
-                    // Mesh vytváříme až při prvním výskytu objektu.
-                    // Další snímky už jen aktualizují pozici, barvu a průhlednost,
-                    // což je levnější než vše vytvářet znovu v každém kroku.
-                    const group = new THREE.Group();
-
-                    // Povolení průhlednosti u materiálů
-                    const geometry = new THREE.SphereGeometry(0.1, 32, 32);
-                    const material = new THREE.MeshLambertMaterial({ color: colorHex, transparent: true });
-                    const mesh = new THREE.Mesh(geometry, material);
-                    mesh.castShadow = true;
-                    mesh.name = "sphere";
-                    group.add(mesh);
-
-                    const lineGeo = new THREE.BufferGeometry().setFromPoints([
-                        new THREE.Vector3(0, 0, 0),
-                        new THREE.Vector3(0, -1, 0)
-                    ]);
-                    const lineMat = new THREE.LineBasicMaterial({ color: colorHex, linewidth: 2, transparent: true });
-                    const line = new THREE.Line(lineGeo, lineMat);
-                    line.name = "line";
-                    group.add(line);
-
-                    scene.add(group);
-                    meshes3D[id] = group;
+            const currentIds = new Set(); const nowSec = performance.now() / 1000;
+            objects.forEach(obj => {
+                const id = String(obj.tag_id); const source = getSourceCategory(obj); currentIds.add(id);
+                const needsRebuild = !meshes3D[id] || meshes3D[id].userData.source !== source;
+                if (needsRebuild) {
+                    if (meshes3D[id]) scene.remove(meshes3D[id]);
+                    meshes3D[id] = createTrackMesh(source); scene.add(meshes3D[id]);
                 }
+                const meshGroup = meshes3D[id]; const sphere = meshGroup.userData.sphere; const ring = meshGroup.userData.ring;
+                const color = getSourceColor(obj); const conf = Math.max(0.10, safeNum(obj.confidence, 1));
+                meshGroup.position.set(safeNum(obj.x), safeNum(obj.z, 0.5), -safeNum(obj.y));
+                sphere.material.color.set(color); sphere.material.emissive.set(color); sphere.material.opacity = conf;
 
-                const heightZ = (obj.z !== undefined && obj.z !== null) ? obj.z : 0.5;
-                const group = meshes3D[id];
-
-                group.position.set(obj.x, heightZ, -obj.y);
-
-                const sphere = group.getObjectByName("sphere");
-                if (sphere) {
-                    sphere.material.color.set(colorHex);
-                    sphere.material.opacity = opacity;
-                }
-
-                const line = group.getObjectByName("line");
-                if (line) {
-                    line.material.color.set(colorHex);
-                    line.material.opacity = opacity;
-                    line.scale.y = heightZ;
+                if (ring) {
+                    const pulse = 0.92 + 0.12 * Math.sin(nowSec * 4 + id.length * 0.35);
+                    ring.scale.setScalar(pulse); ring.material.color.set(color);
+                    ring.material.opacity = Math.max(0.25, conf * (source === 'radar' ? 0.45 : 0.62));
                 }
             });
-
             Object.keys(meshes3D).forEach(id => {
-                if (!currentIds.has(id)) {
-                    scene.remove(meshes3D[id]);
-                    delete meshes3D[id];
-                }
-            });
-        }
-
-        function animate3D() {
-            // 3D render smyčka běží pořád dokola.
-            // Samotné souřadnice objektů se ale mění jen ve chvíli,
-            // kdy přes websocket přijde nový snapshot z backendu.
-            requestAnimationFrame(animate3D);
-            if (currentMode === '3d') {
-                controls.update();
-                renderer.render(scene, camera);
-            }
-        }
-        animate3D();
-
-        // ==========================================
-        //        3. DLAŽDICE A WEBSOCKET
-        // ==========================================
-        function renderTiles(objects) {
-            // Boční dlaždice doplňují grafické zobrazení o přesné numerické hodnoty.
-            // To je důležité hlavně při ladění testů:
-            // uživatel nemusí odhadovat polohu nebo stav jen "od oka" z canvasu.
-            if (!objects || objects.length === 0) {
-                tilesContainer.innerHTML = '<div class="empty-message">Žádný cíl nedetekován.</div>';
-                return;
-            }
-            tilesContainer.innerHTML = '';
-
-            objects.forEach((obj, index) => {
-                const isFused = (obj.tag_id && obj.tag_id !== "unknown");
-                const opacity = (obj.opacity !== undefined) ? obj.opacity : 1.0;
-                const isFading = opacity < 0.95; // Detekce výpadku dat
-
-                const tileClass = isFused ? 'tile fused' : 'tile';
-                const title = isFused ? `ID TAGU: ${obj.tag_id}` : `TRG: NEZNÁMÝ CÍL #${index + 1}`;
-
-                const xVal = obj.x.toFixed(2);
-                const yVal = obj.y.toFixed(2);
-                const zVal = (obj.z !== undefined && obj.z !== null) ? obj.z.toFixed(2) : "0.00";
-                const confVal = obj.confidence ? (obj.confidence * 100).toFixed(0) + '%' : 'N/A';
-
-                // Barva a text podle toho, zda se jedná o výpadek (predikci)
-                const typeText = isFading ? 'VÝPADEK: PREDIKCE TRASY' : (isFused ? 'FÚZE: AKTIVNÍ (RADAR+BLE)' : 'ZDROJ: POUZE RADAR');
-                const colorText = isFading ? '#eab308' : (isFused ? COLOR_FUSED : COLOR_RADAR);
-
-                const tileHTML = `
-                    <div class="${tileClass}" style="opacity: ${Math.max(0.4, opacity)}; transition: opacity 0.2s;">
-                        <h3>${title}</h3>
-                        <div class="data-row"><span>POS X:</span> <strong>${xVal} m</strong></div>
-                        <div class="data-row"><span>POS Y:</span> <strong>${yVal} m</strong></div>
-                        <div class="data-row"><span>POS Z:</span> <strong>${zVal} m</strong></div>
-                        <div class="data-row" style="margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 10px;">
-                            <span style="color: ${colorText}; font-weight: 700; font-size: 12px; letter-spacing: 0.5px;">
-                                ${typeText}
-                            </span>
-                            <span style="font-size: 12px; font-weight: 600;">CONF: ${confVal}</span>
-                        </div>
-                    </div>
-                `;
-                tilesContainer.insertAdjacentHTML('beforeend', tileHTML);
+                if (!currentIds.has(id)) { scene.remove(meshes3D[id]); delete meshes3D[id]; }
             });
         }
 
         function connect() {
-            // Websocket je jediný živý kanál mezi backendem a dashboardem.
-            // Veškeré aktualizace poloh, identity, confidence i opacity jdou právě tudy.
-            const ws = new WebSocket(`ws://${window.location.host}/ws`);
+            const ws = new WebSocket(`ws://${window.location.host}/ws`); // Nebo upravte na absolutní ws://127.0.0.1:8765 pokud nenačítáte z localhostu
+            ws.onopen = () => { document.getElementById('status').className = 'status'; document.getElementById('status').innerText = 'ONLINE'; };
 
-            ws.onopen = function() {
-                statusSpan.textContent = "ONLINE / SNÍMÁNÍ";
-                statusSpan.className = "status";
-                if (currentMode === '2d') drawMap2D();
-            };
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                updateDebugPanel(data.stats);
+                let combined = [];
 
-            ws.onmessage = function(event) {
-                lastUpdateTime = Date.now(); // RESET WATCHDOG STOPEK
+                // --- MAPOVÁNÍ DAT Z NOVÉHO FUSION.PY ---
 
-                const data = JSON.parse(event.data);
-                if (data.type === "update") {
-                    // Jeden fused snapshot aktualizuje všechny části UI najednou:
-                    // 2D mapu, 3D scénu i boční dlaždice.
-                    latestObjects = data.objects;
-
-                    if (currentMode === '2d') drawObjects2D(latestObjects);
-                    if (currentMode === '3d') updateObjects3D(latestObjects);
-                    renderTiles(latestObjects);
+                // 1. Zpracování surových radarových bodů
+                if (data.radar && Array.isArray(data.radar)) {
+                    latestRadarPoints = data.radar.map((r, index) => ({
+                            tag_id: 'RAW_R_' + Math.random().toString(36).substr(2, 6),
+                            object_type: 'radar_raw',
+                            source: 'radar_raw',
+                            x: r.x, y: r.y, z: r.z,
+                            confidence: 0.95
+                    }));
                 }
+
+                // 2. Zpracování BLE dat
+                if (data.ble && Array.isArray(data.ble)) {
+                    data.ble.forEach(b => {
+                        combined.push({
+                            tag_id: b.tag_id,
+                            object_type: 'ble_only',
+                            source: 'ble_only',
+                            x: b.x, y: b.y, z: 0.8,
+                            confidence: 0.6
+                        });
+                    });
+                }
+
+                // Pokud by fusion.py posílal už sloužená data ve starém formátu "objects"
+                if (data.type === "update" && data.objects) {
+                    combined = combined.concat(data.objects);
+                }
+
+                latestObjects = combined;
             };
 
-            ws.onclose = function() {
-                statusSpan.textContent = "OFFLINE / SPOJENÍ PŘERUŠENO";
-                statusSpan.className = "status disconnected";
-                if (currentMode === '2d') drawMap2D();
-                tilesContainer.innerHTML = '<div class="empty-message">Spojení se serverem ztraceno. Obnovuji...</div>';
+            ws.onclose = () => {
+                document.getElementById('status').className = 'status disconnected'; document.getElementById('status').innerText = 'OFFLINE';
                 setTimeout(connect, 2000);
             };
         }
 
-        // --- WATCHDOG PROTI ZAMRZÁNÍ ---
-        setInterval(() => {
-            // Watchdog chrání frontend proti "zamrznutí" posledních známých objektů.
-            // Pokud dlouho nepřijde update, scénu raději vyprázdníme,
-            // aby uživatel neviděl neaktuální data jako živý stav.
-            if (Date.now() - lastUpdateTime > 1000 && latestObjects.length > 0) {
-                latestObjects = [];
-                if (currentMode === '2d') drawObjects2D(latestObjects);
-                if (currentMode === '3d') updateObjects3D(latestObjects);
-                renderTiles(latestObjects);
-            }
-        }, 500);
+        function renderTiles(drawList) {
+            // ODFILTROVÁNÍ SUROVÉHO RADARU, aby nezahltil DOM a nezhroutil prohlížeč
+            const filteredForTiles = drawList.filter(obj => !isRadarRaw(obj));
+            const statsHtml = `
+                <div class="tile source-radar">
+                    <div class="tile-head">
+                        <div>
+                            <h3 class="tile-title">DIAGNOSTIKA SENZORŮ</h3>
+                            <div class="tile-sub">${latestStats ? 'živý MQTT/WebSocket stream' : 'čekám na první zprávu'}</div>
+                        </div>
+                    </div>
+                    <div class="tile-grid">
+                        <div class="metric"><span class="metric-label">Radar nový</span><span class="metric-value">${latestStats?.new_radar_points ?? 0}</span></div>
+                        <div class="metric"><span class="metric-label">Radar historie</span><span class="metric-value">${latestStats?.radar_history_points ?? 0}</span></div>
+                        <div class="metric"><span class="metric-label">BLE 1 tagy</span><span class="metric-value">${latestStats?.ble_1_tags ?? 0}</span></div>
+                        <div class="metric"><span class="metric-label">BLE 2 tagy</span><span class="metric-value">${latestStats?.ble_2_tags ?? 0}</span></div>
+                        <div class="metric"><span class="metric-label">Společné BLE</span><span class="metric-value">${latestStats?.common_ble_tags ?? 0}</span></div>
+                        <div class="metric"><span class="metric-label">Triangulace</span><span class="metric-value">${latestStats?.triangulated_ble ?? 0}</span></div>
+                    </div>
+                    <div class="conf-wrap">
+                        <span class="conf-label">Poslední update</span>
+                        <span class="conf-value">${latestStats ? new Date(latestStats.timestamp * 1000).toLocaleTimeString() : '-'}</span>
+                    </div>
+                </div>`;
 
-        drawMap2D();
+            if (filteredForTiles.length === 0) {
+                tilesContainer.innerHTML = statsHtml + '<div class="empty-state">Žádné sledované cíle (Surová data z radaru nezobrazujeme v seznamu)</div>';
+                return;
+            }
+
+            const sorted = [...filteredForTiles].sort((a, b) => safeNum(b.confidence) - safeNum(a.confidence));
+            tilesContainer.innerHTML = statsHtml + sorted.map(obj => {
+                const sourceLabel = getSourceLabel(obj); const sourceBadgeClass = getSourceBadgeClass(obj);
+                const sourceClass = getTileClass(obj); const conf = safeNum(obj.confidence, 0);
+                const confPct = Math.max(0, Math.min(100, conf * 100)); const tagId = escapeHtml(obj.tag_id || 'UNKNOWN');
+                return `
+                    <div class="tile ${sourceClass}">
+                        <div class="tile-head"><div><h3 class="tile-title">${tagId}</h3><div class="tile-sub">${escapeHtml(String(obj.source || 'fused-stream'))}</div></div>
+                        <div class="badge-row"><span class="badge ${sourceBadgeClass}">${sourceLabel}</span><span class="badge badge-type">${getTypeLabel(obj)}</span></div></div>
+                        <div class="tile-grid">
+                            <div class="metric"><span class="metric-label">X</span><span class="metric-value">${formatMeters(obj.x)}</span></div>
+                            <div class="metric"><span class="metric-label">Y</span><span class="metric-value">${formatMeters(obj.y)}</span></div>
+                            <div class="metric"><span class="metric-label">Z</span><span class="metric-value">${formatMeters(obj.z)}</span></div>
+                            <div class="metric"><span class="metric-label">Confidence</span><span class="metric-value">${formatConf(conf)}</span></div>
+                        </div>
+                        <div class="conf-wrap"><span class="conf-label">Stabilita trasy</span><span class="conf-value">${confPct.toFixed(0)}%</span></div>
+                        <div class="conf-bar"><div class="conf-fill" style="width:${confPct}%"></div></div>
+                    </div>`;
+            }).join('');
+        }
+
+        function animationLoop() {
+            requestAnimationFrame(animationLoop);
+            const nowSec = performance.now() / 1000;
+            const dtSec = Math.min(0.08, Math.max(0.001, nowSec - lastAnimationTimeSec));
+            lastAnimationTimeSec = nowSec;
+
+            const currentIds = new Set();
+            const latestUniqueObjects = dedupeByTagId(latestObjects);
+
+            latestUniqueObjects.forEach(target => {
+                const id = String(target.tag_id);
+                currentIds.add(id);
+
+                if (!displayState[id]) {
+                    displayState[id] = { ...target, last_seen: nowSec, last_reported_confidence: target.confidence ?? 1.0 };
+                } else {
+                    smoothObjectPosition(displayState[id], target, dtSec);
+                    displayState[id].confidence = target.confidence ?? 1.0;
+                    displayState[id].last_reported_confidence = target.confidence ?? 1.0;
+                    displayState[id].object_type = target.object_type || displayState[id].object_type;
+                    displayState[id].source = target.source || displayState[id].source;
+                    displayState[id].last_seen = nowSec;
+                }
+            });
+
+            Object.keys(displayState).forEach(id => {
+                if (currentIds.has(id)) return;
+                const obj = displayState[id];
+                const age = nowSec - (obj.last_seen || nowSec);
+
+                if (age > VISUAL_HOLD_SECONDS) {
+                    delete displayState[id];
+                    return;
+                }
+                const baseConf = obj.last_reported_confidence ?? obj.confidence ?? 1.0;
+                obj.confidence = Math.max(0.15, baseConf * (1 - (age / VISUAL_HOLD_SECONDS)));
+            });
+
+            const drawList = latestRadarPoints.concat(Object.values(displayState));
+            if (currentMode === '2d') { drawObjects2D(drawList); } else { controls.update(); updateObjects3D(drawList); renderer.render(scene, camera); }
+            renderTiles(drawList);
+        }
+
         connect();
+        animationLoop();
     </script>
 </body>
 </html>

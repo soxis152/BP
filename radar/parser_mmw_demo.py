@@ -122,14 +122,14 @@ def parser_helper(data, readNumBytes):
         numTlv              = getUint32(data[headerStartIndex+32:headerStartIndex+36:1])
         subFrameNumber      = getUint32(data[headerStartIndex+36:headerStartIndex+40:1])
 
-    print("headerStartIndex    = %d" % (headerStartIndex))
-    print("totalPacketNumBytes = %d" % (totalPacketNumBytes))
-    print("platform            = %s" % (platform))
-    print("frameNumber         = %d" % (frameNumber))
-    print("timeCpuCycles       = %d" % (timeCpuCycles))
-    print("numDetObj           = %d" % (numDetObj))
-    print("numTlv              = %d" % (numTlv))
-    print("subFrameNumber      = %d" % (subFrameNumber))
+    # print("headerStartIndex    = %d" % (headerStartIndex))
+    # print("totalPacketNumBytes = %d" % (totalPacketNumBytes))
+    # print("platform            = %s" % (platform))
+    # print("frameNumber         = %d" % (frameNumber))
+    # print("timeCpuCycles       = %d" % (timeCpuCycles))
+    # print("numDetObj           = %d" % (numDetObj))
+    # print("numTlv              = %d" % (numTlv))
+    # print("subFrameNumber      = %d" % (subFrameNumber))
 
     return (headerStartIndex, totalPacketNumBytes, frameNumber, numDetObj, numTlv, subFrameNumber)
 
@@ -180,22 +180,22 @@ def parser_one_mmw_demo_output_packet(data, readNumBytes):
 
     if headerStartIndex == -1:
         result = TC_FAIL
-        print("************ Frame Fail, cannot find the magic words *****************")
+        # print("************ Frame Fail, cannot find the magic words *****************")
     else:
         nextHeaderStartIndex = headerStartIndex + totalPacketNumBytes
 
         if headerStartIndex + totalPacketNumBytes > readNumBytes:
             result = TC_FAIL
-            print("********** Frame Fail, readNumBytes may not long enough ***********")
+            # print("********** Frame Fail, readNumBytes may not long enough ***********")
         elif nextHeaderStartIndex + 8 < readNumBytes and checkMagicPattern(data[nextHeaderStartIndex:nextHeaderStartIndex+8:1]) == 0:
             result = TC_FAIL
-            print("********** Frame Fail, incomplete packet **********")
+            # print("********** Frame Fail, incomplete packet **********")
         elif numDetObj <= 0:
             result = TC_FAIL
-            print("************ Frame Fail, numDetObj = %d *****************" % (numDetObj))
+            # print("************ Frame Fail, numDetObj = %d *****************" % (numDetObj))
         elif subFrameNumber > 3:
             result = TC_FAIL
-            print("************ Frame Fail, subFrameNumber = %d *****************" % (subFrameNumber))
+            # print("************ Frame Fail, subFrameNumber = %d *****************" % (subFrameNumber))
         else:
             # process the 1st TLV
             tlvStart = headerStartIndex + headerNumBytes
@@ -204,9 +204,9 @@ def parser_one_mmw_demo_output_packet(data, readNumBytes):
             tlvLen = getUint32(data[tlvStart+4:tlvStart+8:1])
             offset = 8
 
-            print("The 1st TLV")
-            print("    type %d" % (tlvType))
-            print("    len %d bytes" % (tlvLen))
+            # print("The 1st TLV")
+            # print("    type %d" % (tlvType))
+            # print("    len %d bytes" % (tlvLen))
 
             # the 1st TLV must be type 1
             if tlvType == 1 and tlvLen < totalPacketNumBytes:#MMWDEMO_UART_MSG_DETECTED_POINTS
@@ -266,9 +266,9 @@ def parser_one_mmw_demo_output_packet(data, readNumBytes):
             tlvLen   = getUint32(data[tlvStart+4:tlvStart+8:1])
             offset   = 8
 
-            print("The 2nd TLV")
-            print("    type %d" % (tlvType))
-            print("    len %d bytes" % (tlvLen))
+            # print("The 2nd TLV")
+            # print("    type %d" % (tlvType))
+            # print("    len %d bytes" % (tlvLen))
 
             if tlvType == 7:
 
@@ -292,9 +292,9 @@ def parser_one_mmw_demo_output_packet(data, readNumBytes):
                     detectedNoise_array.append(0)
             # end of if tlvType == 7
 
-            print("                  x(m)         y(m)         z(m)        v(m/s)    range(m)  azimuth(deg)  elevAngle(deg)  snr(0.1dB)    noise(0.1dB)")
-            for obj in range(numDetObj):
-                print("    obj%3d: %12f %12f %12f %12f %12f %12f %12d %12d %12d" % (obj, detectedX_array[obj], detectedY_array[obj], detectedZ_array[obj], detectedV_array[obj], detectedRange_array[obj], detectedAzimuth_array[obj], detectedElevAngle_array[obj], detectedSNR_array[obj], detectedNoise_array[obj]))
+            #print("                  x(m)         y(m)         z(m)        v(m/s)    range(m)  azimuth(deg)  elevAngle(deg)  snr(0.1dB)    noise(0.1dB)")
+            #for obj in range(numDetObj):
+                #print("    obj%3d: %12f %12f %12f %12f %12f %12f %12d %12d %12d" % (obj, detectedX_array[obj], detectedY_array[obj], detectedZ_array[obj], detectedV_array[obj], detectedRange_array[obj], detectedAzimuth_array[obj], detectedElevAngle_array[obj], detectedSNR_array[obj], detectedNoise_array[obj]))
+
 
     return (result, headerStartIndex, totalPacketNumBytes, frameNumber, numDetObj, numTlv, subFrameNumber, detectedX_array, detectedY_array, detectedZ_array, detectedV_array, detectedRange_array, detectedAzimuth_array, detectedElevAngle_array, detectedSNR_array, detectedNoise_array)
-

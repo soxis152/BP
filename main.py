@@ -90,7 +90,7 @@ def main() -> None:
     #
     # Vlákna jsou daemon, protože proces chceme ukončovat jako jeden celek.
     threads = [
-        # threading.Thread(target=ingestion_thread, name="ingestion_thread", daemon=True),
+        threading.Thread(target=ingestion_thread, name="ingestion_thread", daemon=True),
         threading.Thread(target=fusion_thread, name="fusion_thread", daemon=True),
         threading.Thread(target=api_thread, name="api_thread", daemon=True),
     ]

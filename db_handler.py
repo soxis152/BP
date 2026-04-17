@@ -65,6 +65,7 @@ class AsyncDBHandler:
             )
 
             # Radar tabulky ukládají syrové body odrazu převedené do globální mapy místnosti.
+            # Přidán sloupec doppler.
             await conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.radar_1 ("
                 "id SERIAL PRIMARY KEY, "
@@ -72,7 +73,8 @@ class AsyncDBHandler:
                 "x DOUBLE PRECISION, "
                 "y DOUBLE PRECISION, "
                 "z DOUBLE PRECISION, "
-                "snr DOUBLE PRECISION)"
+                "snr DOUBLE PRECISION, "
+                "doppler DOUBLE PRECISION)"
             )
             await conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.radar_2 ("
@@ -81,7 +83,8 @@ class AsyncDBHandler:
                 "x DOUBLE PRECISION, "
                 "y DOUBLE PRECISION, "
                 "z DOUBLE PRECISION, "
-                "snr DOUBLE PRECISION)"
+                "snr DOUBLE PRECISION, "
+                "doppler DOUBLE PRECISION)"
             )
 
             # fused_data je už výstup fusion vrstvy:
@@ -139,8 +142,8 @@ class AsyncDBHandler:
             return
 
         cols = {
-            "radar_1": "(timestamp, x, y, z, snr)",
-            "radar_2": "(timestamp, x, y, z, snr)",
+            "radar_1": "(timestamp, x, y, z, snr, doppler)",
+            "radar_2": "(timestamp, x, y, z, snr, doppler)",
             "ble_1": "(timestamp, tag_id, rssi, azimuth)",
             "ble_2": "(timestamp, tag_id, rssi, azimuth)",
             "fused_data": "(timestamp, tag_id, x, y, z, confidence)",

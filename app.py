@@ -81,7 +81,10 @@ async def get():
     if not index_path.exists():
         return HTMLResponse("<h1>Error: missing index.html</h1>")
 
-    return HTMLResponse(index_path.read_text(encoding="utf-8"))
+    return HTMLResponse(
+        index_path.read_text(encoding="utf-8"),
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 @app.websocket("/ws")
