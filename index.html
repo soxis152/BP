@@ -20,6 +20,7 @@
             --source-radar: #0ea5e9;
             --source-radar-ble: #ef4444;
             --source-ble-only: #eab308;
+            --source-diagnostics: #16a34a;
         }
 
         * { box-sizing: border-box; }
@@ -96,6 +97,9 @@
         .tiles-container { display: flex; flex-direction: column; gap: 10px; width: 380px; max-height: 600px; overflow-y: auto; padding-right: 4px; }
         .tiles-container::-webkit-scrollbar { width: 8px; }
         .tiles-container::-webkit-scrollbar-thumb { background: #c7d2de; border-radius: 999px; }
+        .stats-container { width: 100%; max-width: 1000px; margin-bottom: 12px; }
+        .stats-container .tile { margin: 0; }
+        .stats-container .tile-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
         .empty-state { background: var(--bg-card); border: 1px dashed var(--border); border-radius: 12px; color: var(--text-muted); padding: 16px; font-style: italic; }
 
@@ -107,6 +111,7 @@
         .tile.source-radar-ble { border-left-color: var(--source-radar-ble); }
         .tile.source-ble-only { border-left-color: var(--source-ble-only); }
         .tile.source-radar-cluster { border-left-color: #dc2626; }
+        .tile.source-diagnostics { border-left-color: var(--source-diagnostics); }
 
         .tile-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
         .tile-title { font-size: 14px; font-weight: 800; margin: 0; line-height: 1.25; word-break: break-word; }
@@ -138,6 +143,7 @@
             .dashboard { flex-direction: column; align-items: center; }
             .view-container, .tiles-container { width: min(95vw, 700px); }
             .tiles-container { max-height: none; }
+            .stats-container .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
     </style>
 </head>
@@ -149,6 +155,30 @@
             <p>Přehled tras a zdrojů: radar vs. radar+BLE vs. BLE-only</p>
         </div>
         <div class="status-wrap">STATUS: <span id="status" class="status disconnected">OFFLINE</span></div>
+    </div>
+
+    <div id="stats-container" class="stats-container">
+        <div class="tile source-diagnostics">
+            <div class="tile-head">
+                <div>
+                    <h3 class="tile-title">DIAGNOSTIKA SENZORŮ</h3>
+                    <div class="tile-sub">čekám na první zprávu</div>
+                </div>
+            </div>
+            <div class="tile-grid">
+                <div class="metric"><span class="metric-label">Radar nový</span><span class="metric-value">0</span></div>
+                <div class="metric"><span class="metric-label">Radar historie</span><span class="metric-value">0</span></div>
+                <div class="metric"><span class="metric-label">Radar clustery</span><span class="metric-value">0</span></div>
+                <div class="metric"><span class="metric-label">BLE 1 tagy</span><span class="metric-value">0</span></div>
+                <div class="metric"><span class="metric-label">BLE 2 tagy</span><span class="metric-value">0</span></div>
+                <div class="metric"><span class="metric-label">Společné BLE</span><span class="metric-value">0</span></div>
+                <div class="metric"><span class="metric-label">Triangulace</span><span class="metric-value">0</span></div>
+            </div>
+            <div class="conf-wrap">
+                <span class="conf-label">Poslední update</span>
+                <span class="conf-value">-</span>
+            </div>
+        </div>
     </div>
 
     <div class="legend-row">
@@ -190,6 +220,7 @@
         const canvas = document.getElementById('radarCanvas');
         const ctx = canvas.getContext('2d');
         const tilesContainer = document.getElementById('tiles-container');
+        const statsContainer = document.getElementById('stats-container');
 
         const PIXELS_PER_METER = 180;
         const OFFSET = 30;
@@ -546,11 +577,9 @@
             };
         }
 
-        function renderTiles(drawList) {
-            // ODFILTROVÁNÍ SUROVÉHO RADARU, aby nezahltil DOM a nezhroutil prohlížeč
-            const filteredForTiles = drawList.filter(obj => !isRadarRaw(obj));
-            const statsHtml = `
-                <div class="tile source-radar">
+        function renderStatsPanel() {
+            statsContainer.innerHTML = `
+                <div class="tile source-diagnostics">
                     <div class="tile-head">
                         <div>
                             <h3 class="tile-title">DIAGNOSTIKA SENZORŮ</h3>
@@ -571,14 +600,19 @@
                         <span class="conf-value">${latestStats ? new Date(latestStats.timestamp * 1000).toLocaleTimeString() : '-'}</span>
                     </div>
                 </div>`;
+        }
 
+        function renderTiles(drawList) {
+            renderStatsPanel();
+            // ODFILTROVÁNÍ SUROVÉHO RADARU, aby nezahltil DOM a nezhroutil prohlížeč
+            const filteredForTiles = drawList.filter(obj => !isRadarRaw(obj));
             if (filteredForTiles.length === 0) {
-                tilesContainer.innerHTML = statsHtml + '<div class="empty-state">Žádné sledované cíle (Surová data z radaru nezobrazujeme v seznamu)</div>';
+                tilesContainer.innerHTML = '<div class="empty-state">Žádné sledované cíle (Surová data z radaru nezobrazujeme v seznamu)</div>';
                 return;
             }
 
             const sorted = [...filteredForTiles].sort((a, b) => safeNum(b.confidence) - safeNum(a.confidence));
-            tilesContainer.innerHTML = statsHtml + sorted.map(obj => {
+            tilesContainer.innerHTML = sorted.map(obj => {
                 const sourceLabel = getSourceLabel(obj); const sourceBadgeClass = getSourceBadgeClass(obj);
                 const sourceClass = getTileClass(obj); const conf = safeNum(obj.confidence, 0);
                 const confPct = Math.max(0, Math.min(100, conf * 100)); const tagId = escapeHtml(obj.tag_id || 'UNKNOWN');
