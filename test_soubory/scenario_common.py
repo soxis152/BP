@@ -24,6 +24,7 @@ MQTT_PORT = 1883
 
 # Publish period odpovídá periodě, s jakou se typicky očekává nový krok simulace i fusion.
 PUBLISH_PERIOD_SECONDS = 0.15
+MAX_SYNTHETIC_SPEED_MPS = 4.0
 
 # Geometrie senzorů v testech musí odpovídat hlavnímu systému, jinak by testy netestovaly
 # stejnou matematiku jako ostrý běh.
@@ -92,6 +93,39 @@ def normalize_angle(angle_deg):
     return ((angle_deg + 180.0) % 360.0) - 180.0
 
 
+def update_object_velocities(objects, previous_positions, dt):
+    if dt <= 0.0:
+        return
+
+    for obj in objects:
+        previous = previous_positions.get(id(obj))
+        if previous is None:
+            continue
+
+        prev_x, prev_y = previous
+        vx = (obj.x - prev_x) / dt
+        vy = (obj.y - prev_y) / dt
+        speed = math.hypot(vx, vy)
+
+        if speed > MAX_SYNTHETIC_SPEED_MPS:
+            obj.vx = 0.0
+            obj.vy = 0.0
+            continue
+
+        obj.vx = vx
+        obj.vy = vy
+
+
+def estimate_radial_doppler(obj, cfg):
+    dx = obj.x - cfg["pos_x"]
+    dy = obj.y - cfg["pos_y"]
+    distance_xy = math.hypot(dx, dy)
+    if distance_xy <= 0.001:
+        return 0.0
+
+    return (obj.vx * dx + obj.vy * dy) / distance_xy
+
+
 def build_radar_records(objects, cfg, timestamp):
     """Vygeneruje syntetické radarové body pro jeden radar.
 
@@ -131,6 +165,7 @@ def build_radar_records(objects, cfg, timestamp):
             # SNR zde není přesný fyzikální model, ale dostatečně realistická aproximace:
             # s rostoucí vzdáleností zpravidla klesá a zároveň lehce kolísá.
             snr = max(7.0, 23.0 - distance * 2.6 + random.uniform(-1.8, 1.8))
+            doppler = estimate_radial_doppler(obj, cfg)
 
             records.append(
                 (
@@ -139,6 +174,7 @@ def build_radar_records(objects, cfg, timestamp):
                     round(point_y_glob, 3),
                     round(point_z_glob, 3),
                     round(snr, 2),
+                    round(doppler, 3),
                 )
             )
 
@@ -199,6 +235,7 @@ async def publish_and_store(mqtt_client, sensor_name, records, is_radar):
                 "y": record[2],
                 "z": record[3],
                 "snr": record[4],
+                "doppler": record[5],
             }
         else:
             payload = {
@@ -240,9 +277,11 @@ async def run_scenario(scenario_name, objects, update_fn):
     try:
         while True:
             cycle_started = time.time()
+            previous_positions = {id(obj): (obj.x, obj.y) for obj in objects}
 
             # update_fn je jediné místo, kde se mění ideální svět scénáře.
             update_fn(step_index, objects, PUBLISH_PERIOD_SECONDS)
+            update_object_velocities(objects, previous_positions, PUBLISH_PERIOD_SECONDS)
 
             for cfg in RADAR_CONFIGS:
                 records = build_radar_records(objects, cfg, cycle_started)

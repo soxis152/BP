@@ -1,0 +1,8 @@
+aiomqtt>=2.3
+asyncpg>=0.29
+fastapi>=0.110
+uvicorn[standard]>=0.27
+paho-mqtt>=2.0
+pyserial>=3.5
+numpy>=1.26
+matplotlib>=3.8
