@@ -135,7 +135,6 @@ python -c "import ast, pathlib; [ast.parse(p.read_text(encoding='utf-8'), filena
 
 ## Zname technicke dluhy
 
-- Geometrie senzoru v testech neni uplne sjednocena s `ingestion.py`.
 - `kalman_filter.py` existuje, ale hlavni fusion vrstva ho zatim nepouziva.
 - Nektere chyby ve fusion vrstve se pouze spolknou bez logovani.
 - Konfigurace je zatim natvrdo ve zdrojacich misto `.env` nebo konfiguracniho souboru.
