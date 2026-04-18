@@ -45,6 +45,7 @@ def ingestion_thread() -> None:
             daemon=True,
             name=f"{cfg['id']}_worker",
         ).start()
+        time.sleep(2)
 
     # Každá BLE kotva dostane také vlastní worker vlákno.
     for cfg in ingestion.BLE_CONFIGS:

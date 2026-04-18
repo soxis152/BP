@@ -97,6 +97,9 @@ INGEST_GATE_Y_MAX = 3.5
 INGEST_GATE_Z_MIN = 0.0
 INGEST_GATE_Z_MAX = 2.5
 
+RADAR_CONFIG_COMMAND_DELAY_SECONDS = 0.12
+RADAR_CONFIG_CONTROL_DELAY_SECONDS = 0.50
+
 
 # ==========================================
 # --- POMOCNÉ FUNKCE ---
@@ -105,16 +108,22 @@ INGEST_GATE_Z_MAX = 2.5
 def send_radar_config(cfg):
     """Po startu pošle do radaru konfigurační profil."""
     try:
+        print(f"Radar {cfg['id']}: Posílám konfiguraci na {cfg['cfg_port']}...")
         with serial.Serial(cfg["cfg_port"], 115200, timeout=1) as ser:
+            ser.reset_input_buffer()
+            ser.reset_output_buffer()
             with open(RADAR_CONFIG_FILE, "r") as file_handle:
                 for line in file_handle:
                     cmd = line.strip()
                     if cmd and not cmd.startswith("%"):
                         ser.write((cmd + "\n").encode())
-                        time.sleep(0.05)
+                        delay = RADAR_CONFIG_CONTROL_DELAY_SECONDS if cmd in {"sensorStop", "flushCfg", "sensorStart"} else RADAR_CONFIG_COMMAND_DELAY_SECONDS
+                        time.sleep(delay)
             print(f"Radar {cfg['id']}: Konfigurace úspěšně odeslána.")
+            return True
     except Exception as exc:
         print(f"Radar {cfg['id']}: Chyba konfigurace: {exc}")
+        return False
 
 
 def transform_to_global(x_loc, y_loc, z_loc, cfg):
@@ -157,7 +166,9 @@ def db_worker():
 
 
 def radar_worker(cfg):
-    send_radar_config(cfg)
+    while not send_radar_config(cfg):
+        time.sleep(5)
+
     mqtt_client = mqtt.Client(client_id=f"ingest_{cfg['id']}")
     mqtt_client.connect("127.0.0.1", 1883)
     mqtt_client.loop_start()

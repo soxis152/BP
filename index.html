@@ -110,7 +110,7 @@
         .tile.source-radar { border-left-color: var(--source-radar); }
         .tile.source-radar-ble { border-left-color: var(--source-radar-ble); }
         .tile.source-ble-only { border-left-color: var(--source-ble-only); }
-        .tile.source-radar-cluster { border-left-color: #dc2626; }
+        .tile.source-radar-cluster { border-left-color: var(--source-radar); }
         .tile.source-diagnostics { border-left-color: var(--source-diagnostics); }
 
         .tile-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
@@ -120,7 +120,7 @@
         .badge-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
         .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; border: 1px solid transparent; white-space: nowrap; }
         .badge-radar { color: #0369a1; background: #e0f2fe; border-color: #bae6fd; }
-        .badge-radar-cluster { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
+        .badge-radar-cluster { color: #0369a1; background: #e0f2fe; border-color: #bae6fd; }
         .badge-radar-ble { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
         .badge-ble-only { color: #854d0e; background: #fef3c7; border-color: #fde68a; }
         .badge-type { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }
@@ -182,7 +182,7 @@
     </div>
 
     <div class="legend-row">
-        <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar);"></span>Radar only</span>
+        <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar);"></span>Radar cluster</span>
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar-ble);"></span>Radar + BLE</span>
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-ble-only);"></span>BLE only</span>
     </div>
@@ -201,7 +201,7 @@
     </div>
 
     <script>
-        const COLOR_SOURCE = { radar: '#0ea5e9', radar_raw: '#0ea5e9', radar_cluster: '#dc2626', radar_ble: '#ef4444', ble_only: '#eab308' };
+        const COLOR_SOURCE = { radar: '#0ea5e9', radar_raw: '#0ea5e9', radar_cluster: '#0ea5e9', radar_ble: '#ef4444', ble_only: '#eab308' };
         const SENSOR_NODES = [ { id: "S1", x: 1.5, y: 0.0, z: 0.8 }, { id: "S2", x: 0.0, y: 1.5, z: 0.8 } ];
 
         let currentMode = '2d';
@@ -215,7 +215,8 @@
         const BLE_SMOOTH_SECONDS = 0.55;
         const TRACK_MAX_VISUAL_SPEED_MPS = 1.10;
         const BLE_MAX_VISUAL_SPEED_MPS = 0.55;
-        const VISUAL_HOLD_SECONDS = 1.6;
+        const VISUAL_HOLD_SECONDS = 3.0;
+        const SHOW_RAW_RADAR_POINTS = false;
 
         const canvas = document.getElementById('radarCanvas');
         const ctx = canvas.getContext('2d');
@@ -289,6 +290,7 @@
             const type = getObjectType(obj);
             if (type === 'radar_raw') return 'Raw';
             if (type === 'radar_cluster') return 'Cluster';
+            if (type === 'radar_ble') return 'Fused';
             if (type === 'tagged') return 'Tagged';
             if (type === 'ble_only') return 'BLE';
             return 'Track';
@@ -409,7 +411,7 @@
 
         function drawObjects2D(objects) {
             drawMap2D();
-            const order = { radar: 0, radar_ble: 1, ble_only: 2 };
+            const order = { radar_raw: 0, radar_cluster: 1, ble_only: 2, radar_ble: 3, radar: 1 };
             objects.sort((a, b) => (order[getSourceCategory(a)] ?? 0) - (order[getSourceCategory(b)] ?? 0));
 
             objects.forEach(obj => {
@@ -427,7 +429,7 @@
 
                 ctx.lineWidth = rawRadar ? 2 : (isCluster ? 4 : 3);
                 ctx.strokeStyle = rawRadar ? 'rgba(255, 255, 255, 0.85)' : '#ffffff';
-                ctx.shadowColor = rawRadar ? 'rgba(14, 165, 233, 0.85)' : (isCluster ? 'rgba(220, 38, 38, 0.75)' : 'rgba(0, 0, 0, 0.35)');
+                ctx.shadowColor = rawRadar ? 'rgba(14, 165, 233, 0.85)' : (isCluster ? 'rgba(14, 165, 233, 0.75)' : 'rgba(0, 0, 0, 0.35)');
                 ctx.shadowBlur = rawRadar ? 12 : (isCluster ? 14 : 6); ctx.stroke();
                 ctx.shadowColor = 'transparent';
                 ctx.shadowBlur = 0;
@@ -642,37 +644,36 @@
                     }));
                 }
 
-                if (data.radar_clusters && Array.isArray(data.radar_clusters)) {
-                    data.radar_clusters.forEach(cluster => {
-                        combined.push({
-                            tag_id: cluster.id,
-                            object_type: 'radar_cluster',
-                            source: 'radar_cluster',
-                            x: cluster.x,
-                            y: cluster.y,
-                            z: cluster.z,
-                            points: cluster.points,
-                            confidence: Math.min(1.0, 0.45 + (cluster.points * 0.08))
+                if (Array.isArray(data.objects)) {
+                    combined = data.objects;
+                } else {
+                    if (data.radar_clusters && Array.isArray(data.radar_clusters)) {
+                        data.radar_clusters.forEach(cluster => {
+                            combined.push({
+                                tag_id: cluster.id,
+                                object_type: 'radar_cluster',
+                                source: 'radar_cluster',
+                                x: cluster.x,
+                                y: cluster.y,
+                                z: cluster.z,
+                                points: cluster.points,
+                                confidence: Math.min(1.0, 0.45 + (cluster.points * 0.08))
+                            });
                         });
-                    });
-                }
+                    }
 
-                // 2. Zpracování BLE dat
-                if (data.ble && Array.isArray(data.ble)) {
-                    data.ble.forEach(b => {
-                        combined.push({
-                            tag_id: b.tag_id,
-                            object_type: 'ble_only',
-                            source: 'ble_only',
-                            x: b.x, y: b.y, z: 0.8,
-                            confidence: 0.6
+                    // 2. Zpracování BLE dat
+                    if (data.ble && Array.isArray(data.ble)) {
+                        data.ble.forEach(b => {
+                            combined.push({
+                                tag_id: b.tag_id,
+                                object_type: 'ble_only',
+                                source: 'ble_only',
+                                x: b.x, y: b.y, z: 0.8,
+                                confidence: 0.6
+                            });
                         });
-                    });
-                }
-
-                // Pokud by fusion.py posílal už sloužená data ve starém formátu "objects"
-                if (data.type === "update" && data.objects) {
-                    combined = combined.concat(data.objects);
+                    }
                 }
 
                 latestObjects = combined;
@@ -697,6 +698,13 @@
                         <div class="metric"><span class="metric-label">Radar nový</span><span class="metric-value">${latestStats?.new_radar_points ?? 0}</span></div>
                         <div class="metric"><span class="metric-label">Radar historie</span><span class="metric-value">${latestStats?.radar_history_points ?? 0}</span></div>
                         <div class="metric"><span class="metric-label">Radar clustery</span><span class="metric-value">${latestStats?.radar_clusters ?? 0}</span></div>
+                        <div class="metric"><span class="metric-label">Objekty</span><span class="metric-value">${latestStats?.objects ?? 0}</span></div>
+                        <div class="metric"><span class="metric-label">Radar + BLE</span><span class="metric-value">${latestStats?.paired_radar_ble ?? 0}</span></div>
+                        <div class="metric"><span class="metric-label">Limit párování</span><span class="metric-value">${formatMeters(latestStats?.pair_max_distance ?? 0)}</span></div>
+                        <div class="metric"><span class="metric-label">Podržení páru</span><span class="metric-value">${safeNum(latestStats?.pair_hold_seconds ?? 0).toFixed(0)} s</span></div>
+                        <div class="metric"><span class="metric-label">Návaznost clusteru</span><span class="metric-value">${formatMeters(latestStats?.pair_reacquire_distance ?? 0)}</span></div>
+                        <div class="metric"><span class="metric-label">Pouze radar</span><span class="metric-value">${latestStats?.radar_cluster_objects ?? 0}</span></div>
+                        <div class="metric"><span class="metric-label">Pouze BLE</span><span class="metric-value">${latestStats?.ble_only_objects ?? 0}</span></div>
                         <div class="metric"><span class="metric-label">BLE 1 tagy</span><span class="metric-value">${latestStats?.ble_1_tags ?? 0}</span></div>
                         <div class="metric"><span class="metric-label">BLE 2 tagy</span><span class="metric-value">${latestStats?.ble_2_tags ?? 0}</span></div>
                         <div class="metric"><span class="metric-label">Společné BLE</span><span class="metric-value">${latestStats?.common_ble_tags ?? 0}</span></div>
@@ -732,6 +740,9 @@
                             <div class="metric"><span class="metric-label">Y</span><span class="metric-value">${formatMeters(obj.y)}</span></div>
                             <div class="metric"><span class="metric-label">Z</span><span class="metric-value">${formatMeters(obj.z)}</span></div>
                             <div class="metric"><span class="metric-label">Confidence</span><span class="metric-value">${formatConf(conf)}</span></div>
+                            ${obj.points !== undefined ? `<div class="metric"><span class="metric-label">Body clusteru</span><span class="metric-value">${escapeHtml(obj.points)}</span></div>` : ''}
+                            ${obj.pair_distance !== undefined ? `<div class="metric"><span class="metric-label">BLE-Radar</span><span class="metric-value">${formatMeters(obj.pair_distance)}</span></div>` : ''}
+                            ${obj.pair_mode ? `<div class="metric"><span class="metric-label">Párování</span><span class="metric-value">${escapeHtml(obj.pair_mode)}</span></div>` : ''}
                         </div>
                         <div class="conf-wrap"><span class="conf-label">Stabilita trasy</span><span class="conf-value">${confPct.toFixed(0)}%</span></div>
                         <div class="conf-bar"><div class="conf-fill" style="width:${confPct}%"></div></div>
@@ -774,10 +785,11 @@
                     return;
                 }
                 const baseConf = obj.last_reported_confidence ?? obj.confidence ?? 1.0;
-                obj.confidence = Math.max(0.15, baseConf * (1 - (age / VISUAL_HOLD_SECONDS)));
+                const minHoldConfidence = getSourceCategory(obj) === 'radar_ble' ? 0.55 : 0.15;
+                obj.confidence = Math.max(minHoldConfidence, baseConf * (1 - (age / VISUAL_HOLD_SECONDS)));
             });
 
-            const drawList = latestRadarPoints.concat(Object.values(displayState));
+            const drawList = (SHOW_RAW_RADAR_POINTS ? latestRadarPoints : []).concat(Object.values(displayState));
             if (currentMode === '2d') { drawObjects2D(drawList); } else { controls.update(); updateObjects3D(drawList); renderer.render(scene, camera); }
             renderTiles(drawList);
         }
