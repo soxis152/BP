@@ -1,3 +1,10 @@
+"""Scenar 03: stop-and-go po trojuhelniku.
+
+Tady sleduju, jestli objekt pri zastaveni nedriftuje a jestli se po rozjezdu
+znovu navaze na stejnou identitu. Je to dobry test na prechody mezi klidem a
+pohybem.
+"""
+
 import asyncio
 import math
 from Four.test_soubory.scenario_common import ObjectState, run_scenario

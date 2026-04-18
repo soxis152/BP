@@ -1,3 +1,16 @@
+"""Spolecna infrastruktura pro vsechny simulacni scenare.
+
+Jednotlive testy nemaji rucne skladat MQTT payloady ani DB radky. Popisuji jen
+idealni pohyb objektu v mistnosti a tenhle helper z nej vyrobi synteticka
+radarova a BLE mereni.
+
+Diky tomu scenare pouzivaji stejnou vstupni cestu jako realny system:
+
+- radarove body jdou do `sensors/raw/radar_*`,
+- BLE azimuty jdou do `sensors/raw/ble_*`,
+- fusion vrstva je nerozlisuje od skutecnych senzoru.
+"""
+
 import asyncio
 import json
 import math
@@ -94,6 +107,7 @@ def normalize_angle(angle_deg):
 
 
 def update_object_velocities(objects, previous_positions, dt):
+    """Dopocita rychlost objektu z posunu mezi dvema kroky scenare."""
     if dt <= 0.0:
         return
 
@@ -108,6 +122,9 @@ def update_object_velocities(objects, previous_positions, dt):
         speed = math.hypot(vx, vy)
 
         if speed > MAX_SYNTHETIC_SPEED_MPS:
+            # Nektere scenare objekt po opusteni prostoru teleportuji zpet na
+            # start. Takovy skok neni fyzicka rychlost, proto ho pro doppler
+            # vynuluju.
             obj.vx = 0.0
             obj.vy = 0.0
             continue
@@ -117,6 +134,7 @@ def update_object_velocities(objects, previous_positions, dt):
 
 
 def estimate_radial_doppler(obj, cfg):
+    """Odhadne radialni rychlost objektu vuci konkretnimu radaru."""
     dx = obj.x - cfg["pos_x"]
     dy = obj.y - cfg["pos_y"]
     distance_xy = math.hypot(dx, dy)
@@ -165,6 +183,9 @@ def build_radar_records(objects, cfg, timestamp):
             # SNR zde není přesný fyzikální model, ale dostatečně realistická aproximace:
             # s rostoucí vzdáleností zpravidla klesá a zároveň lehce kolísá.
             snr = max(7.0, 23.0 - distance * 2.6 + random.uniform(-1.8, 1.8))
+            # Doppler v simulaci neni detailni fyzikalni model. Staci nam
+            # radialni slozka rychlosti, aby melo DB schema i frontend stejny
+            # tvar dat jako realny radar.
             doppler = estimate_radial_doppler(obj, cfg)
 
             records.append(

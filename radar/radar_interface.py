@@ -1,3 +1,10 @@
+"""Tenký wrapper nad radarovým sériovým portem.
+
+Parser Texas Instruments pracuje s jedním blokem bytů. Tahle třída řeší jen
+otevření portu, načtení dat a předání bufferu parseru. Díky tomu nemusí
+`ingestion.py` znát detaily sériové knihovny ani parseru.
+"""
+
 import serial
 from .parser_mmw_demo import parser_one_mmw_demo_output_packet
 
@@ -21,6 +28,8 @@ class RadarInterface:
         :param buffer_size: Maximum number of bytes to read in one call.
         :return: Byte array of the received data.
         """
+        # Radar posila binarni stream. Ctu pevny blok a parser si uvnitr
+        # najde magic pattern zacatku frame.
         return self.serial_port.read(buffer_size)
 
     def parse_frame(self, data):

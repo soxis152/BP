@@ -1,3 +1,7 @@
+# Runtime zavislosti projektu.
+# Verze jsou zamerne jako minimalni rozsahy: projekt neni navazany na jednu
+# konkretni patch verzi, ale potrebuje dostatecne nove knihovny pro async MQTT,
+# FastAPI a Python 3.11+.
 aiomqtt>=2.3
 asyncpg>=0.29
 fastapi>=0.110

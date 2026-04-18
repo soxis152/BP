@@ -1,3 +1,9 @@
+"""Scenar 13: rychly prijezd a prudke zabrzdeni.
+
+Modeluje objekt typu vysokozdvizny vozik. Sleduju hlavne overshoot po brzdeni,
+stabilitu pri stani a navazani identity pri pomalem navratu na start.
+"""
+
 import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario

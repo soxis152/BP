@@ -1,3 +1,9 @@
+"""Scenar 02: kruhovy/elipticky pohyb.
+
+Tento test je uzitecny pro kontrolu, jestli se odhad polohy nerozpada pri
+plynule zmene smeru. Na rozdil od linearniho pruchodu tu objekt porad zataci.
+"""
+
 import asyncio
 import math
 

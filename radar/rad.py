@@ -1,3 +1,13 @@
+"""Samostatna utilita pro rucni test jednoho radaru.
+
+Tento soubor neni hlavni cesta produkcniho behu. Hlavni system pouziva
+`ingestion.py`, kde se spousti dva radary, BLE kotvy, MQTT a DB zapis.
+
+`rad.py` je uzitecny hlavne pri ozivovani hardwaru: vybere nebo pouzije pevne
+COM porty, posle konfiguraci do radaru a zobrazi body v jednoduchem matplotlib
+okne. Proto je kod vice interaktivni a mene obecny nez ingestion worker.
+"""
+
 import json
 import os
 import re
@@ -47,6 +57,8 @@ def parse_cfg_file(file_path):
 
 
 def configure(port):
+    # Konfigurace se posila po radcich stejne, jako kdyby se profil zadaval
+    # rucne pres terminal. Radar po uspesnem prikazu typicky vraci "Done".
     with serial.Serial(port, BAUD_RATE_CON, timeout=con_timeout) as ser:
         ser.reset_input_buffer()  # Flush input buffer
         try:
@@ -80,6 +92,8 @@ def configure(port):
 
 
 def select_two_ports():
+    # Interaktivni vyber se hodi pri prvnim zapojeni radaru, kdy jeste neni
+    # jasne, ktere COM cislo Windows zarizeni pridelil.
     ports = [port.device for port in serial.tools.list_ports.comports()]
     if len(ports) < 2:
         print("Not enough COM ports found.")
@@ -110,7 +124,8 @@ def load_or_select_ports():
     Directly returns the fixed ports COM19 (config) and COM18 (data).
     :return: A list of two fixed ports.
     """
-    # Hardcoded ports
+    # Hardcoded ports. Pro rychle laboratorni testy je pohodlnejsi mit pevne
+    # hodnoty, ale v hlavnim systemu jsou porty soustredene v `ingestion.py`.
     config_port = "COM13"
     data_port = "COM14"
 
@@ -128,6 +143,8 @@ def load_or_select_ports():
 
 
 def main():
+    # Minimalni smycka: nakonfigurovat radar, cist binarni data, parsovat frame
+    # a poslat vysledek do jednoduche 3D vizualizace.
     selected_ports = load_or_select_ports()
     if selected_ports and len(selected_ports) == 2:
         port1, port2 = selected_ports

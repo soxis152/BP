@@ -1,3 +1,9 @@
+"""Scenar 05: zigzag a zmeny rychlosti.
+
+Tento scenar zamerne neni pohodlny. Objekt meni smer, rychlost a obcas se
+odrazi od hranice. Pouzivam ho jako stress test stability fuzni logiky.
+"""
+
 import asyncio
 from Four.test_soubory.scenario_common import ObjectState, run_scenario
 

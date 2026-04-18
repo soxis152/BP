@@ -1,3 +1,10 @@
+"""Scenar 01: jednoduchy linearni pruchod.
+
+Slouzi jako prvni sanity check celeho retezce. Pokud nefunguje tento scenar,
+nedava smysl ladit slozitejsi pohyby, protoze problem bude pravdepodobne v
+MQTT, DB, fusion smycce nebo dashboardu.
+"""
+
 import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario

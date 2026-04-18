@@ -1,3 +1,14 @@
+"""Sberna vrstva pro fyzicke senzory.
+
+Tento modul stoji nejbliz hardwaru. Cte data z radarovych a BLE seriovych
+portu, prevadi radarove souradnice do spolecne mapy mistnosti, publikuje
+syrova mereni do MQTT a soucasne je uklada do PostgreSQL.
+
+Dulezite pravidlo: ingestion nic nefuzuje. Pokud se tady zacne rozhodovat,
+ktery radarovy bod patri ke kteremu BLE tagu, zacnou se vrstvy michat a bude
+tezsi ladit chyby. Identita a parovani patri do `fusion.py`.
+"""
+
 import asyncio
 import json
 import math
@@ -64,6 +75,8 @@ BLE_CONFIGS = [
 ]
 
 BASE_DIR = Path(__file__).resolve().parent
+# Profil radaru je verzovany s projektem. Cesta je skladana relativne k tomuto
+# souboru, aby spusteni nezaviselo na aktualnim pracovnim adresari.
 RADAR_CONFIG_FILE = BASE_DIR / "radar" / "tdm" / "AWR294X_profile_2025_11_07T16_27_59_226 copy2.cfg"
 
 RADAR_CONFIGS = [
@@ -128,6 +141,8 @@ def send_radar_config(cfg):
 
 def transform_to_global(x_loc, y_loc, z_loc, cfg):
     """Převede lokální radarové souřadnice do společné globální mapy místnosti."""
+    # Kazdy radar vidi svuj lokalni svet. Tady ho otocim podle fyzicke montaze
+    # a posunu do spolecne souradne soustavy mistnosti.
     angle_rad = math.radians(cfg["rotation"])
     x_glob = x_loc * math.cos(angle_rad) - y_loc * math.sin(angle_rad)
     y_glob = x_loc * math.sin(angle_rad) + y_loc * math.cos(angle_rad)
@@ -166,6 +181,9 @@ def db_worker():
 
 
 def radar_worker(cfg):
+    # Radar se nejdriv musi nakonfigurovat pres ridici port. Pokud to selze,
+    # worker nepadne, ale zkousi to znovu. To pomaha pri startu, kdy zarizeni
+    # nebo Windows COM port jeste nemusi byt pripravene.
     while not send_radar_config(cfg):
         time.sleep(5)
 
@@ -186,6 +204,8 @@ def radar_worker(cfg):
 
                 detections_for_print = []
                 for index in range(len(parsed[7])):
+                    # Parser vraci pole hodnot podle TI formatu. Indexy 7-10
+                    # jsou detekovane x/y/z/doppler, index 14 je SNR.
                     x_l, y_l, z_l = parsed[7][index], parsed[8][index], parsed[9][index]
                     doppler = parsed[10][index]
                     snr = parsed[14][index]
@@ -240,6 +260,9 @@ def ble_worker(cfg):
                     if not match:
                         continue
 
+                    # BLE kotva neposila primo polohu. Posila identitu tagu,
+                    # RSSI a azimut. Poloha vznikne az ve fusion vrstve ze
+                    # dvou kotev.
                     tag_id = match.group(1)
                     rssi = int(match.group(2))
                     azimuth = int(match.group(3))

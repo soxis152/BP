@@ -1,3 +1,10 @@
+"""Scenar 08: ztrata a znovunalezeni identity.
+
+Objekt na cas uplne zmizi ze vsech senzoru a potom se vrati. Sleduju, jestli
+system udrzi identitu pri kratkem vypadku a jestli pri delsim vypadku nevytvori
+nekontrolovane duplicity.
+"""
+
 import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario

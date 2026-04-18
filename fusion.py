@@ -1,3 +1,21 @@
+"""Online fuzni vrstva radarovych a BLE dat.
+
+Vstupem jsou syrova mereni z MQTT topicu `sensors/raw/#`. Radar uz prichazi
+prevedeny do globalnich souradnic mistnosti, BLE prichazi jako identita tagu
+a azimut z jednotlivych kotev.
+
+Vystupem je jeden pravidelne publikovany JSON snapshot do `sensors/fused`.
+Dashboard potom nemusi znat detaily triangulace, clusteringu ani parovani.
+
+Aktualni verze neni plny tracker s Kalman filtrem. Je to prakticka online
+heuristika:
+
+- BLE tag se trianguluje prusecikem dvou smeru.
+- Radarove body se seskupi do shluku podle vzdalenosti.
+- BLE pozice se sparuje s nejblizsim vhodnym radar clusterem.
+- Kratka `pair_memory` pomaha udrzet identitu pri malych vypadcich a jitteru.
+"""
+
 import asyncio
 import json
 import math
@@ -7,6 +25,8 @@ import aiomqtt
 
 RAW_RADAR_HISTORY_SECONDS = 2
 MAX_RAW_RADAR_HISTORY_POINTS = 700
+# Prahy jsou zatim ladene pro malou 3x3m mistnost. Drzim je pohromade tady,
+# aby bylo jasne, ktere konstanty meni chovani fuzni logiky.
 RADAR_CLUSTER_DISTANCE = 0.45
 RADAR_CLUSTER_MIN_POINTS = 3
 RADAR_BLE_PAIR_MAX_DISTANCE = 1.0
@@ -78,6 +98,8 @@ def cluster_radar_points(points):
     visited = [False] * len(valid_points)
     clusters = []
 
+    # Tohle je jednoducha flood-fill varianta clusteringu. Pro stovky bodu
+    # v male mistnosti je O(n^2) porad v poradku a ma minimum zavislosti.
     for start_index, _ in enumerate(valid_points):
         if visited[start_index]:
             continue
@@ -129,6 +151,8 @@ def build_fused_objects(radar_clusters, ble_positions, now):
         memory = shared_state["pair_memory"].get(ble["tag_id"])
         return bool(memory and now - memory.get("seen_at", 0) <= RADAR_BLE_PAIR_HOLD_SECONDS)
 
+    # BLE tagy s aktivni pameti parujeme jako prvni. Tim zmensujeme sanci,
+    # ze jim novy tag "ukradne" cluster, se kterym byly spojene v minulem okne.
     for ble in sorted(ble_positions, key=lambda item: 0 if has_active_memory(item) else 1):
         best_cluster = None
         best_distance = None
@@ -138,6 +162,9 @@ def build_fused_objects(radar_clusters, ble_positions, now):
         memory_is_valid = memory and now - memory.get("seen_at", 0) <= RADAR_BLE_PAIR_HOLD_SECONDS
 
         if memory_is_valid:
+            # Pri platne pameti nehledame jen nejblizsi cluster k aktualni BLE
+            # triangulaci. BLE umi poskakovat, proto nejdriv hledame cluster,
+            # ktery navazuje na posledni radarovou polohu.
             remembered_cluster = None
             remembered_score = None
             for cluster in radar_clusters:
@@ -168,6 +195,8 @@ def build_fused_objects(radar_clusters, ble_positions, now):
                     pair_mode = "locked"
 
         if not best_cluster and not memory_is_valid:
+            # Bez pameti spadneme na jednoduche nejblizsi parovani v povolenem
+            # dosahu. To je startovni stav pro novy tag nebo pro tag po timeoutu.
             for cluster in radar_clusters:
                 if cluster["id"] in used_cluster_ids:
                     continue
@@ -222,6 +251,9 @@ def build_fused_objects(radar_clusters, ble_positions, now):
             )
 
     for cluster in radar_clusters:
+        # Nesparovane clustery nechavam ve vystupu jako radar-only objekty.
+        # Je to dulezite pro ladeni: hned vidim, jestli radar neco vidi, ale
+        # BLE k tomu nema identitu.
         if cluster["id"] in used_cluster_ids:
             continue
         objects.append(
@@ -273,6 +305,9 @@ async def mqtt_listener():
 
 async def fused_publisher():
     """Publikuje snapshot pro app.py -> WebSocket -> index.html."""
+    # Radarove body nedrzim jen v jednom frame, ale v kratke historii. Radar
+    # vraci mrak bodu a clustering je stabilnejsi, kdyz ma par poslednich
+    # mereni misto jedineho okamziku.
     radar_history = []
 
     while True:
@@ -285,6 +320,9 @@ async def fused_publisher():
                     now = time.time()
 
                     async with lock:
+                        # Sdilene fronty se cisti atomicky pod lockem. Publisher
+                        # si vezme aktualni davku a listener muze hned prijimat
+                        # dalsi zpravy.
                         new_radar_points = list(shared_state["radar_points"])
                         shared_state["radar_points"].clear()
 
@@ -324,6 +362,9 @@ async def fused_publisher():
                     out_clusters = cluster_radar_points(out_radar)
                     out_objects, paired_count = build_fused_objects(out_clusters, out_ble, now)
 
+                    # Payload je navrzeny tak, aby frontend dostal zaroven
+                    # surovy radar, clustery, vysledne objekty i diagnostiku.
+                    # Pri ladeni pak nemusim menit backend jen kvuli grafu.
                     payload = json.dumps(
                         {
                             "type": "update",

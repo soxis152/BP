@@ -1,3 +1,9 @@
+"""Scenar 09: vertikalni pohyb.
+
+Objekt meni vysku, zatimco se pohybuje v pudorysu. Scenar je urceny hlavne na
+kontrolu, ze osa Z prochazi datovym tokem bez skoku a bez ztraty informace.
+"""
+
 import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario

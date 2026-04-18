@@ -1,3 +1,9 @@
+"""Scenar 07: ruzne urovne sumu.
+
+Tri objekty maji podobny pohyb, ale rozdilne zasumena mereni. Scenar pomaha
+poznat, pri jake urovni sumu se zacne rozpadat clustering nebo parovani.
+"""
+
 import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario

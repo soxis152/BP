@@ -1,4 +1,15 @@
-"""Hlavní vstupní bod, který skládá celý systém dohromady."""
+"""Hlavni vstupni bod, ktery sklada cely system dohromady.
+
+`main.py` neobsahuje doménovou logiku. Je to orchestrator procesu:
+
+- ingestion vlakna sbiraji data ze senzoru,
+- fusion vlakno pocita online vystup,
+- API vlakno servruje dashboard.
+
+Vse bezi v jednom procesu hlavne kvuli jednoduchosti lokalni demonstrace.
+Kdyby bylo potreba nasazeni do produkcnejsiho prostredi, tyto tri casti se daji
+spustit jako samostatne procesy, protoze spolu komunikuji pres MQTT.
+"""
 
 import asyncio
 import sys

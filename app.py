@@ -1,3 +1,16 @@
+"""Webova vrstva celeho systemu.
+
+Tento soubor zamerne nedela zadnou matematickou fuzni logiku. Jeho role je
+jen prezentacni a transportni:
+
+1. naservirovat `index.html`,
+2. pripojit se na MQTT topic s hotovymi fused daty,
+3. preposlat kazdy novy snapshot vsem otevrenym dashboardum pres WebSocket.
+
+Tim zustava dashboard oddeleny od mereni i od vypoctu. Kdyz se pozdeji zmeni
+fusion algoritmus, frontend se nemusi menit, pokud zustane stejny JSON format.
+"""
+
 import asyncio
 import json
 import sys
@@ -27,7 +40,8 @@ app = FastAPI()
 # pro případné API endpointy nad historií dat.
 db_pool = None
 
-# V paměti držíme seznam právě připojených dashboardů.
+# Jednoduchy in-memory seznam staci, protoze dashboard bezi lokalne a
+# nepotrebujeme distribuovat stav mezi vice instanci API serveru.
 active_websockets = []
 
 DB_CONFIG = {"user": "postgres", "password": "postgres", "database": "sensor_data", "host": "127.0.0.1"}
@@ -38,6 +52,9 @@ BASE_DIR = Path(__file__).resolve().parent
 async def startup():
     """Inicializace webové vrstvy při startu FastAPI."""
     global db_pool
+    # Pool se zatim nepouziva pro HTTP endpointy, ale nechavam ho tu jako
+    # pripravu pro historii mereni. Zaroven tim pri startu rychle zjistim,
+    # jestli je databaze dostupna.
     db_pool = await asyncpg.create_pool(**DB_CONFIG)
     print("Web/API connected to database.")
 
@@ -49,6 +66,9 @@ async def mqtt_listener():
     """Poslouchá fused MQTT zprávy a rozesílá je všem připojeným dashboardům."""
     while True:
         try:
+            # Listener se pripojuje primo k lokalnimu brokeru. Pokud broker
+            # spadne nebo jeste nebezi, vyjimka se zachyti nize a smycka to
+            # po kratke pauze zkusi znovu.
             async with aiomqtt.Client("127.0.0.1") as client:
                 await client.subscribe("sensors/fused")
                 print("App: Listening on MQTT topic 'sensors/fused'")
@@ -99,6 +119,7 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             # Frontend v tomto směru v zásadě nic důležitého neposílá,
             # ale receive_text() udržuje spojení aktivní a detekuje disconnect.
+            # Bez cekani na prijem by endpoint skoncil hned po acceptu.
             await websocket.receive_text()
     except WebSocketDisconnect:
         if websocket in active_websockets:

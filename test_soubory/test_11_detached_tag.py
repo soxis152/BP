@@ -1,3 +1,10 @@
+"""Scenar 11: odlozeny BLE tag.
+
+Simuluje situaci, kdy osoba odlozi tag a pokracuje dal bez nej. Dulezite je,
+aby system nespojoval odchazejici radarovy track s BLE tagem, ktery zustal
+staticky na puvodnim miste.
+"""
+
 import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario

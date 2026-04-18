@@ -1,4 +1,9 @@
-# detected_object.py
+"""Jednoducha datova trida pro starsi radarove pokusy.
+
+Hlavni online system dnes pracuje primarne s dictionary payloady z parseru a
+MQTT. Tuhle tridu nechavam jako malou pomocnou reprezentaci detekce tam, kde
+je pohodlnejsi predavat objekt s `id`, polohou a rychlosti.
+"""
 
 class DetectedObject:
     def __init__(self, obj_id, position, velocity):
@@ -20,6 +25,8 @@ class DetectedObject:
 
         :return: Boolean indicating movement status.
         """
+        # Prah je zamerne jednoduchy. Slouzi jen jako rychle rozliseni
+        # statickeho a pohybujiciho se objektu v pomocnych radar testech.
         velocity_magnitude = (self.velocity[0] ** 2 + self.velocity[1] ** 2) ** 0.5
         VELOCITY_THRESHOLD = 0.5  # Adjust based on your radar's sensitivity
         return velocity_magnitude >= VELOCITY_THRESHOLD

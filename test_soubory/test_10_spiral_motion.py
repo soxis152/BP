@@ -1,3 +1,9 @@
+"""Scenar 10: prostorova spirala.
+
+Kombinuje kruhovy pohyb v X/Y a plynulou zmenu vysky. Je to kompaktni test
+3D trajektorie, kde se soucasne meni smer i Z souradnice.
+"""
+
 import asyncio
 import math
 

@@ -1,3 +1,10 @@
+"""Jednoducha matplotlib vizualizace pro samostatne testovani radaru.
+
+Dashboard v `index.html` je hlavni vizualizace celeho systemu. Tohle okno je
+spis laboratorni pomucka pro rychlou kontrolu, ze radar vraci body a parser
+vraci souradnice v ocekavanem formatu.
+"""
+
 import matplotlib.pyplot as plt
 import matplotlib
 
@@ -35,6 +42,8 @@ class RadarUI:
         self.texts = []
 
     def update(self, parsed_data):
+        # Parser vraci dlouhou n-tici hodnot. Pro rychle zobrazeni me zajima
+        # hlavne cislo frame a pole souradnic detekovanych bodu.
         (
             _, _, _, frame_number, num_det_obj, _, _,
             detected_x_array, detected_y_array, detected_z_array, *_
@@ -45,6 +54,8 @@ class RadarUI:
         self.texts.clear()
 
         # FILTR: Ponecháme jen body, které leží čistě uvnitř našeho pole 3x3 metry
+        # Filtr ponecha jen body uvnitr testovaciho pole. Bez toho graf snadno
+        # zaplni odrazy od sten nebo veci mimo sledovany prostor.
         valid_x, valid_y, valid_z = [], [], []
 
         if num_det_obj > 0:

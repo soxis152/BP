@@ -1,3 +1,9 @@
+"""Scenar 04: krizeni dvou drah do tvaru X.
+
+Dva objekty se priblizi ke stejnemu mistu a potom se zase vzdali. Scenar je
+zamereny na riziko prohozeni identit pri krizeni trajektorii.
+"""
+
 import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario

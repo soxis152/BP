@@ -1,3 +1,10 @@
+"""Scenar 12: shluk lidi pri stridani smen.
+
+Pet objektu se sejde do male oblasti, chvili stoji blizko sebe a potom se
+rozejde. Scenar je zamereny na sliti clusteru, prohozeni identit a rozpad
+tracku pri vysoke hustote objektu.
+"""
+
 import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario

@@ -1,3 +1,11 @@
+"""Jednoduchy Kalmanuv filtr pro budouci tracking objektu.
+
+Tento modul je zatim pripraveny jako stavebni blok. Hlavni `fusion.py` v teto
+verzi jeste pouziva clustering a parovaci heuristiku, ne plny Kalmanuv tracker.
+Filtr tu nechavam oddelene, aby se dal pozdeji zapojit bez prepisovani zbytku
+systemu.
+"""
+
 import numpy as np
 
 
@@ -74,6 +82,8 @@ class KalmanObject:
 
     def update(self, meas_x, meas_y, meas_z):
         """Opraví predikovaný stav podle skutečného radarového měření."""
+        # Z se zatim nefiltruje maticove. Beru posledni zmerenou vysku, protoze
+        # hlavni problem prototypu je stabilni 2D poloha v pudorysu mistnosti.
         self.z = meas_z  # Aktualizace výšky
         z_meas = np.array([meas_x, meas_y])
 

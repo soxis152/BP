@@ -1,3 +1,10 @@
+"""Scenar 06: vypadky senzoru a navrat objektu.
+
+Testuje, jak se system chova, kdyz radar nebo BLE na chvili prestane objekt
+videt. Cilem je odhalit ghost objekty, ztratu identity a spatne navazani po
+navratu dat.
+"""
+
 import asyncio
 
 from Four.test_soubory.scenario_common import ObjectState, run_scenario

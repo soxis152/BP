@@ -30,6 +30,18 @@
 # *  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *
 
+"""Parser binarniho vystupu Texas Instruments mmWave demo radaru.
+
+Soubor je z velke casti prevzaty z TI ukazkoveho kodu. Nechavam ho oddeleny od
+zbytku aplikace, protoze obsahuje nizkourovnove parsovani binarniho packetu a
+neni vhodne do nej michat logiku projektu.
+"""
+
+# Parser je prevzaty z Texas Instruments demo kodu a upraveny jen tak, aby sel
+# volat z naseho `RadarInterface`. Komentare uvnitr zamerne nechavam blizko
+# originalu, protoze pri ladeni binarniho formatu je dulezite mit zachovanou
+# terminologii TI dokumentace.
+
 # import the required Python packages
 import struct
 import math

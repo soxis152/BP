@@ -4,10 +4,20 @@
     <meta charset="UTF-8">
     <title>Senzorová fúze: profesionální dashboard</title>
 
+    <!--
+        Dashboard je zamerne jednosouborovy. Backend jen posle hotovy HTML a
+        potom pres WebSocket streamuje JSON snapshoty z fusion vrstvy. Diky
+        tomu neni potreba build krok, npm ani samostatny frontend server.
+    -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
     <style>
+        /*
+            Barvy jsou navazane na zdroj dat, ne na konkretni objekt. Pri ladeni
+            tak hned vidim, jestli bod pochazi jen z radaru, jen z BLE, nebo ze
+            sparovane radar+BLE detekce.
+        */
         :root {
             --bg-page: #edf2f7;
             --bg-card: #ffffff;
@@ -149,6 +159,7 @@
 </head>
 <body>
 
+    <!-- Horni panel drzi stav spojeni a kratky popis aktualniho pohledu. -->
     <div class="header-panel">
         <div class="title-wrap">
             <h1>Senzorová fúze 3x3m</h1>
@@ -157,6 +168,7 @@
         <div class="status-wrap">STATUS: <span id="status" class="status disconnected">OFFLINE</span></div>
     </div>
 
+    <!-- Diagnostika je oddelena od seznamu objektu, protoze odpovida stavu cele pipeline. -->
     <div id="stats-container" class="stats-container">
         <div class="tile source-diagnostics">
             <div class="tile-head">
@@ -181,6 +193,7 @@
         </div>
     </div>
 
+    <!-- Legenda pouziva stejne barvy jako 2D canvas, 3D scena i karty objektu. -->
     <div class="legend-row">
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar);"></span>Radar cluster</span>
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar-ble);"></span>Radar + BLE</span>
@@ -192,6 +205,7 @@
         <button id="btn3d" onclick="switchView('3d')">3D Pohled</button>
     </div>
 
+    <!-- Hlavni plocha: vlevo mapa/scena, vpravo textovy seznam aktualnich objektu. -->
     <div class="dashboard">
         <div class="view-container">
             <canvas id="radarCanvas" width="600" height="600"></canvas>
@@ -201,9 +215,17 @@
     </div>
 
     <script>
+        /*
+            Frontend nedela skutecnou fuzni matematiku. Jen:
+            1. prijme snapshot z WebSocketu,
+            2. sjednoti a trochu vyhladi polohy pro citelne zobrazeni,
+            3. vykresli 2D/3D pohled a diagnosticke karty.
+        */
         const COLOR_SOURCE = { radar: '#0ea5e9', radar_raw: '#0ea5e9', radar_cluster: '#0ea5e9', radar_ble: '#ef4444', ble_only: '#eab308' };
         const SENSOR_NODES = [ { id: "S1", x: 1.5, y: 0.0, z: 0.8 }, { id: "S2", x: 0.0, y: 1.5, z: 0.8 } ];
 
+        // latest* je posledni surovy stav z backendu, displayState je vyhlazeny
+        // stav pouzivany jen pro kresleni. Tim oddeluju realna data od animace.
         let currentMode = '2d';
         let latestObjects = [];
         let latestStats = null;
@@ -211,6 +233,7 @@
         let latestRadarPoints = [];
         let lastAnimationTimeSec = performance.now() / 1000;
 
+        // Vyhlazeni je ciste vizualni. Backendova data se tim nemeni.
         const TRACK_SMOOTH_SECONDS = 0.34;
         const BLE_SMOOTH_SECONDS = 0.55;
         const TRACK_MAX_VISUAL_SPEED_MPS = 1.10;
@@ -323,6 +346,9 @@
         function safeNum(value, fallback = 0) { const n = Number(value); return Number.isFinite(n) ? n : fallback; }
 
         function smoothObjectPosition(displayObj, targetObj, dtSec) {
+            // Backend posila diskretni skoky podle senzorovych update. Pro oko je
+            // citelnejsi plynule dojeti k cilove poloze, proto tu drzim
+            // samostatny display stav.
             const isBle = isBLEOnly(targetObj);
             if (isRadarRaw(targetObj)) {
                 // Surový radar se nevyhlazuje - okamžitý snap
@@ -350,6 +376,8 @@
             const maxStep = maxSpeed * Math.max(0.001, dtSec);
 
             if (step > maxStep && step > 0) {
+                // Omezim maximalni vizualni krok, aby kratky glitch v BLE
+                // triangulaci nepreletel pres celou mapu.
                 const scale = maxStep / step;
                 nextX = currentX + dx * scale;
                 nextY = currentY + dy * scale;
@@ -451,6 +479,8 @@
             });
         }
 
+        // 3D scena kopiruje stejnou 3x3m mapu jako 2D canvas. Osy jsou
+        // prevedene do Three.js souradnic pres helper `toScenePosition`.
         const scene = new THREE.Scene(); scene.background = new THREE.Color(0xf8fafc);
         const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100); camera.position.set(3.9, 5.25, 4.2);
         const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(600, 600);
@@ -598,6 +628,8 @@
         }
 
         function updateObjects3D(objects) {
+            // Mesh se znovu vytvari jen pri zmene zdroje objektu. Bezne update
+            // jen posune existujici geometrii, aby se zbytecne nezatezoval GC.
             const currentIds = new Set(); const nowSec = performance.now() / 1000;
             objects.forEach(obj => {
                 const id = String(obj.tag_id); const source = getSourceCategory(obj); currentIds.add(id);
@@ -623,6 +655,9 @@
         }
 
         function connect() {
+            // WebSocket je jediny zivy vstup dashboardu. Pri odpojeni se po
+            // kratke pauze zkusim pripojit znovu, takze refresh stranky neni
+            // nutny pri restartu backendu.
             const ws = new WebSocket(`ws://${window.location.host}/ws`); // Nebo upravte na absolutní ws://127.0.0.1:8765 pokud nenačítáte z localhostu
             ws.onopen = () => { document.getElementById('status').className = 'status'; document.getElementById('status').innerText = 'ONLINE'; };
 
@@ -631,9 +666,10 @@
                 updateDebugPanel(data.stats);
                 let combined = [];
 
-                // --- MAPOVÁNÍ DAT Z NOVÉHO FUSION.PY ---
+                // --- Mapovani dat z fusion.py ---
 
-                // 1. Zpracování surových radarových bodů
+                // Surove radarove body drzim oddelene. Pri beznem zobrazeni je
+                // nevypisuju do karet, protoze by DOM zahltily stovky bodu.
                 if (data.radar && Array.isArray(data.radar)) {
                     latestRadarPoints = data.radar.map((r, index) => ({
                             tag_id: 'RAW_R_' + Math.random().toString(36).substr(2, 6),
@@ -686,6 +722,8 @@
         }
 
         function renderStatsPanel() {
+            // Diagnostika je prepisovana jako cele HTML. Je mala, takze je to
+            // jednodussi a citelnejsi nez udrzovat mnoho jednotlivych uzlu.
             statsContainer.innerHTML = `
                 <div class="tile source-diagnostics">
                     <div class="tile-head">
@@ -751,6 +789,9 @@
         }
 
         function animationLoop() {
+            // Render loop bezi nezavisle na WebSocket frekvenci. Kdyz nova data
+            // chvili neprijdou, posledni objekty se jeste kratce drzi a pomalu
+            // slabnou podle confidence.
             requestAnimationFrame(animationLoop);
             const nowSec = performance.now() / 1000;
             const dtSec = Math.min(0.08, Math.max(0.001, nowSec - lastAnimationTimeSec));

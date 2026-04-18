@@ -1,3 +1,13 @@
+"""Databazova vrstva projektu.
+
+Vsechny zapisy do PostgreSQL jdou pres tento modul. Cilem je, aby zbytek
+aplikace nemusel znat SQL detaily, nazvy sloupcu ani inicializaci tabulek.
+
+Prototyp pouziva jednoduche `CREATE TABLE IF NOT EXISTS`, protoze je to
+rychle pro lokalni vyvoj. Pokud by projekt rostl, dalsi prirozeny krok jsou
+migrace, ale pro soucasne mereni je centralizovane schema prehlednejsi.
+"""
+
 import asyncpg
 
 # Tento modul je jediná společná vrstva pro práci s PostgreSQL.
@@ -141,6 +151,8 @@ class AsyncDBHandler:
         if not data_list or not self.pool:
             return
 
+        # Sloupce definuji explicitne podle typu senzoru. Zaroven tim branim
+        # tomu, aby volajici posilal libovolne nazvy sloupcu do SQL dotazu.
         cols = {
             "radar_1": "(timestamp, x, y, z, snr, doppler)",
             "radar_2": "(timestamp, x, y, z, snr, doppler)",
@@ -151,6 +163,8 @@ class AsyncDBHandler:
 
         async with self.pool.acquire() as conn:
             placeholders = ",".join([f"${i + 1}" for i in range(len(data_list[0]))])
+            # `table_name` neni parametrizovatelny pres asyncpg placeholdery,
+            # proto musi pochazet z pevne mapy `cols` vyse.
             query = f"INSERT INTO {DB_SCHEMA}.{table_name} {cols[table_name]} VALUES ({placeholders})"
             await conn.executemany(query, data_list)
 
