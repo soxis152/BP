@@ -32,6 +32,9 @@ except ImportError:
 
 RAW_RADAR_HISTORY_SECONDS = 2
 MAX_RAW_RADAR_HISTORY_POINTS = 700
+MAX_RADAR_POINTS_IN_MQTT_PAYLOAD = 250
+FUSED_PUBLISH_INTERVAL_SECONDS = 0.1
+MQTT_RECONNECT_SECONDS = 2
 # Prahy jsou zatim ladene pro malou 3x3m mistnost. Drzim je pohromade tady,
 # aby bylo jasne, ktere konstanty meni chovani fuzni logiky.
 RADAR_CLUSTER_DISTANCE = 0.45
@@ -53,11 +56,6 @@ FUSED_DB_FLUSH_SECONDS = DB_FLUSH_SECONDS
 FUSED_DB_BATCH_SIZE = DB_BATCH_SIZE
 FUSED_DB_RETRY_SECONDS = 5.0
 bad_message_count = 0
-
-# Fusion bezi v main.py ve vlastnim vlakne a vlastnim asyncio event loopu.
-# Proto tu nepouzivam globalni db_handler sdileny s ingestion.py. asyncpg pool
-# patri vzdy tomu event loopu, ve kterem vznikl.
-fusion_db_handler = AsyncDBHandler()
 
 # BLE geometrie musi odpovidat fyzickemu rozmisteni kotev v mistnosti.
 SENSORS = {
@@ -151,7 +149,7 @@ def radar_cluster_confidence(point_count):
     return round(clamp(confidence, RADAR_CLUSTER_CONFIDENCE_MIN, RADAR_CLUSTER_CONFIDENCE_MAX), 3)
 
 
-async def ensure_fused_db_ready(last_retry_at):
+async def ensure_fused_db_ready(fusion_db_handler, last_retry_at):
     """Pripravi DB spojeni pro fused_data a pri vypadku ho zkousi obnovit."""
     now = time.time()
     if now - last_retry_at < FUSED_DB_RETRY_SECONDS:
@@ -191,6 +189,11 @@ def validate_raw_message(topic, data):
         return "ble_2"
 
     raise ValueError(f"unsupported raw topic: {topic}")
+
+
+def normalize_ble_tag_id(tag_id):
+    """Sjednoti BLE ID, aby stejny tag nevznikl dvakrat kvuli velikosti pismen."""
+    return str(tag_id).strip().upper()
 
 
 def triangulate(tag_id):
@@ -435,9 +438,11 @@ async def mqtt_listener():
                     if source == "radar":
                         shared_state["radar_points"].append(data)
                     elif source == "ble_1":
+                        data["tag_id"] = normalize_ble_tag_id(data["tag_id"])
                         data["_seen_at"] = time.time()
                         shared_state["ble_tags"]["ble_1"][data["tag_id"]] = data
                     elif source == "ble_2":
+                        data["tag_id"] = normalize_ble_tag_id(data["tag_id"])
                         data["_seen_at"] = time.time()
                         shared_state["ble_tags"]["ble_2"][data["tag_id"]] = data
             except (json.JSONDecodeError, UnicodeDecodeError, ValueError, KeyError, TypeError) as exc:
@@ -463,6 +468,10 @@ async def fused_publisher():
     last_db_retry = 0.0
     last_db_sample = 0.0
     last_db_flush = time.time()
+    # asyncpg pool patri konkretnimu asyncio event loopu. Handler proto vzniká
+    # az tady uvnitr publisheru, aby po restartu fusion loopu nepouzil stary
+    # pool navazany na uz zavreny event loop.
+    fusion_db_handler = AsyncDBHandler()
 
     while True:
         try:
@@ -470,7 +479,7 @@ async def fused_publisher():
                 print("Fusion: Publikuji fused data na 'sensors/fused'")
 
                 while True:
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(FUSED_PUBLISH_INTERVAL_SECONDS)
                     now = time.time()
 
                     async with lock:
@@ -489,10 +498,13 @@ async def fused_publisher():
 
                         ble_1_count = len(shared_state["ble_tags"]["ble_1"])
                         ble_2_count = len(shared_state["ble_tags"]["ble_2"])
+                        ble_1_ids = sorted(shared_state["ble_tags"]["ble_1"].keys())
+                        ble_2_ids = sorted(shared_state["ble_tags"]["ble_2"].keys())
                         out_ble = []
                         common_tags = set(shared_state["ble_tags"]["ble_1"].keys()) & set(
                             shared_state["ble_tags"]["ble_2"].keys()
                         )
+                        common_tag_ids = sorted(common_tags)
                         for tag_id in common_tags:
                             pos = triangulate(tag_id)
                             if pos:
@@ -513,6 +525,7 @@ async def fused_publisher():
                         {key: value for key, value in point.items() if key != "_seen_at"}
                         for point in radar_history
                     ]
+                    out_radar_payload = out_radar[-MAX_RADAR_POINTS_IN_MQTT_PAYLOAD:]
                     out_clusters = cluster_radar_points(out_radar)
                     out_objects, paired_count = build_fused_objects(out_clusters, out_ble, now)
 
@@ -522,7 +535,7 @@ async def fused_publisher():
                     payload = json.dumps(
                         {
                             "type": "update",
-                            "radar": out_radar,
+                            "radar": out_radar_payload,
                             "radar_clusters": out_clusters,
                             "ble": out_ble,
                             "objects": out_objects,
@@ -530,6 +543,7 @@ async def fused_publisher():
                                 "timestamp": now,
                                 "new_radar_points": len(new_radar_points),
                                 "radar_history_points": len(out_radar),
+                                "radar_payload_points": len(out_radar_payload),
                                 "radar_clusters": len(out_clusters),
                                 "objects": len(out_objects),
                                 "paired_radar_ble": paired_count,
@@ -542,19 +556,22 @@ async def fused_publisher():
                                 "ble_1_tags": ble_1_count,
                                 "ble_2_tags": ble_2_count,
                                 "common_ble_tags": len(common_tags),
+                                "ble_1_ids": ble_1_ids,
+                                "ble_2_ids": ble_2_ids,
+                                "common_ble_ids": common_tag_ids,
                                 "triangulated_ble": len(out_ble),
                             },
                         }
                     )
                     await client.publish("sensors/fused", payload)
 
-                    if not db_ready:
-                        db_ready, last_db_retry = await ensure_fused_db_ready(last_db_retry)
+                    if out_objects and not db_ready:
+                        db_ready, last_db_retry = await ensure_fused_db_ready(fusion_db_handler, last_db_retry)
 
                     # Do DB neukladam kazdy 50ms frame. Dashboard potrebuje
                     # plynuly MQTT stream, ale databazi staci ridci vzorkovani
                     # v davkach, aby se zbytecne nezahltila pri delsim mereni.
-                    if db_ready and now - last_db_sample >= FUSED_DB_SAMPLE_SECONDS:
+                    if db_ready and out_objects and now - last_db_sample >= FUSED_DB_SAMPLE_SECONDS:
                         fused_db_buffer.extend(build_fused_db_rows(out_objects, now))
                         last_db_sample = now
 
@@ -571,9 +588,9 @@ async def fused_publisher():
                             db_ready = False
                             last_db_retry = now
                             print(f"Fusion DB: zapis fused_data selhal, spojeni obnovim pozdeji: {exc}")
-        except aiomqtt.MqttError:
-            print("Fusion publisher: MQTT connection lost, retrying in 2s...")
-            await asyncio.sleep(2)
+        except (aiomqtt.MqttError, OSError) as exc:
+            print(f"Fusion publisher: MQTT/socket problem, retrying in {MQTT_RECONNECT_SECONDS}s: {exc}")
+            await asyncio.sleep(MQTT_RECONNECT_SECONDS)
 
 
 async def main():

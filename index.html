@@ -452,6 +452,25 @@
             latestStats = stats;
         }
 
+        function syncDisplayMetadata(displayObj, targetObj) {
+            // Pozice se vyhlazuje samostatne, ale popisna pole musi odpovidat
+            // posledni zprave presne. Jinak by BLE-only karta mohla zdedit
+            // stare radarove udaje z predchoziho radar+BLE stavu.
+            displayObj.tag_id = targetObj.tag_id ?? displayObj.tag_id;
+            displayObj.object_type = targetObj.object_type || displayObj.object_type;
+            displayObj.source = targetObj.source || displayObj.source;
+            displayObj.confidence = targetObj.confidence ?? 1.0;
+            displayObj.last_reported_confidence = targetObj.confidence ?? 1.0;
+
+            ['points', 'pair_distance', 'pair_mode', 'radar_cluster_id'].forEach(field => {
+                if (targetObj[field] !== undefined && targetObj[field] !== null) {
+                    displayObj[field] = targetObj[field];
+                } else {
+                    delete displayObj[field];
+                }
+            });
+        }
+
         function buildStatsPanelHtml() {
             return `
                 <div class="tile source-diagnostics">
@@ -788,7 +807,7 @@
                                 y: cluster.y,
                                 z: cluster.z,
                                 points: cluster.points,
-                                confidence: Math.min(1.0, 0.45 + (cluster.points * 0.08))
+                                confidence: Math.min(0.85, 0.45 + (cluster.points * 0.06))
                             });
                         });
                     }
@@ -875,10 +894,7 @@
                     displayState[id] = { ...target, last_seen: nowSec, last_reported_confidence: target.confidence ?? 1.0 };
                 } else {
                     smoothObjectPosition(displayState[id], target, dtSec);
-                    displayState[id].confidence = target.confidence ?? 1.0;
-                    displayState[id].last_reported_confidence = target.confidence ?? 1.0;
-                    displayState[id].object_type = target.object_type || displayState[id].object_type;
-                    displayState[id].source = target.source || displayState[id].source;
+                    syncDisplayMetadata(displayState[id], target);
                     displayState[id].last_seen = nowSec;
                 }
             });

@@ -67,10 +67,21 @@ def ingestion_thread() -> None:
 
 def fusion_thread() -> None:
     """Spusti fusion engine ve vlastnim asyncio loopu."""
-    print("[thread-2] Starting fusion loop")
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(fusion.main_fusion())
+    while True:
+        print("[thread-2] Starting fusion loop")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            loop.run_until_complete(fusion.main_fusion())
+        except OSError as exc:
+            # Na Windows se muze pri zahlceni MQTT/WebSocket socketu objevit
+            # WinError 10055 primo v event loopu. Fusion potom radsi obnovim,
+            # nez aby zbytek mereni bezel bez fused vrstvy.
+            print(f"[thread-2] Fusion socket error, restarting in 2s: {exc}")
+            time.sleep(2)
+        finally:
+            loop.close()
 
 
 def api_thread() -> None:

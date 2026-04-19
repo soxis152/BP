@@ -188,7 +188,7 @@ def ble_worker(cfg):
                     if not match:
                         continue
 
-                    tag_id = match.group(1)
+                    tag_id = match.group(1).upper()
                     rssi = int(match.group(2))
                     azimuth = int(match.group(3))
 
