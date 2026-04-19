@@ -64,10 +64,12 @@
             color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;
         }
 
-        .legend-row {
-            width: 100%; max-width: 1000px; display: flex; gap: 8px;
-            margin-bottom: 12px; flex-wrap: wrap;
+        .toolbar {
+            width: 100%; max-width: 1000px; display: flex; justify-content: space-between;
+            align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
         }
+
+        .legend-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
         .legend-chip {
             display: inline-flex; align-items: center; gap: 8px;
@@ -78,9 +80,7 @@
 
         .legend-dot { width: 10px; height: 10px; border-radius: 999px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7); }
 
-        .view-controls {
-            display: flex; gap: 10px; margin-bottom: 16px; width: 100%; max-width: 1000px;
-        }
+        .view-controls { display: flex; gap: 10px; }
 
         .view-controls button {
             background-color: var(--bg-card); border: 1px solid var(--border);
@@ -93,7 +93,7 @@
             box-shadow: 0 8px 22px rgba(51, 65, 85, 0.22);
         }
 
-        .dashboard { display: flex; flex-direction: row; gap: 20px; justify-content: center; width: 100%; max-width: 1000px; }
+        .dashboard { display: flex; flex-direction: row; gap: 20px; justify-content: center; width: 100%; max-width: 1000px; margin-bottom: 14px; }
 
         .view-container {
             position: relative; width: 600px; height: 600px;
@@ -110,6 +110,28 @@
         .stats-container { width: 100%; max-width: 1000px; margin-bottom: 12px; }
         .stats-container .tile { margin: 0; }
         .stats-container .tile-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .diagnostics-panel {
+            width: 100%; max-width: 1000px; margin-bottom: 12px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; box-shadow: 0 5px 14px rgba(15, 23, 42, 0.06);
+        }
+        .diagnostics-panel summary {
+            cursor: pointer; padding: 12px 14px; font-weight: 800; color: #0f172a;
+            display: flex; justify-content: space-between; gap: 12px; list-style: none;
+        }
+        .diagnostics-panel summary::-webkit-details-marker { display: none; }
+        .diagnostics-panel summary::after {
+            content: "Rozbalit"; color: #64748b; font-size: 12px; text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .diagnostics-panel[open] summary::after { content: "Sbalit"; }
+        .diagnostics-panel .stats-container { padding: 0 12px 12px; margin-bottom: 0; box-sizing: border-box; }
+        .stats-section { margin-top: 12px; }
+        .stats-section:first-of-type { margin-top: 0; }
+        .stats-section-title {
+            font-size: 11px; font-weight: 800; color: #334155;
+            text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 6px;
+        }
 
         .empty-state { background: var(--bg-card); border: 1px dashed var(--border); border-radius: 12px; color: var(--text-muted); padding: 16px; font-style: italic; }
 
@@ -179,7 +201,7 @@
             </div>
             <div class="tile-grid">
                 <div class="metric"><span class="metric-label">Radar nový</span><span class="metric-value">0</span></div>
-                <div class="metric"><span class="metric-label">Radar historie</span><span class="metric-value">0</span></div>
+                <div class="metric"><span class="metric-label">Radar okno</span><span class="metric-value">0</span></div>
                 <div class="metric"><span class="metric-label">Radar clustery</span><span class="metric-value">0</span></div>
                 <div class="metric"><span class="metric-label">BLE 1 tagy</span><span class="metric-value">0</span></div>
                 <div class="metric"><span class="metric-label">BLE 2 tagy</span><span class="metric-value">0</span></div>
@@ -243,6 +265,36 @@
         const ctx = canvas.getContext('2d');
         const tilesContainer = document.getElementById('tiles-container');
         const statsContainer = document.getElementById('stats-container');
+
+        function mountToolbar() {
+            const legend = document.querySelector('.legend-row');
+            const controls = document.querySelector('.view-controls');
+            if (!legend || !controls) return;
+
+            const toolbar = document.createElement('div');
+            toolbar.className = 'toolbar';
+            legend.before(toolbar);
+            toolbar.appendChild(legend);
+            toolbar.appendChild(controls);
+        }
+
+        function mountDiagnosticsPanel() {
+            const dashboard = document.querySelector('.dashboard');
+            if (!dashboard || !statsContainer) return;
+
+            const panel = document.createElement('details');
+            panel.className = 'diagnostics-panel';
+
+            const summary = document.createElement('summary');
+            summary.textContent = 'Diagnostika senzorů a fúze';
+            panel.appendChild(summary);
+
+            dashboard.insertAdjacentElement('afterend', panel);
+            panel.appendChild(statsContainer);
+        }
+
+        mountToolbar();
+        mountDiagnosticsPanel();
 
         const PIXELS_PER_METER = 180;
         const OFFSET = 30;
@@ -398,6 +450,51 @@
         function updateDebugPanel(stats) {
             if (!stats) return;
             latestStats = stats;
+        }
+
+        function buildStatsPanelHtml() {
+            return `
+                <div class="tile source-diagnostics">
+                    <div class="tile-head">
+                        <div>
+                            <h3 class="tile-title">DIAGNOSTIKA SENZORŮ</h3>
+                            <div class="tile-sub">${latestStats ? 'živý MQTT/WebSocket stream' : 'čekám na první zprávu'}</div>
+                        </div>
+                    </div>
+                    <div class="stats-section">
+                        <div class="stats-section-title">Vstupy senzorů</div>
+                        <div class="tile-grid">
+                            <div class="metric"><span class="metric-label">Radar nový</span><span class="metric-value">${latestStats?.new_radar_points ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Radar okno</span><span class="metric-value">${latestStats?.radar_history_points ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">BLE 1 tagy</span><span class="metric-value">${latestStats?.ble_1_tags ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">BLE 2 tagy</span><span class="metric-value">${latestStats?.ble_2_tags ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Společné BLE</span><span class="metric-value">${latestStats?.common_ble_tags ?? 0}</span></div>
+                        </div>
+                    </div>
+                    <div class="stats-section">
+                        <div class="stats-section-title">Výsledek zpracování</div>
+                        <div class="tile-grid">
+                            <div class="metric"><span class="metric-label">Radar clustery</span><span class="metric-value">${latestStats?.radar_clusters ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Triangulace</span><span class="metric-value">${latestStats?.triangulated_ble ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Objekty</span><span class="metric-value">${latestStats?.objects ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Radar + BLE</span><span class="metric-value">${latestStats?.paired_radar_ble ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Pouze radar</span><span class="metric-value">${latestStats?.radar_cluster_objects ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Pouze BLE</span><span class="metric-value">${latestStats?.ble_only_objects ?? 0}</span></div>
+                        </div>
+                    </div>
+                    <div class="stats-section">
+                        <div class="stats-section-title">Parametry fúze</div>
+                        <div class="tile-grid">
+                            <div class="metric"><span class="metric-label">Limit párování</span><span class="metric-value">${formatMeters(latestStats?.pair_max_distance ?? 0)}</span></div>
+                            <div class="metric"><span class="metric-label">Podržení páru</span><span class="metric-value">${safeNum(latestStats?.pair_hold_seconds ?? 0).toFixed(0)} s</span></div>
+                            <div class="metric"><span class="metric-label">Reakvizice clusteru</span><span class="metric-value">${formatMeters(latestStats?.pair_reacquire_distance ?? 0)}</span></div>
+                        </div>
+                    </div>
+                    <div class="conf-wrap">
+                        <span class="conf-label">Poslední update</span>
+                        <span class="conf-value">${latestStats ? new Date(latestStats.timestamp * 1000).toLocaleTimeString() : '-'}</span>
+                    </div>
+                </div>`;
         }
 
         function drawMap2D() {
@@ -722,35 +819,7 @@
         function renderStatsPanel() {
             // Diagnostika je prepisovana jako cele HTML. Je mala, takze je to
             // jednodussi a citelnejsi nez udrzovat mnoho jednotlivych uzlu.
-            statsContainer.innerHTML = `
-                <div class="tile source-diagnostics">
-                    <div class="tile-head">
-                        <div>
-                            <h3 class="tile-title">DIAGNOSTIKA SENZORŮ</h3>
-                            <div class="tile-sub">${latestStats ? 'živý MQTT/WebSocket stream' : 'čekám na první zprávu'}</div>
-                        </div>
-                    </div>
-                    <div class="tile-grid">
-                        <div class="metric"><span class="metric-label">Radar nový</span><span class="metric-value">${latestStats?.new_radar_points ?? 0}</span></div>
-                        <div class="metric"><span class="metric-label">Radar historie</span><span class="metric-value">${latestStats?.radar_history_points ?? 0}</span></div>
-                        <div class="metric"><span class="metric-label">Radar clustery</span><span class="metric-value">${latestStats?.radar_clusters ?? 0}</span></div>
-                        <div class="metric"><span class="metric-label">Objekty</span><span class="metric-value">${latestStats?.objects ?? 0}</span></div>
-                        <div class="metric"><span class="metric-label">Radar + BLE</span><span class="metric-value">${latestStats?.paired_radar_ble ?? 0}</span></div>
-                        <div class="metric"><span class="metric-label">Limit párování</span><span class="metric-value">${formatMeters(latestStats?.pair_max_distance ?? 0)}</span></div>
-                        <div class="metric"><span class="metric-label">Podržení páru</span><span class="metric-value">${safeNum(latestStats?.pair_hold_seconds ?? 0).toFixed(0)} s</span></div>
-                        <div class="metric"><span class="metric-label">Návaznost clusteru</span><span class="metric-value">${formatMeters(latestStats?.pair_reacquire_distance ?? 0)}</span></div>
-                        <div class="metric"><span class="metric-label">Pouze radar</span><span class="metric-value">${latestStats?.radar_cluster_objects ?? 0}</span></div>
-                        <div class="metric"><span class="metric-label">Pouze BLE</span><span class="metric-value">${latestStats?.ble_only_objects ?? 0}</span></div>
-                        <div class="metric"><span class="metric-label">BLE 1 tagy</span><span class="metric-value">${latestStats?.ble_1_tags ?? 0}</span></div>
-                        <div class="metric"><span class="metric-label">BLE 2 tagy</span><span class="metric-value">${latestStats?.ble_2_tags ?? 0}</span></div>
-                        <div class="metric"><span class="metric-label">Společné BLE</span><span class="metric-value">${latestStats?.common_ble_tags ?? 0}</span></div>
-                        <div class="metric"><span class="metric-label">Triangulace</span><span class="metric-value">${latestStats?.triangulated_ble ?? 0}</span></div>
-                    </div>
-                    <div class="conf-wrap">
-                        <span class="conf-label">Poslední update</span>
-                        <span class="conf-value">${latestStats ? new Date(latestStats.timestamp * 1000).toLocaleTimeString() : '-'}</span>
-                    </div>
-                </div>`;
+            statsContainer.innerHTML = buildStatsPanelHtml();
         }
 
         function renderTiles(drawList) {
@@ -780,7 +849,7 @@
                             ${obj.pair_distance !== undefined ? `<div class="metric"><span class="metric-label">BLE-Radar</span><span class="metric-value">${formatMeters(obj.pair_distance)}</span></div>` : ''}
                             ${obj.pair_mode ? `<div class="metric"><span class="metric-label">Párování</span><span class="metric-value">${escapeHtml(obj.pair_mode)}</span></div>` : ''}
                         </div>
-                        <div class="conf-wrap"><span class="conf-label">Stabilita trasy</span><span class="conf-value">${confPct.toFixed(0)}%</span></div>
+                        <div class="conf-wrap"><span class="conf-label">Spolehlivost detekce</span><span class="conf-value">${confPct.toFixed(0)}%</span></div>
                         <div class="conf-bar"><div class="conf-fill" style="width:${confPct}%"></div></div>
                     </div>`;
             }).join('');

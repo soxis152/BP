@@ -111,6 +111,15 @@ class AsyncDBHandler:
             await conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_fused_tag ON {DB_SCHEMA}.fused_data(tag_id)"
             )
+            await conn.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_ble_1_tag_timestamp ON {DB_SCHEMA}.ble_1(tag_id, timestamp)"
+            )
+            await conn.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_ble_2_tag_timestamp ON {DB_SCHEMA}.ble_2(tag_id, timestamp)"
+            )
+            await conn.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_fused_tag_timestamp ON {DB_SCHEMA}.fused_data(tag_id, timestamp)"
+            )
 
             print("Tabulky a indexy byly zkontrolovany nebo vytvoreny.")
 

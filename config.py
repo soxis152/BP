@@ -39,8 +39,13 @@ DB_CONFIG = {
     "database": os.getenv("FOUR_DB_NAME", "sensor_data"),
     "host": os.getenv("FOUR_DB_HOST", "127.0.0.1"),
     "port": env_int("FOUR_DB_PORT", 5432),
+    "min_size": env_int("FOUR_DB_POOL_MIN_SIZE", 1),
+    "max_size": env_int("FOUR_DB_POOL_MAX_SIZE", 5),
+    "command_timeout": env_float("FOUR_DB_COMMAND_TIMEOUT", 60.0),
 }
 DB_SCHEMA = os.getenv("FOUR_DB_SCHEMA", "public")
+DB_BATCH_SIZE = env_int("FOUR_DB_BATCH_SIZE", 100)
+DB_FLUSH_SECONDS = env_float("FOUR_DB_FLUSH_SECONDS", 1.0)
 
 RADAR_CONFIG_FILE = env_path(
     "FOUR_RADAR_CONFIG_FILE",

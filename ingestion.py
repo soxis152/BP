@@ -20,11 +20,11 @@ import paho.mqtt.client as mqtt
 import serial
 
 try:
-    from config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIG_FILE, RADAR_CONFIGS
+    from config import BLE_CONFIGS, DB_BATCH_SIZE, MQTT_HOST, MQTT_PORT, RADAR_CONFIG_FILE, RADAR_CONFIGS
     from db_handler import db_handler
     from radar.radar_interface import RadarInterface
 except ImportError:
-    from .config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIG_FILE, RADAR_CONFIGS
+    from .config import BLE_CONFIGS, DB_BATCH_SIZE, MQTT_HOST, MQTT_PORT, RADAR_CONFIG_FILE, RADAR_CONFIGS
     from .db_handler import db_handler
     from .radar.radar_interface import RadarInterface
 
@@ -98,7 +98,7 @@ def db_worker():
         if table_name in buffers:
             buffers[table_name].append(data)
 
-            if len(buffers[table_name]) >= 50 or db_queue.empty():
+            if len(buffers[table_name]) >= DB_BATCH_SIZE or db_queue.empty():
                 try:
                     loop.run_until_complete(db_handler.insert_batch(table_name, buffers[table_name]))
                     buffers[table_name].clear()

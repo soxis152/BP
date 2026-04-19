@@ -24,9 +24,11 @@ import time
 import aiomqtt
 
 try:
-    from config import MQTT_HOST
+    from config import DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST
+    from db_handler import AsyncDBHandler
 except ImportError:
-    from .config import MQTT_HOST
+    from .config import DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST
+    from .db_handler import AsyncDBHandler
 
 RAW_RADAR_HISTORY_SECONDS = 2
 MAX_RAW_RADAR_HISTORY_POINTS = 700
@@ -39,9 +41,23 @@ RADAR_BLE_PAIR_HOLD_SECONDS = 8.0
 RADAR_BLE_REACQUIRE_DISTANCE = 0.8
 RADAR_BLE_LOCK_MAX_DISTANCE = 1.35
 BLE_TAG_TTL_SECONDS = 4.0
+RADAR_BLE_CONFIDENCE_MIN = 0.72
+RADAR_BLE_CONFIDENCE_MAX = 0.97
+RADAR_BLE_LOCK_PENALTY = 0.12
+RADAR_CLUSTER_CONFIDENCE_MIN = 0.45
+RADAR_CLUSTER_CONFIDENCE_MAX = 0.85
 MAX_BAD_MESSAGE_LOGS = 20
 MAX_PAYLOAD_PREVIEW_CHARS = 240
+FUSED_DB_SAMPLE_SECONDS = 0.25
+FUSED_DB_FLUSH_SECONDS = DB_FLUSH_SECONDS
+FUSED_DB_BATCH_SIZE = DB_BATCH_SIZE
+FUSED_DB_RETRY_SECONDS = 5.0
 bad_message_count = 0
+
+# Fusion bezi v main.py ve vlastnim vlakne a vlastnim asyncio event loopu.
+# Proto tu nepouzivam globalni db_handler sdileny s ingestion.py. asyncpg pool
+# patri vzdy tomu event loopu, ve kterem vznikl.
+fusion_db_handler = AsyncDBHandler()
 
 # BLE geometrie musi odpovidat fyzickemu rozmisteni kotev v mistnosti.
 SENSORS = {
@@ -68,6 +84,87 @@ def payload_preview(payload):
     if len(text) > MAX_PAYLOAD_PREVIEW_CHARS:
         return text[:MAX_PAYLOAD_PREVIEW_CHARS] + "..."
     return text
+
+
+def safe_float(value, default=0.0):
+    """Prevede hodnotu na float tak, aby jeden spatny objekt nezastavil zapis DB."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def build_fused_db_rows(objects, timestamp):
+    """Prevede vystupni fused objekty na radky pro tabulku fused_data."""
+    rows = []
+
+    for obj in objects:
+        tag_id = str(obj.get("tag_id", "")).strip()
+        if not tag_id:
+            continue
+
+        rows.append(
+            (
+                timestamp,
+                tag_id,
+                safe_float(obj.get("x")),
+                safe_float(obj.get("y")),
+                safe_float(obj.get("z")),
+                safe_float(obj.get("confidence")),
+            )
+        )
+
+    return rows
+
+
+def clamp(value, minimum, maximum):
+    """Omezi hodnotu do pevneho intervalu."""
+    return max(minimum, min(maximum, value))
+
+
+def radar_ble_confidence(pair_distance, pair_mode):
+    """Spocita duveru pro objekt potvrzeny radarem i BLE.
+
+    Nejvyssi duveru ma tag, jehoz BLE triangulace lezi blizko radar clusteru.
+    Na hrane povolene vzdalenosti confidence klesa, protoze parovani uz muze
+    byt nahodne. Locked parovani drzim nize, protoze cast informace pochazi
+    z pameti predchozich snimku.
+    """
+    normalized_distance = clamp(pair_distance / RADAR_BLE_PAIR_MAX_DISTANCE, 0.0, 1.0)
+    confidence = RADAR_BLE_CONFIDENCE_MAX - (
+        normalized_distance * (RADAR_BLE_CONFIDENCE_MAX - RADAR_BLE_CONFIDENCE_MIN)
+    )
+
+    if pair_mode == "locked":
+        confidence -= RADAR_BLE_LOCK_PENALTY
+
+    return round(clamp(confidence, RADAR_BLE_CONFIDENCE_MIN, RADAR_BLE_CONFIDENCE_MAX), 3)
+
+
+def radar_cluster_confidence(point_count):
+    """Spocita duveru anonymniho radar clusteru podle poctu bodu.
+
+    Bez BLE identity to nikdy nepovazuji za stoprocentni objekt. Vice bodu
+    znamena stabilnejsi radarovou detekci, ale horni limit zustava pod 1.0.
+    """
+    confidence = RADAR_CLUSTER_CONFIDENCE_MIN + (point_count * 0.06)
+    return round(clamp(confidence, RADAR_CLUSTER_CONFIDENCE_MIN, RADAR_CLUSTER_CONFIDENCE_MAX), 3)
+
+
+async def ensure_fused_db_ready(last_retry_at):
+    """Pripravi DB spojeni pro fused_data a pri vypadku ho zkousi obnovit."""
+    now = time.time()
+    if now - last_retry_at < FUSED_DB_RETRY_SECONDS:
+        return False, last_retry_at
+
+    try:
+        await fusion_db_handler.connect()
+        await fusion_db_handler.init_tables()
+        print("Fusion DB: fused_data zapis je pripraveny.")
+        return True, now
+    except Exception as exc:
+        print(f"Fusion DB: databaze neni dostupna, dalsi pokus za {FUSED_DB_RETRY_SECONDS}s: {exc}")
+        return False, now
 
 
 def validate_raw_message(topic, data):
@@ -262,7 +359,7 @@ def build_fused_objects(radar_clusters, ble_positions, now):
                 "z": best_cluster.get("z", 0.8),
                 "seen_at": now,
             }
-            confidence = 0.95 if pair_mode == "live" else 0.80
+            confidence = radar_ble_confidence(best_distance, pair_mode)
             objects.append(
                 {
                     "tag_id": tag_id,
@@ -307,7 +404,7 @@ def build_fused_objects(radar_clusters, ble_positions, now):
                 "x": cluster["x"],
                 "y": cluster["y"],
                 "z": cluster["z"],
-                "confidence": min(1.0, 0.45 + (cluster["points"] * 0.08)),
+                "confidence": radar_cluster_confidence(cluster["points"]),
                 "points": cluster["points"],
             }
         )
@@ -356,11 +453,16 @@ async def mqtt_listener():
 
 
 async def fused_publisher():
-    """Publikuje snapshot pro app.py -> WebSocket -> index.html."""
+    """Publikuje snapshot pro app.py -> WebSocket -> index.html a uklada fused_data."""
     # Radarove body nedrzim jen v jednom frame, ale v kratke historii. Radar
     # vraci mrak bodu a clustering je stabilnejsi, kdyz ma par poslednich
     # mereni misto jedineho okamziku.
     radar_history = []
+    fused_db_buffer = []
+    db_ready = False
+    last_db_retry = 0.0
+    last_db_sample = 0.0
+    last_db_flush = time.time()
 
     while True:
         try:
@@ -445,6 +547,30 @@ async def fused_publisher():
                         }
                     )
                     await client.publish("sensors/fused", payload)
+
+                    if not db_ready:
+                        db_ready, last_db_retry = await ensure_fused_db_ready(last_db_retry)
+
+                    # Do DB neukladam kazdy 50ms frame. Dashboard potrebuje
+                    # plynuly MQTT stream, ale databazi staci ridci vzorkovani
+                    # v davkach, aby se zbytecne nezahltila pri delsim mereni.
+                    if db_ready and now - last_db_sample >= FUSED_DB_SAMPLE_SECONDS:
+                        fused_db_buffer.extend(build_fused_db_rows(out_objects, now))
+                        last_db_sample = now
+
+                    should_flush = (
+                        len(fused_db_buffer) >= FUSED_DB_BATCH_SIZE
+                        or now - last_db_flush >= FUSED_DB_FLUSH_SECONDS
+                    )
+                    if db_ready and fused_db_buffer and should_flush:
+                        try:
+                            await fusion_db_handler.insert_batch("fused_data", fused_db_buffer)
+                            fused_db_buffer.clear()
+                            last_db_flush = now
+                        except Exception as exc:
+                            db_ready = False
+                            last_db_retry = now
+                            print(f"Fusion DB: zapis fused_data selhal, spojeni obnovim pozdeji: {exc}")
         except aiomqtt.MqttError:
             print("Fusion publisher: MQTT connection lost, retrying in 2s...")
             await asyncio.sleep(2)
