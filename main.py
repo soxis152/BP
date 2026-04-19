@@ -1,14 +1,13 @@
-"""Hlavni vstupni bod, ktery sklada cely system dohromady.
+"""Hlavni vstupni bod celeho systemu.
 
-`main.py` neobsahuje doménovou logiku. Je to orchestrator procesu:
+Soubor jen sklada dohromady tri samostatne casti:
 
-- ingestion vlakna sbiraji data ze senzoru,
-- fusion vlakno pocita online vystup,
-- API vlakno servruje dashboard.
+- ingestion: cteni senzoru, MQTT publish a DB zapis,
+- fusion: online zpracovani raw dat,
+- API: FastAPI server s dashboardem.
 
-Vse bezi v jednom procesu hlavne kvuli jednoduchosti lokalni demonstrace.
-Kdyby bylo potreba nasazeni do produkcnejsiho prostredi, tyto tri casti se daji
-spustit jako samostatne procesy, protoze spolu komunikuji pres MQTT.
+Vse bezi v jednom procesu kvuli jednoduche lokalni demonstraci. Protoze spolu
+casti komunikuji pres MQTT, lze je pozdeji spustit i jako samostatne procesy.
 """
 
 import asyncio
@@ -18,9 +17,13 @@ import time
 
 import uvicorn
 
+try:
+    from config import API_HOST, API_PORT
+except ImportError:
+    from .config import API_HOST, API_PORT
+
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
 
 try:
     import app as web_app
@@ -32,22 +35,12 @@ except ImportError:
     from . import ingestion
 
 
-# Tento modul neobsahuje matematiku ani sběr dat.
-# Jeho smysl je orchestrace:
-# - spustit ingestion vrstvu,
-# - spustit fusion vrstvu,
-# - spustit webový dashboard,
-# a držet tyto části naživu v jednom procesu.
-
-
 def ingestion_thread() -> None:
-    """Spustí sběr syrových dat ze senzorů."""
+    """Spusti workery pro sber raw dat."""
     print("[thread-1] Starting ingestion workers")
 
-    # Jeden DB worker zapisuje všechna syrová data z fronty.
     threading.Thread(target=ingestion.db_worker, daemon=True, name="db_worker").start()
 
-    # Každý radar dostane vlastní worker vlákno.
     for cfg in ingestion.RADAR_CONFIGS:
         print(f"[thread-1] Starting radar worker: {cfg['id']}")
         threading.Thread(
@@ -58,7 +51,6 @@ def ingestion_thread() -> None:
         ).start()
         time.sleep(2)
 
-    # Každá BLE kotva dostane také vlastní worker vlákno.
     for cfg in ingestion.BLE_CONFIGS:
         print(f"[thread-1] Starting BLE worker: {cfg['id']}")
         threading.Thread(
@@ -74,7 +66,7 @@ def ingestion_thread() -> None:
 
 
 def fusion_thread() -> None:
-    """Spustí fusion engine ve vlastním asyncio loopu."""
+    """Spusti fusion engine ve vlastnim asyncio loopu."""
     print("[thread-2] Starting fusion loop")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -82,25 +74,18 @@ def fusion_thread() -> None:
 
 
 def api_thread() -> None:
-    """Spustí FastAPI server s dashboardem."""
-    print("[thread-3] Starting FastAPI server on http://127.0.0.1:8000")
+    """Spusti FastAPI server s dashboardem."""
+    print(f"[thread-3] Starting FastAPI server on http://{API_HOST}:{API_PORT}")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    config = uvicorn.Config(web_app.app, host="127.0.0.1", port=8000, reload=False, loop="asyncio")
+    config = uvicorn.Config(web_app.app, host=API_HOST, port=API_PORT, reload=False, loop="asyncio")
     server = uvicorn.Server(config)
     loop.run_until_complete(server.serve())
 
 
 def main() -> None:
-    """Složí dohromady všechny hlavní subsystémy."""
-
-    # Každá velká část systému běží odděleně:
-    # - ingestion = sběr syrových dat,
-    # - fusion = matematické zpracování,
-    # - api = prezentace a websocket přenos do browseru.
-    #
-    # Vlákna jsou daemon, protože proces chceme ukončovat jako jeden celek.
+    """Spusti vsechny hlavni casti a hlida, jestli vlakna nezemrela."""
     threads = [
         threading.Thread(target=ingestion_thread, name="ingestion_thread", daemon=True),
         threading.Thread(target=fusion_thread, name="fusion_thread", daemon=True),
@@ -115,8 +100,6 @@ def main() -> None:
 
     try:
         while True:
-            # Jednoduchý watchdog hlavního procesu:
-            # pokud některé důležité vlákno umře, chceme to vidět v logu.
             for thread in threads:
                 if not thread.is_alive():
                     print(f"[main] WARNING: {thread.name} stopped unexpectedly!")

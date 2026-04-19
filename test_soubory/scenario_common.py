@@ -19,7 +19,16 @@ import time
 
 import paho.mqtt.client as mqtt
 
-from Four.db_handler import db_handler
+try:
+    from Four.config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIGS
+    from Four.db_handler import db_handler
+except ImportError:
+    try:
+        from four.config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIGS
+        from four.db_handler import db_handler
+    except ImportError:
+        from config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIGS
+        from db_handler import db_handler
 
 # Tento modul je společná testovací infrastruktura pro všechny scénáře ve složce test_soubory.
 #
@@ -32,26 +41,12 @@ from Four.db_handler import db_handler
 # Díky tomu testovací scénáře nepíší přímo radarové body ani BLE věty.
 # Stačí jim definovat pohyb objektu v mapě a helper se postará o zbytek.
 
-MQTT_HOST = "127.0.0.1"
-MQTT_PORT = 1883
-
 # Publish period odpovídá periodě, s jakou se typicky očekává nový krok simulace i fusion.
 PUBLISH_PERIOD_SECONDS = 0.15
 MAX_SYNTHETIC_SPEED_MPS = 4.0
 
 # Geometrie senzorů v testech musí odpovídat hlavnímu systému, jinak by testy netestovaly
 # stejnou matematiku jako ostrý běh.
-RADAR_CONFIGS = [
-    {"id": "radar_1", "pos_x": 1.5, "pos_y": 0.0, "pos_z": 0.8, "rotation": 0},
-    {"id": "radar_2", "pos_x": 0.0, "pos_y": 1.5, "pos_z": 0.8, "rotation": -90},
-]
-
-BLE_CONFIGS = [
-    {"id": "ble_1", "pos_x": 1.5, "pos_y": 0.0, "pos_z": 0.8, "rotation": 90},
-    {"id": "ble_2", "pos_x": 0.0, "pos_y": 1.5, "pos_z": 0.8, "rotation": 0},
-]
-
-
 class ObjectState:
     """Stav jednoho simulovaného objektu.
 

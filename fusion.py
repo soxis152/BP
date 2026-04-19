@@ -23,6 +23,11 @@ import time
 
 import aiomqtt
 
+try:
+    from config import MQTT_HOST
+except ImportError:
+    from .config import MQTT_HOST
+
 RAW_RADAR_HISTORY_SECONDS = 2
 MAX_RAW_RADAR_HISTORY_POINTS = 700
 # Prahy jsou zatim ladene pro malou 3x3m mistnost. Drzim je pohromade tady,
@@ -34,14 +39,17 @@ RADAR_BLE_PAIR_HOLD_SECONDS = 8.0
 RADAR_BLE_REACQUIRE_DISTANCE = 0.8
 RADAR_BLE_LOCK_MAX_DISTANCE = 1.35
 BLE_TAG_TTL_SECONDS = 4.0
+MAX_BAD_MESSAGE_LOGS = 20
+MAX_PAYLOAD_PREVIEW_CHARS = 240
+bad_message_count = 0
 
-# --- GEOMETRIE DLE INGESTION.PY ---
+# BLE geometrie musi odpovidat fyzickemu rozmisteni kotev v mistnosti.
 SENSORS = {
-    "ble_1": {"x": 1.5, "y": 0.0, "facing_angle": 90},  # Na spodní zdi, kouká nahoru (+Y)
-    "ble_2": {"x": 0.0, "y": 1.5, "facing_angle": 0},  # Na levé zdi, kouká doprava (+X)
+    "ble_1": {"x": 1.5, "y": 0.0, "facing_angle": 90},
+    "ble_2": {"x": 0.0, "y": 1.5, "facing_angle": 0},
 }
 
-# --- SDÍLENÁ DATA ---
+# Stav sdileny mezi MQTT listenerem a publisherem.
 shared_state = {
     "radar_points": [],
     "ble_tags": {"ble_1": {}, "ble_2": {}},
@@ -50,46 +58,81 @@ shared_state = {
 lock = asyncio.Lock()
 
 
+def payload_preview(payload):
+    """Vrati zkracenou ukazku payloadu pro diagnosticky log."""
+    try:
+        text = payload.decode("utf-8", errors="replace")
+    except AttributeError:
+        text = str(payload)
+
+    if len(text) > MAX_PAYLOAD_PREVIEW_CHARS:
+        return text[:MAX_PAYLOAD_PREVIEW_CHARS] + "..."
+    return text
+
+
+def validate_raw_message(topic, data):
+    """Zkontroluje minimalni schema raw MQTT zpravy pred ulozenim do shared_state."""
+    if not isinstance(data, dict):
+        raise ValueError("payload is not a JSON object")
+
+    if "radar" in topic:
+        missing = [key for key in ("x", "y", "z") if key not in data]
+        if missing:
+            raise ValueError(f"radar payload missing keys: {', '.join(missing)}")
+        return "radar"
+
+    if "ble_1" in topic:
+        missing = [key for key in ("tag_id", "azimuth") if key not in data]
+        if missing:
+            raise ValueError(f"ble_1 payload missing keys: {', '.join(missing)}")
+        return "ble_1"
+
+    if "ble_2" in topic:
+        missing = [key for key in ("tag_id", "azimuth") if key not in data]
+        if missing:
+            raise ValueError(f"ble_2 payload missing keys: {', '.join(missing)}")
+        return "ble_2"
+
+    raise ValueError(f"unsupported raw topic: {topic}")
+
+
 def triangulate(tag_id):
-    """Základní 2D průsečík dvou přímek z BLE."""
+    """Vrati 2D prusecik smeru ze dvou BLE kotev pro jeden tag."""
     b1 = shared_state["ble_tags"]["ble_1"].get(tag_id)
     b2 = shared_state["ble_tags"]["ble_2"].get(tag_id)
 
     if not b1 or not b2: return None
 
-    # Převod u-blox azimutu na úhel v místnosti (0° je vpravo, 90° je nahoru)
-    # Předpoklad: u-blox azimut kladný doprava, záporný doleva
+    # u-blox azimut prevadim do souradne soustavy mistnosti.
     ang1 = math.radians(SENSORS["ble_1"]["facing_angle"] - b1["azimuth"])
     ang2 = math.radians(SENSORS["ble_2"]["facing_angle"] - b2["azimuth"])
 
     x1, y1 = SENSORS["ble_1"]["x"], SENSORS["ble_1"]["y"]
     x2, y2 = SENSORS["ble_2"]["x"], SENSORS["ble_2"]["y"]
 
-    # Výpočet směrových vektorů
     v1x, v1y = math.cos(ang1), math.sin(ang1)
     v2x, v2y = math.cos(ang2), math.sin(ang2)
 
-    # Průsečík (Cramerovo pravidlo)
+    # Analyticky prusecik dvou parametrickych primek.
     det = v1x * v2y - v1y * v2x
-    if abs(det) < 0.001: return None  # Přímky jsou rovnoběžné
+    if abs(det) < 0.001: return None
 
     dx = x2 - x1
     dy = y2 - y1
     t1 = (dx * v2y - dy * v2x) / det
 
-    if t1 < 0: return None  # Průsečík je "za" senzorem
+    if t1 < 0: return None
 
     x = x1 + t1 * v1x
     y = y1 + t1 * v1y
 
-    # Omezení na velikost místnosti (3x3m s lehkým přesahem)
     if -0.5 <= x <= 3.5 and -0.5 <= y <= 3.5:
         return (x, y)
     return None
 
 
 def cluster_radar_points(points):
-    """Seskupí blízké radarové body a vrátí jejich středy."""
+    """Seskupi blizke radarove body a vrati stredu kazdeho shluku."""
     valid_points = [
         point
         for point in points
@@ -142,7 +185,7 @@ def cluster_radar_points(points):
 
 
 def build_fused_objects(radar_clusters, ble_positions, now):
-    """Spojí BLE pozice s nejbližším radar clusterem a vrátí objekty pro dashboard."""
+    """Sestavi objekty pro dashboard z radar clusteru a BLE triangulaci."""
     objects = []
     used_cluster_ids = set()
     paired_count = 0
@@ -280,27 +323,36 @@ def build_fused_objects(radar_clusters, ble_positions, now):
 
 
 async def mqtt_listener():
-    """Naslouchá datům z ingestion.py."""
+    """Prijima raw MQTT zpravy z ingestion vrstvy."""
+    global bad_message_count
     print("Fusion: Čekám na MQTT data na 'sensors/raw/#'...")
-    async with aiomqtt.Client("127.0.0.1") as client:
+    async with aiomqtt.Client(MQTT_HOST) as client:
         await client.subscribe("sensors/raw/#")
         async for message in client.messages:
             try:
                 topic = str(message.topic)
                 data = json.loads(message.payload.decode())
+                source = validate_raw_message(topic, data)
 
                 async with lock:
-                    if "radar" in topic:
-                        # Ingestion.py už udělalo převod na globální x, y!
+                    if source == "radar":
                         shared_state["radar_points"].append(data)
-                    elif "ble_1" in topic:
+                    elif source == "ble_1":
                         data["_seen_at"] = time.time()
                         shared_state["ble_tags"]["ble_1"][data["tag_id"]] = data
-                    elif "ble_2" in topic:
+                    elif source == "ble_2":
                         data["_seen_at"] = time.time()
                         shared_state["ble_tags"]["ble_2"][data["tag_id"]] = data
-            except Exception:
-                pass
+            except (json.JSONDecodeError, UnicodeDecodeError, ValueError, KeyError, TypeError) as exc:
+                bad_message_count += 1
+                if bad_message_count <= MAX_BAD_MESSAGE_LOGS:
+                    print(
+                        "Fusion listener: bad raw MQTT message "
+                        f"#{bad_message_count} on {message.topic}: {exc}; "
+                        f"payload={payload_preview(message.payload)!r}"
+                    )
+                elif bad_message_count == MAX_BAD_MESSAGE_LOGS + 1:
+                    print("Fusion listener: dalsi spatne raw MQTT zpravy uz potlacuji, aby log nebyl zahlceny.")
 
 
 async def fused_publisher():
@@ -312,7 +364,7 @@ async def fused_publisher():
 
     while True:
         try:
-            async with aiomqtt.Client("127.0.0.1") as client:
+            async with aiomqtt.Client(MQTT_HOST) as client:
                 print("Fusion: Publikuji fused data na 'sensors/fused'")
 
                 while True:
@@ -399,7 +451,6 @@ async def fused_publisher():
 
 
 async def main():
-    # Listener sbira raw data z ingestion.py, publisher je posila do app.py.
     await asyncio.gather(mqtt_listener(), fused_publisher())
 
 

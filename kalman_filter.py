@@ -1,62 +1,42 @@
 """Jednoduchy Kalmanuv filtr pro budouci tracking objektu.
 
-Tento modul je zatim pripraveny jako stavebni blok. Hlavni `fusion.py` v teto
-verzi jeste pouziva clustering a parovaci heuristiku, ne plny Kalmanuv tracker.
-Filtr tu nechavam oddelene, aby se dal pozdeji zapojit bez prepisovani zbytku
-systemu.
+Hlavni `fusion.py` ted pouziva clustering a parovaci heuristiku. Tento modul je
+pripraveny jako samostatny stavebni blok pro pozdejsi rozsireni na skutecny
+tracker.
+
+Model sleduje stav `[x, y, vx, vy]`. Osa Z se zatim nefiltruje maticove, protoze
+pro aktualni dashboard je nejdulezitejsi stabilni pudorysna poloha v X/Y.
 """
 
 import numpy as np
 
 
-# Tento modul obsahuje jednoduchý Kalmanův filtr pro sledování pohybu v rovině X-Y.
-#
-# Proč filtrujeme jen X a Y:
-# - v aktuální architektuře je nejdůležitější stabilní poloha objektu v mapě místnosti,
-# - osa Z se ve fusion vrstvě drží odděleně jako poslední známá výška radarového clusteru,
-# - model tak zůstává jednoduchý, rychlý a dobře laditelný.
-#
-# Stav objektu je:
-#   [x, y, vx, vy]
-
 class KalmanObject:
-    """Jedna sledovaná stopa s modelem konstantní rychlosti."""
+    """Jedna sledovana stopa s modelem konstantni rychlosti."""
 
     def __init__(self, tag_id, x0, y0, z0, dt=0.1):
         self.tag_id = tag_id
-
-        # Stavový vektor [x, y, vx, vy].
-        # Nový objekt vzniká na známé poloze, ale s nulovou počáteční rychlostí.
         self.state = np.array([x0, y0, 0, 0], dtype=float)
-        self.z = z0  # Výšku si držíme mimo matice
+        self.z = z0
 
-        # Kovarianční matice P vyjadřuje naši nejistotu o aktuálním stavu.
         self.P = np.eye(4) * 1.0
-
-        # Transformační matice F (model konstantní rychlosti).
         self.F = np.array([
             [1, 0, dt, 0],
             [0, 1, 0, dt],
             [0, 0, 1, 0],
-            [0, 0, 0, 1]
+            [0, 0, 0, 1],
         ])
-
-        # Matice pozorování H (měříme pouze polohu x a y, rychlost ne).
         self.H = np.array([
             [1, 0, 0, 0],
-            [0, 1, 0, 0]
+            [0, 1, 0, 0],
         ])
 
-        # Q = procesní šum. (Jak moc může objekt nečekaně změnit směr).
-        # ZMĚNA: Velmi nízká hodnota (0.01). Tečka nebude tolik uskakovat do stran.
+        # Q urcuje, jak moc pripoustim necekane zmeny pohybu.
         self.Q = np.eye(4) * 0.01
 
-        # R = měřicí šum. (Jak moc věříme samotnému radarovému měření).
-        # ZMĚNA: Vysoká hodnota (1.5). Filtr bude silně vyhlazovat skákání těžiště
-        # a povede tečku raději setrvačností.
+        # R urcuje, jak moc verim jednomu mereni proti predikci.
         self.R = np.eye(2) * 1.5
 
-        # Počítadlo pro detekci "ztráty" objektu
         self.missed_frames = 0
         self.update_count = 1
 
@@ -69,8 +49,7 @@ class KalmanObject:
         return self.state[1]
 
     def predict(self, dt=0.1):
-        """Provede predikci stavu do dalšího kroku (Coasting)."""
-        # Aktualizace časového kroku v matici F
+        """Predikuje dalsi stav bez noveho mereni."""
         self.F[0, 2] = dt
         self.F[1, 3] = dt
 
@@ -81,22 +60,14 @@ class KalmanObject:
         return float(self.x), float(self.y)
 
     def update(self, meas_x, meas_y, meas_z):
-        """Opraví predikovaný stav podle skutečného radarového měření."""
-        # Z se zatim nefiltruje maticove. Beru posledni zmerenou vysku, protoze
-        # hlavni problem prototypu je stabilni 2D poloha v pudorysu mistnosti.
-        self.z = meas_z  # Aktualizace výšky
+        """Opravi predikovany stav podle noveho mereni."""
+        self.z = meas_z
         z_meas = np.array([meas_x, meas_y])
 
-        # Inovace (rozdíl mezi měřením a predikcí)
-        y = z_meas - (self.H @ self.state)
+        innovation = z_meas - (self.H @ self.state)
+        innovation_covariance = self.H @ self.P @ self.H.T + self.R
+        kalman_gain = self.P @ self.H.T @ np.linalg.inv(innovation_covariance)
 
-        # Inovační kovariance
-        S = self.H @ self.P @ self.H.T + self.R
-
-        # Kalmanův zisk
-        K = self.P @ self.H.T @ np.linalg.inv(S)
-
-        # Aktualizace stavu a kovariance
-        self.state = self.state + (K @ y)
-        I = np.eye(self.P.shape[0])
-        self.P = (I - K @ self.H) @ self.P
+        self.state = self.state + (kalman_gain @ innovation)
+        identity = np.eye(self.P.shape[0])
+        self.P = (identity - kalman_gain @ self.H) @ self.P

@@ -216,10 +216,8 @@
 
     <script>
         /*
-            Frontend nedela skutecnou fuzni matematiku. Jen:
-            1. prijme snapshot z WebSocketu,
-            2. sjednoti a trochu vyhladi polohy pro citelne zobrazeni,
-            3. vykresli 2D/3D pohled a diagnosticke karty.
+            Frontend nepocita fuzni logiku. Jen prijme snapshot z backendu,
+            vyhladi ho pro citelne zobrazeni a vykresli 2D/3D pohled.
         */
         const COLOR_SOURCE = { radar: '#0ea5e9', radar_raw: '#0ea5e9', radar_cluster: '#0ea5e9', radar_ble: '#ef4444', ble_only: '#eab308' };
         const SENSOR_NODES = [ { id: "S1", x: 1.5, y: 0.0, z: 0.8 }, { id: "S2", x: 0.0, y: 1.5, z: 0.8 } ];
@@ -351,7 +349,7 @@
             // samostatny display stav.
             const isBle = isBLEOnly(targetObj);
             if (isRadarRaw(targetObj)) {
-                // Surový radar se nevyhlazuje - okamžitý snap
+                // Surovy radar se nevyhlazuje, chci videt okamzite body.
                 displayObj.x = safeNum(targetObj.x, safeNum(displayObj.x));
                 displayObj.y = safeNum(targetObj.y, safeNum(displayObj.y));
                 if (targetObj.z !== undefined) displayObj.z = safeNum(targetObj.z, safeNum(displayObj.z));
@@ -622,7 +620,7 @@
                 }
                 group.userData = { sphere, ring, source };
             } else {
-                group.userData = { sphere, ring: null, source }; // Radar nemá velké prstence
+                group.userData = { sphere, ring: null, source };
             }
             return group;
         }
@@ -658,7 +656,7 @@
             // WebSocket je jediny zivy vstup dashboardu. Pri odpojeni se po
             // kratke pauze zkusim pripojit znovu, takze refresh stranky neni
             // nutny pri restartu backendu.
-            const ws = new WebSocket(`ws://${window.location.host}/ws`); // Nebo upravte na absolutní ws://127.0.0.1:8765 pokud nenačítáte z localhostu
+            const ws = new WebSocket(`ws://${window.location.host}/ws`);
             ws.onopen = () => { document.getElementById('status').className = 'status'; document.getElementById('status').innerText = 'ONLINE'; };
 
             ws.onmessage = (e) => {
@@ -698,7 +696,7 @@
                         });
                     }
 
-                    // 2. Zpracování BLE dat
+                    // Fallback pro starsi payload bez `objects`.
                     if (data.ble && Array.isArray(data.ble)) {
                         data.ble.forEach(b => {
                             combined.push({
@@ -757,7 +755,7 @@
 
         function renderTiles(drawList) {
             renderStatsPanel();
-            // ODFILTROVÁNÍ SUROVÉHO RADARU, aby nezahltil DOM a nezhroutil prohlížeč
+            // Surove radarove body nevypisuju do karet, aby zbytecne nerostl DOM.
             const filteredForTiles = drawList.filter(obj => !isRadarRaw(obj));
             if (filteredForTiles.length === 0) {
                 tilesContainer.innerHTML = '<div class="empty-state">Žádné sledované cíle (Surová data z radaru nezobrazujeme v seznamu)</div>';

@@ -19,10 +19,41 @@ radar/BLE senzory -> ingestion.py -> MQTT -> fusion.py -> MQTT -> app.py -> WebS
 
 Projekt aktualne pouziva lokalni konfiguraci natvrdo ve zdrojovych souborech. Hlavni mista:
 
-- `db_handler.py`: pripojeni k PostgreSQL
-- `app.py`: pripojeni k PostgreSQL pro webovou vrstvu
-- `ingestion.py`: COM porty radaru, BLE kotev a cesta k radarovemu profilu
-- `fusion.py`: MQTT host a parametry parovani/fuze
+- `config.py`: DB, MQTT, API, COM porty, pozice senzoru a cesta k radarovemu profilu
+- `fusion.py`: parametry parovani/fuze
+
+## Konfigurace
+
+Vychozi konfigurace je v `config.py`. Hodnoty jde prepsat pres environment variables:
+
+```powershell
+$env:FOUR_MQTT_HOST = "127.0.0.1"
+$env:FOUR_MQTT_PORT = "1883"
+$env:FOUR_DB_HOST = "127.0.0.1"
+$env:FOUR_DB_PORT = "5432"
+$env:FOUR_DB_NAME = "sensor_data"
+$env:FOUR_DB_USER = "postgres"
+$env:FOUR_DB_PASSWORD = "postgres"
+$env:FOUR_API_HOST = "127.0.0.1"
+$env:FOUR_API_PORT = "8000"
+```
+
+Porty senzoru:
+
+```powershell
+$env:FOUR_BLE_1_PORT = "COM38"
+$env:FOUR_BLE_2_PORT = "COM17"
+$env:FOUR_RADAR_1_CFG_PORT = "COM13"
+$env:FOUR_RADAR_1_DAT_PORT = "COM14"
+$env:FOUR_RADAR_2_CFG_PORT = "COM11"
+$env:FOUR_RADAR_2_DAT_PORT = "COM12"
+```
+
+Cestu k radarovemu profilu lze prepsat pres:
+
+```powershell
+$env:FOUR_RADAR_CONFIG_FILE = "C:\path\to\profile.cfg"
+```
 
 ## Instalace
 
@@ -136,5 +167,3 @@ python -c "import ast, pathlib; [ast.parse(p.read_text(encoding='utf-8'), filena
 ## Zname technicke dluhy
 
 - `kalman_filter.py` existuje, ale hlavni fusion vrstva ho zatim nepouziva.
-- Nektere chyby ve fusion vrstve se pouze spolknou bez logovani.
-- Konfigurace je zatim natvrdo ve zdrojacich misto `.env` nebo konfiguracniho souboru.
