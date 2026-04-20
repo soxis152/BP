@@ -24,10 +24,10 @@ import time
 import aiomqtt
 
 try:
-    from config import DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST
+    from config import DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST, RUN_ID
     from db_handler import AsyncDBHandler
 except ImportError:
-    from .config import DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST
+    from .config import DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST, RUN_ID
     from .db_handler import AsyncDBHandler
 
 RAW_RADAR_HISTORY_SECONDS = 2
@@ -104,6 +104,7 @@ def build_fused_db_rows(objects, timestamp):
         rows.append(
             (
                 timestamp,
+                RUN_ID,
                 tag_id,
                 safe_float(obj.get("x")),
                 safe_float(obj.get("y")),

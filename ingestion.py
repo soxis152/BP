@@ -20,11 +20,11 @@ import paho.mqtt.client as mqtt
 import serial
 
 try:
-    from config import BLE_CONFIGS, DB_BATCH_SIZE, MQTT_HOST, MQTT_PORT, RADAR_CONFIG_FILE, RADAR_CONFIGS
+    from config import BLE_CONFIGS, DB_BATCH_SIZE, MQTT_HOST, MQTT_PORT, RADAR_CONFIG_FILE, RADAR_CONFIGS, RUN_ID
     from db_handler import db_handler
     from radar.radar_interface import RadarInterface
 except ImportError:
-    from .config import BLE_CONFIGS, DB_BATCH_SIZE, MQTT_HOST, MQTT_PORT, RADAR_CONFIG_FILE, RADAR_CONFIGS
+    from .config import BLE_CONFIGS, DB_BATCH_SIZE, MQTT_HOST, MQTT_PORT, RADAR_CONFIG_FILE, RADAR_CONFIGS, RUN_ID
     from .db_handler import db_handler
     from .radar.radar_interface import RadarInterface
 
@@ -157,7 +157,7 @@ def radar_worker(cfg):
                         "doppler": doppler,
                     }
                     mqtt_client.publish(f"sensors/raw/{cfg['id']}", json.dumps(payload))
-                    db_queue.put((cfg["id"], (time.time(), x_g, y_g, z_g, snr, doppler)))
+                    db_queue.put((cfg["id"], (RUN_ID, time.time(), x_g, y_g, z_g, snr, doppler)))
 
                 if detections_for_print:
                     formatted = ", ".join(
@@ -194,7 +194,7 @@ def ble_worker(cfg):
 
                     payload = {"timestamp": time.time(), "tag_id": tag_id, "rssi": rssi, "azimuth": azimuth}
                     mqtt_client.publish(f"sensors/raw/{cfg['id']}", json.dumps(payload))
-                    db_queue.put((cfg["id"], (time.time(), tag_id, rssi, azimuth)))
+                    db_queue.put((cfg["id"], (RUN_ID, time.time(), tag_id, rssi, azimuth)))
 
         except Exception as exc:
             print(f"BLE {cfg['id']} Error: {exc}. Restart za 5s...")

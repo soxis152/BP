@@ -15,6 +15,9 @@ except ImportError:
     from .config import DB_CONFIG, DB_SCHEMA
 
 
+TABLES = ("ble_1", "ble_2", "radar_1", "radar_2", "fused_data")
+
+
 class AsyncDBHandler:
     """Asynchronni obsluha PostgreSQL poolu a zakladnich tabulek."""
 
@@ -38,6 +41,7 @@ class AsyncDBHandler:
             await conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.ble_1 ("
                 "id SERIAL PRIMARY KEY, "
+                "run_id TEXT, "
                 "timestamp DOUBLE PRECISION, "
                 "tag_id TEXT, "
                 "rssi INT, "
@@ -46,6 +50,7 @@ class AsyncDBHandler:
             await conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.ble_2 ("
                 "id SERIAL PRIMARY KEY, "
+                "run_id TEXT, "
                 "timestamp DOUBLE PRECISION, "
                 "tag_id TEXT, "
                 "rssi INT, "
@@ -55,6 +60,7 @@ class AsyncDBHandler:
             await conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.radar_1 ("
                 "id SERIAL PRIMARY KEY, "
+                "run_id TEXT, "
                 "timestamp DOUBLE PRECISION, "
                 "x DOUBLE PRECISION, "
                 "y DOUBLE PRECISION, "
@@ -65,6 +71,7 @@ class AsyncDBHandler:
             await conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.radar_2 ("
                 "id SERIAL PRIMARY KEY, "
+                "run_id TEXT, "
                 "timestamp DOUBLE PRECISION, "
                 "x DOUBLE PRECISION, "
                 "y DOUBLE PRECISION, "
@@ -76,6 +83,7 @@ class AsyncDBHandler:
             await conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.fused_data ("
                 "id SERIAL PRIMARY KEY, "
+                "run_id TEXT, "
                 "timestamp DOUBLE PRECISION, "
                 "tag_id TEXT, "
                 "x DOUBLE PRECISION, "
@@ -83,6 +91,12 @@ class AsyncDBHandler:
                 "z DOUBLE PRECISION, "
                 "confidence DOUBLE PRECISION)"
             )
+
+            for table_name in TABLES:
+                await conn.execute(
+                    f"ALTER TABLE {DB_SCHEMA}.{table_name} "
+                    "ADD COLUMN IF NOT EXISTS run_id TEXT"
+                )
 
             # Casove indexy jsou hlavni pro pozdejsi analyzu prubehu mereni.
             await conn.execute(
@@ -120,6 +134,11 @@ class AsyncDBHandler:
             await conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_fused_tag_timestamp ON {DB_SCHEMA}.fused_data(tag_id, timestamp)"
             )
+            for table_name in TABLES:
+                await conn.execute(
+                    f"CREATE INDEX IF NOT EXISTS idx_{table_name}_run_timestamp "
+                    f"ON {DB_SCHEMA}.{table_name}(run_id, timestamp)"
+                )
 
             print("Tabulky a indexy byly zkontrolovany nebo vytvoreny.")
 
@@ -131,11 +150,11 @@ class AsyncDBHandler:
         # Tabulka ani sloupce nejdou bezpecne parametrizovat pres asyncpg
         # placeholdery, proto jsou povolene jen hodnoty z pevne mapy.
         cols = {
-            "radar_1": "(timestamp, x, y, z, snr, doppler)",
-            "radar_2": "(timestamp, x, y, z, snr, doppler)",
-            "ble_1": "(timestamp, tag_id, rssi, azimuth)",
-            "ble_2": "(timestamp, tag_id, rssi, azimuth)",
-            "fused_data": "(timestamp, tag_id, x, y, z, confidence)",
+            "radar_1": "(run_id, timestamp, x, y, z, snr, doppler)",
+            "radar_2": "(run_id, timestamp, x, y, z, snr, doppler)",
+            "ble_1": "(run_id, timestamp, tag_id, rssi, azimuth)",
+            "ble_2": "(run_id, timestamp, tag_id, rssi, azimuth)",
+            "fused_data": "(run_id, timestamp, tag_id, x, y, z, confidence)",
         }
 
         async with self.pool.acquire() as conn:

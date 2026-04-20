@@ -126,8 +126,8 @@ def load_or_select_ports():
     """
     # Hardcoded ports. Pro rychle laboratorni testy je pohodlnejsi mit pevne
     # hodnoty, ale v hlavnim systemu jsou porty soustredene v `ingestion.py`.
-    config_port = "COM11"
-    data_port = "COM12"
+    config_port = "COM13"
+    data_port = "COM14"
 
     # Validate the ports
     try:

@@ -7,9 +7,11 @@ kvuli jinemu pocitaci, portu nebo databazi nemusel menit zdrojovy kod.
 
 import os
 from pathlib import Path
+from datetime import datetime
 
 
 BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_RUN_ID = datetime.now().strftime("run_%Y%m%d_%H%M%S")
 
 
 def env_int(name, default):
@@ -46,6 +48,7 @@ DB_CONFIG = {
 DB_SCHEMA = os.getenv("FOUR_DB_SCHEMA", "public")
 DB_BATCH_SIZE = env_int("FOUR_DB_BATCH_SIZE", 100)
 DB_FLUSH_SECONDS = env_float("FOUR_DB_FLUSH_SECONDS", 1.0)
+RUN_ID = os.getenv("FOUR_RUN_ID", DEFAULT_RUN_ID)
 
 RADAR_CONFIG_FILE = env_path(
     "FOUR_RADAR_CONFIG_FILE",
