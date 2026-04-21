@@ -60,14 +60,12 @@ $env:FOUR_RADAR_CONFIG_FILE = "C:\path\to\profile.cfg"
 Z korenove slozky projektu:
 
 ```powershell
-cd C:\Users\kabup\OneDrive\Plocha\BP_\KOD\four
+cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD\Four
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
-
-Poznamka: skutecna cesta v tomto workspace obsahuje znak s diakritikou ve slozce `KOD`. Pokud prikaz kopirujes, uprav cestu podle realneho nazvu slozky ve Windows.
 
 ## Databaze
 
@@ -102,7 +100,7 @@ sensors/fused
 Pred spustenim musi bezet PostgreSQL a MQTT broker. Take musi odpovidat COM porty v `ingestion.py`.
 
 ```powershell
-cd C:\Users\kabup\OneDrive\Plocha\BP_\KOD\four
+cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD\Four
 .\.venv\Scripts\Activate.ps1
 python main.py
 ```
@@ -145,23 +143,31 @@ Ve slozce `test_soubory` jsou simulacni scenare, ktere generuji synteticka radar
 
 Aktualni scenare jsou popsane v `test_soubory/Popis_testu.md`.
 
-Poznamka: testovaci helper aktualne pouziva importy ve tvaru `Four...`, zatimco slozka v tomto workspace je `four`. Na Windows to muze projit diky case-insensitive filesystemu, ale pro prenositelnost je vhodne importy pozdeji sjednotit.
+Testovaci moduly aktualne importuji balicek jako `Four...`, coz odpovida aktualnimu nazvu adresare v tomto workspace. Pri presunu projektu do jine slozky je potreba zachovat stejny nazev balicku, nebo importy sjednotit.
 
 Priklad spusteni prvniho scenare z nadrazene slozky projektu:
 
 ```powershell
-cd C:\Users\kabup\OneDrive\Plocha\BP_\KOD
-python -m four.test_soubory.test_01_linear_pass
+cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD
+python -m Four.test_soubory.test_01_linear_pass
 ```
 
 Pro vyhodnoceni scenare musi bezet MQTT broker, PostgreSQL a idealne i `fusion.py` + `app.py`.
+
+## Uzitecne pomocne skripty
+
+Pocet radku a velikost tabulek v PostgreSQL:
+
+```powershell
+python db_stats.py
+```
 
 ## Overeni syntaxe
 
 Rychla kontrola, ze se vsechny Python soubory parsuji:
 
 ```powershell
-python -c "import ast, pathlib; [ast.parse(p.read_text(encoding='utf-8'), filename=str(p)) for p in pathlib.Path('four').rglob('*.py')]; print('OK')"
+python -c "import ast, pathlib; [ast.parse(p.read_text(encoding='utf-8'), filename=str(p)) for p in pathlib.Path('Four').rglob('*.py')]; print('OK')"
 ```
 
 ## Zname technicke dluhy
