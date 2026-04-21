@@ -29,6 +29,7 @@
 
             --source-radar: #0ea5e9;
             --source-radar-ble: #ef4444;
+            --source-radar-ble-coasting: #f97316;
             --source-ble-only: #eab308;
             --source-diagnostics: #16a34a;
         }
@@ -141,6 +142,7 @@
         }
         .tile.source-radar { border-left-color: var(--source-radar); }
         .tile.source-radar-ble { border-left-color: var(--source-radar-ble); }
+        .tile.source-radar-ble-coasting { border-left-color: var(--source-radar-ble-coasting); }
         .tile.source-ble-only { border-left-color: var(--source-ble-only); }
         .tile.source-radar-cluster { border-left-color: var(--source-radar); }
         .tile.source-diagnostics { border-left-color: var(--source-diagnostics); }
@@ -154,6 +156,7 @@
         .badge-radar { color: #0369a1; background: #e0f2fe; border-color: #bae6fd; }
         .badge-radar-cluster { color: #0369a1; background: #e0f2fe; border-color: #bae6fd; }
         .badge-radar-ble { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
+        .badge-radar-ble-coasting { color: #9a3412; background: #ffedd5; border-color: #fdba74; }
         .badge-ble-only { color: #854d0e; background: #fef3c7; border-color: #fde68a; }
         .badge-type { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }
 
@@ -219,6 +222,7 @@
     <div class="legend-row">
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar);"></span>Radar cluster</span>
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar-ble);"></span>Radar + BLE</span>
+        <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar-ble-coasting);"></span>Radar + BLE coasting</span>
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-ble-only);"></span>BLE only</span>
     </div>
 
@@ -241,7 +245,14 @@
             Frontend nepocita fuzni logiku. Jen prijme snapshot z backendu,
             vyhladi ho pro citelne zobrazeni a vykresli 2D/3D pohled.
         */
-        const COLOR_SOURCE = { radar: '#0ea5e9', radar_raw: '#0ea5e9', radar_cluster: '#0ea5e9', radar_ble: '#ef4444', ble_only: '#eab308' };
+        const COLOR_SOURCE = {
+            radar: '#0ea5e9',
+            radar_raw: '#0ea5e9',
+            radar_cluster: '#0ea5e9',
+            radar_ble: '#ef4444',
+            radar_ble_coasting: '#f97316',
+            ble_only: '#eab308'
+        };
         const SENSOR_NODES = [ { id: "S1", x: 1.5, y: 0.0, z: 0.8 }, { id: "S2", x: 0.0, y: 1.5, z: 0.8 } ];
 
         // latest* je posledni surovy stav z backendu, displayState je vyhlazeny
@@ -342,6 +353,7 @@
             if (sourceRaw.includes('ble_only') || sourceRaw.includes('ble only')) return 'ble_only';
             if (sourceRaw.includes('radar_cluster') || type === 'radar_cluster') return 'radar_cluster';
             if (sourceRaw.includes('radar_raw') || type === 'radar_raw') return 'radar_raw';
+            if (sourceRaw.includes('coasting')) return 'radar_ble_coasting';
             if ((sourceRaw.includes('radar') && sourceRaw.includes('ble')) || sourceRaw.includes('radar+ble')) return 'radar_ble';
             if (sourceRaw.includes('ble') && !sourceRaw.includes('radar')) return 'ble_only';
             if (sourceRaw.includes('radar')) return 'radar';
@@ -355,6 +367,7 @@
             const source = getSourceCategory(obj);
             if (source === 'radar_cluster') return 'Radar cluster';
             if (source === 'radar_ble') return 'Radar + BLE';
+            if (source === 'radar_ble_coasting') return 'Radar + BLE coasting';
             if (source === 'ble_only') return 'BLE only';
             return 'Radar only';
         }
@@ -364,6 +377,7 @@
             if (type === 'radar_raw') return 'Raw';
             if (type === 'radar_cluster') return 'Cluster';
             if (type === 'radar_ble') return 'Fused';
+            if (type === 'radar_ble_coasting') return 'Coasting';
             if (type === 'tagged') return 'Tagged';
             if (type === 'ble_only') return 'BLE';
             return 'Track';
@@ -375,6 +389,7 @@
             const source = getSourceCategory(obj);
             if (source === 'radar_cluster') return 'badge-radar-cluster';
             if (source === 'radar_ble') return 'badge-radar-ble';
+            if (source === 'radar_ble_coasting') return 'badge-radar-ble-coasting';
             if (source === 'ble_only') return 'badge-ble-only';
             return 'badge-radar';
         }
@@ -383,6 +398,7 @@
             const source = getSourceCategory(obj);
             if (source === 'radar_cluster') return 'source-radar-cluster';
             if (source === 'radar_ble') return 'source-radar-ble';
+            if (source === 'radar_ble_coasting') return 'source-radar-ble-coasting';
             if (source === 'ble_only') return 'source-ble-only';
             return 'source-radar';
         }
@@ -499,6 +515,7 @@
                             <div class="metric"><span class="metric-label">Radar + BLE</span><span class="metric-value">${latestStats?.paired_radar_ble ?? 0}</span></div>
                             <div class="metric"><span class="metric-label">Pouze radar</span><span class="metric-value">${latestStats?.radar_cluster_objects ?? 0}</span></div>
                             <div class="metric"><span class="metric-label">Pouze BLE</span><span class="metric-value">${latestStats?.ble_only_objects ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">BLE coast</span><span class="metric-value">${latestStats?.radar_ble_coasting_objects ?? 0}</span></div>
                         </div>
                     </div>
                     <div class="stats-section">
@@ -553,7 +570,7 @@
 
         function drawObjects2D(objects) {
             drawMap2D();
-            const order = { radar_raw: 0, radar_cluster: 1, ble_only: 2, radar_ble: 3, radar: 1 };
+            const order = { radar_raw: 0, radar_cluster: 1, ble_only: 2, radar_ble_coasting: 3, radar_ble: 4, radar: 1 };
             objects.sort((a, b) => (order[getSourceCategory(a)] ?? 0) - (order[getSourceCategory(b)] ?? 0));
 
             objects.forEach(obj => {
@@ -819,7 +836,7 @@
                                 tag_id: b.tag_id,
                                 object_type: 'ble_only',
                                 source: 'ble_only',
-                                x: b.x, y: b.y, z: 0.8,
+                                x: b.x, y: b.y, z: b.z,
                                 confidence: 0.6
                             });
                         });

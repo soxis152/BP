@@ -2,7 +2,7 @@
 
 Vstupem jsou syrova mereni z MQTT topicu `sensors/raw/#`. Radar uz prichazi
 prevedeny do globalnich souradnic mistnosti, BLE prichazi jako identita tagu
-a azimut z jednotlivych kotev.
+a azimut/elevace z jednotlivych kotev.
 
 Vystupem je jeden pravidelne publikovany JSON snapshot do `sensors/fused`.
 Dashboard potom nemusi znat detaily triangulace, clusteringu ani parovani.
@@ -10,7 +10,7 @@ Dashboard potom nemusi znat detaily triangulace, clusteringu ani parovani.
 Aktualni verze neni plny tracker s Kalman filtrem. Je to prakticka online
 heuristika:
 
-- BLE tag se trianguluje prusecikem dvou smeru.
+- BLE tag se trianguluje z dvojice 3D smeru.
 - Radarove body se seskupi do shluku podle vzdalenosti.
 - BLE pozice se sparuje s nejblizsim vhodnym radar clusterem.
 - Kratka `pair_memory` pomaha udrzet identitu pri malych vypadcich a jitteru.
@@ -24,13 +24,13 @@ import time
 import aiomqtt
 
 try:
-    from config import DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST, RUN_ID
+    from config import BLE_CONFIGS, DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST, RUN_ID
     from db_handler import AsyncDBHandler
 except ImportError:
-    from .config import DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST, RUN_ID
+    from .config import BLE_CONFIGS, DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST, RUN_ID
     from .db_handler import AsyncDBHandler
 
-RAW_RADAR_HISTORY_SECONDS = 2
+RAW_RADAR_HISTORY_SECONDS = 1.7
 MAX_RAW_RADAR_HISTORY_POINTS = 700
 MAX_RADAR_POINTS_IN_MQTT_PAYLOAD = 250
 FUSED_PUBLISH_INTERVAL_SECONDS = 0.1
@@ -38,15 +38,19 @@ MQTT_RECONNECT_SECONDS = 2
 # Prahy jsou zatim ladene pro malou 3x3m mistnost. Drzim je pohromade tady,
 # aby bylo jasne, ktere konstanty meni chovani fuzni logiky.
 RADAR_CLUSTER_DISTANCE = 0.45
+RADAR_CLUSTER_MAX_DZ = 0.40
 RADAR_CLUSTER_MIN_POINTS = 3
 RADAR_BLE_PAIR_MAX_DISTANCE = 1.0
 RADAR_BLE_PAIR_HOLD_SECONDS = 8.0
 RADAR_BLE_REACQUIRE_DISTANCE = 0.8
 RADAR_BLE_LOCK_MAX_DISTANCE = 1.35
+RADAR_BLE_Z_WEIGHT = 2.0
+RADAR_BLE_COAST_SECONDS = 0.6
 BLE_TAG_TTL_SECONDS = 4.0
 RADAR_BLE_CONFIDENCE_MIN = 0.72
 RADAR_BLE_CONFIDENCE_MAX = 0.97
 RADAR_BLE_LOCK_PENALTY = 0.12
+RADAR_BLE_COAST_CONFIDENCE = 0.68
 RADAR_CLUSTER_CONFIDENCE_MIN = 0.45
 RADAR_CLUSTER_CONFIDENCE_MAX = 0.85
 MAX_BAD_MESSAGE_LOGS = 20
@@ -59,8 +63,14 @@ bad_message_count = 0
 
 # BLE geometrie musi odpovidat fyzickemu rozmisteni kotev v mistnosti.
 SENSORS = {
-    "ble_1": {"x": 1.5, "y": 0.0, "facing_angle": 90},
-    "ble_2": {"x": 0.0, "y": 1.5, "facing_angle": 0},
+    cfg["id"]: {
+        "x": cfg["pos_x"],
+        "y": cfg["pos_y"],
+        "z": cfg["pos_z"],
+        "facing_angle": cfg["rotation"],
+    }
+    for cfg in BLE_CONFIGS
+    if cfg["id"] in ("ble_1", "ble_2")
 }
 
 # Stav sdileny mezi MQTT listenerem a publisherem.
@@ -103,8 +113,8 @@ def build_fused_db_rows(objects, timestamp):
 
         rows.append(
             (
-                timestamp,
                 RUN_ID,
+                timestamp,
                 tag_id,
                 safe_float(obj.get("x")),
                 safe_float(obj.get("y")),
@@ -138,6 +148,16 @@ def radar_ble_confidence(pair_distance, pair_mode):
         confidence -= RADAR_BLE_LOCK_PENALTY
 
     return round(clamp(confidence, RADAR_BLE_CONFIDENCE_MIN, RADAR_BLE_CONFIDENCE_MAX), 3)
+
+
+def radar_ble_coasting_confidence(memory):
+    """Vrati duveru pro kratky radar BLE coasting po vypadku radaru."""
+    if not memory:
+        return RADAR_BLE_COAST_CONFIDENCE
+
+    last_confidence = safe_float(memory.get("last_confidence"), RADAR_BLE_CONFIDENCE_MIN)
+    confidence = min(last_confidence - 0.04, RADAR_BLE_COAST_CONFIDENCE)
+    return round(clamp(confidence, 0.60, RADAR_BLE_COAST_CONFIDENCE), 3)
 
 
 def radar_cluster_confidence(point_count):
@@ -178,13 +198,13 @@ def validate_raw_message(topic, data):
         return "radar"
 
     if "ble_1" in topic:
-        missing = [key for key in ("tag_id", "azimuth") if key not in data]
+        missing = [key for key in ("tag_id", "azimuth", "elevation") if key not in data]
         if missing:
             raise ValueError(f"ble_1 payload missing keys: {', '.join(missing)}")
         return "ble_1"
 
     if "ble_2" in topic:
-        missing = [key for key in ("tag_id", "azimuth") if key not in data]
+        missing = [key for key in ("tag_id", "azimuth", "elevation") if key not in data]
         if missing:
             raise ValueError(f"ble_2 payload missing keys: {', '.join(missing)}")
         return "ble_2"
@@ -197,38 +217,95 @@ def normalize_ble_tag_id(tag_id):
     return str(tag_id).strip().upper()
 
 
-def triangulate(tag_id):
-    """Vrati 2D prusecik smeru ze dvou BLE kotev pro jeden tag."""
+def vector_length(vector):
+    return math.sqrt(sum(component * component for component in vector))
+
+
+def dot(a, b):
+    return sum(x * y for x, y in zip(a, b))
+
+
+def subtract(a, b):
+    return tuple(x - y for x, y in zip(a, b))
+
+
+def add(a, b):
+    return tuple(x + y for x, y in zip(a, b))
+
+
+def scale(vector, factor):
+    return tuple(component * factor for component in vector)
+
+
+def point_distance_3d(a, b, z_weight=RADAR_BLE_Z_WEIGHT):
+    dx = safe_float(a.get("x")) - safe_float(b.get("x"))
+    dy = safe_float(a.get("y")) - safe_float(b.get("y"))
+    dz = safe_float(a.get("z")) - safe_float(b.get("z"))
+    return math.sqrt((dx * dx) + (dy * dy) + (z_weight * dz * dz))
+
+
+def ble_direction_vector(sensor, measurement):
+    """Prevede azimut a elevaci z BLE kotvy na globalni 3D smerovy vektor."""
+    yaw = math.radians(sensor["facing_angle"] - safe_float(measurement["azimuth"]))
+    elevation = math.radians(safe_float(measurement["elevation"]))
+    cos_elevation = math.cos(elevation)
+    vector = (
+        cos_elevation * math.cos(yaw),
+        cos_elevation * math.sin(yaw),
+        math.sin(elevation),
+    )
+    length = vector_length(vector)
+    if length < 1e-6:
+        return None
+    return tuple(component / length for component in vector)
+
+
+def triangulate_3d(tag_id):
+    """Vrati 3D odhad polohy tagu jako midpoint nejblizsiho priblizeni dvou paprsku."""
     b1 = shared_state["ble_tags"]["ble_1"].get(tag_id)
     b2 = shared_state["ble_tags"]["ble_2"].get(tag_id)
 
-    if not b1 or not b2: return None
+    if not b1 or not b2:
+        return None
 
-    # u-blox azimut prevadim do souradne soustavy mistnosti.
-    ang1 = math.radians(SENSORS["ble_1"]["facing_angle"] - b1["azimuth"])
-    ang2 = math.radians(SENSORS["ble_2"]["facing_angle"] - b2["azimuth"])
+    sensor_1 = SENSORS.get("ble_1")
+    sensor_2 = SENSORS.get("ble_2")
+    if not sensor_1 or not sensor_2:
+        return None
 
-    x1, y1 = SENSORS["ble_1"]["x"], SENSORS["ble_1"]["y"]
-    x2, y2 = SENSORS["ble_2"]["x"], SENSORS["ble_2"]["y"]
+    origin_1 = (sensor_1["x"], sensor_1["y"], sensor_1["z"])
+    origin_2 = (sensor_2["x"], sensor_2["y"], sensor_2["z"])
+    direction_1 = ble_direction_vector(sensor_1, b1)
+    direction_2 = ble_direction_vector(sensor_2, b2)
+    if not direction_1 or not direction_2:
+        return None
 
-    v1x, v1y = math.cos(ang1), math.sin(ang1)
-    v2x, v2y = math.cos(ang2), math.sin(ang2)
+    w0 = subtract(origin_1, origin_2)
+    a = dot(direction_1, direction_1)
+    b = dot(direction_1, direction_2)
+    c = dot(direction_2, direction_2)
+    d = dot(direction_1, w0)
+    e = dot(direction_2, w0)
+    denominator = (a * c) - (b * b)
+    if abs(denominator) < 1e-4:
+        return None
 
-    # Analyticky prusecik dvou parametrickych primek.
-    det = v1x * v2y - v1y * v2x
-    if abs(det) < 0.001: return None
+    t1 = ((b * e) - (c * d)) / denominator
+    t2 = ((a * e) - (b * d)) / denominator
+    if t1 < 0 or t2 < 0:
+        return None
 
-    dx = x2 - x1
-    dy = y2 - y1
-    t1 = (dx * v2y - dy * v2x) / det
+    closest_1 = add(origin_1, scale(direction_1, t1))
+    closest_2 = add(origin_2, scale(direction_2, t2))
+    separation = vector_length(subtract(closest_1, closest_2))
+    if separation > 1.0:
+        return None
 
-    if t1 < 0: return None
+    midpoint = tuple((p1 + p2) / 2.0 for p1, p2 in zip(closest_1, closest_2))
+    x, y, z = midpoint
 
-    x = x1 + t1 * v1x
-    y = y1 + t1 * v1y
-
-    if -0.5 <= x <= 3.5 and -0.5 <= y <= 3.5:
-        return (x, y)
+    if -0.5 <= x <= 3.5 and -0.5 <= y <= 3.5 and -0.5 <= z <= 3.5:
+        return {"x": x, "y": y, "z": z}
     return None
 
 
@@ -265,7 +342,8 @@ def cluster_radar_points(points):
                     current_point["x"] - next_point["x"],
                     current_point["y"] - next_point["y"],
                 )
-                if distance <= RADAR_CLUSTER_DISTANCE:
+                dz = abs(current_point["z"] - next_point["z"])
+                if distance <= RADAR_CLUSTER_DISTANCE and dz <= RADAR_CLUSTER_MAX_DZ:
                     visited[next_index] = True
                     queue.append(next_index)
 
@@ -304,6 +382,7 @@ def build_fused_objects(radar_clusters, ble_positions, now):
         pair_mode = "live"
         memory = shared_state["pair_memory"].get(tag_id)
         memory_is_valid = memory and now - memory.get("seen_at", 0) <= RADAR_BLE_PAIR_HOLD_SECONDS
+        coast_is_valid = memory and now - memory.get("last_radar_seen_at", 0) <= RADAR_BLE_COAST_SECONDS
 
         if memory_is_valid:
             # Pri platne pameti nehledame jen nejblizsi cluster k aktualni BLE
@@ -315,9 +394,13 @@ def build_fused_objects(radar_clusters, ble_positions, now):
                 if cluster["id"] in used_cluster_ids:
                     continue
 
-                distance_from_memory = math.hypot(
-                    cluster["x"] - memory.get("x", cluster["x"]),
-                    cluster["y"] - memory.get("y", cluster["y"]),
+                distance_from_memory = point_distance_3d(
+                    cluster,
+                    {
+                        "x": memory.get("x", cluster["x"]),
+                        "y": memory.get("y", cluster["y"]),
+                        "z": memory.get("z", cluster.get("z", 0.0)),
+                    },
                 )
                 if distance_from_memory > RADAR_BLE_REACQUIRE_DISTANCE:
                     continue
@@ -329,23 +412,27 @@ def build_fused_objects(radar_clusters, ble_positions, now):
                     remembered_score = score
 
             if remembered_cluster and remembered_cluster["id"] not in used_cluster_ids:
-                remembered_distance = math.hypot(
-                    ble["x"] - remembered_cluster["x"],
-                    ble["y"] - remembered_cluster["y"],
+                remembered_distance = point_distance_3d(
+                    ble,
+                    {
+                        "x": remembered_cluster["x"],
+                        "y": remembered_cluster["y"],
+                        "z": remembered_cluster["z"],
+                    },
                 )
                 if remembered_distance <= RADAR_BLE_LOCK_MAX_DISTANCE:
                     best_cluster = remembered_cluster
                     best_distance = remembered_distance
                     pair_mode = "locked"
 
-        if not best_cluster and not memory_is_valid:
+        if not best_cluster:
             # Bez pameti spadneme na jednoduche nejblizsi parovani v povolenem
             # dosahu. To je startovni stav pro novy tag nebo pro tag po timeoutu.
             for cluster in radar_clusters:
                 if cluster["id"] in used_cluster_ids:
                     continue
 
-                distance = math.hypot(ble["x"] - cluster["x"], ble["y"] - cluster["y"])
+                distance = point_distance_3d(ble, cluster)
                 if distance <= RADAR_BLE_PAIR_MAX_DISTANCE and (
                     best_distance is None or distance < best_distance
                 ):
@@ -360,10 +447,12 @@ def build_fused_objects(radar_clusters, ble_positions, now):
                 "cluster_id": best_cluster["id"],
                 "x": best_cluster["x"],
                 "y": best_cluster["y"],
-                "z": best_cluster.get("z", 0.8),
+                "z": best_cluster["z"],
                 "seen_at": now,
+                "last_radar_seen_at": now,
+                "last_confidence": radar_ble_confidence(best_distance, pair_mode),
             }
-            confidence = radar_ble_confidence(best_distance, pair_mode)
+            confidence = shared_state["pair_memory"][tag_id]["last_confidence"]
             objects.append(
                 {
                     "tag_id": tag_id,
@@ -371,7 +460,7 @@ def build_fused_objects(radar_clusters, ble_positions, now):
                     "source": "radar_ble",
                     "x": (best_cluster["x"] * 0.70) + (ble["x"] * 0.30),
                     "y": (best_cluster["y"] * 0.70) + (ble["y"] * 0.30),
-                    "z": best_cluster.get("z", 0.8),
+                    "z": best_cluster["z"],
                     "confidence": confidence,
                     "radar_cluster_id": best_cluster["id"],
                     "points": best_cluster["points"],
@@ -380,19 +469,34 @@ def build_fused_objects(radar_clusters, ble_positions, now):
                 }
             )
         else:
-            if not memory_is_valid:
-                shared_state["pair_memory"].pop(tag_id, None)
-            objects.append(
-                {
-                    "tag_id": tag_id,
-                    "object_type": "ble_only",
-                    "source": "ble_only",
-                    "x": ble["x"],
-                    "y": ble["y"],
-                    "z": 0.8,
-                    "confidence": 0.60,
-                }
-            )
+            if coast_is_valid:
+                objects.append(
+                    {
+                        "tag_id": tag_id,
+                        "object_type": "radar_ble_coasting",
+                        "source": "radar_ble_coasting",
+                        "x": (memory.get("x", ble["x"]) * 0.20) + (ble["x"] * 0.80),
+                        "y": (memory.get("y", ble["y"]) * 0.20) + (ble["y"] * 0.80),
+                        "z": memory.get("z", ble["z"]),
+                        "confidence": radar_ble_coasting_confidence(memory),
+                        "radar_cluster_id": memory.get("cluster_id"),
+                        "pair_mode": "coasting",
+                    }
+                )
+            else:
+                if not memory_is_valid:
+                    shared_state["pair_memory"].pop(tag_id, None)
+                objects.append(
+                    {
+                        "tag_id": tag_id,
+                        "object_type": "ble_only",
+                        "source": "ble_only",
+                        "x": ble["x"],
+                        "y": ble["y"],
+                        "z": ble["z"],
+                        "confidence": 0.60,
+                    }
+                )
 
     for cluster in radar_clusters:
         # Nesparovane clustery nechavam ve vystupu jako radar-only objekty.
@@ -507,9 +611,9 @@ async def fused_publisher():
                         )
                         common_tag_ids = sorted(common_tags)
                         for tag_id in common_tags:
-                            pos = triangulate(tag_id)
+                            pos = triangulate_3d(tag_id)
                             if pos:
-                                out_ble.append({"tag_id": tag_id, "x": pos[0], "y": pos[1]})
+                                out_ble.append({"tag_id": tag_id, "x": pos["x"], "y": pos["y"], "z": pos["z"]})
 
                     for point in new_radar_points:
                         point = dict(point)
@@ -552,7 +656,12 @@ async def fused_publisher():
                                 "pair_hold_seconds": RADAR_BLE_PAIR_HOLD_SECONDS,
                                 "pair_reacquire_distance": RADAR_BLE_REACQUIRE_DISTANCE,
                                 "pair_lock_max_distance": RADAR_BLE_LOCK_MAX_DISTANCE,
+                                "pair_z_weight": RADAR_BLE_Z_WEIGHT,
+                                "pair_coast_seconds": RADAR_BLE_COAST_SECONDS,
                                 "ble_only_objects": sum(1 for obj in out_objects if obj["source"] == "ble_only"),
+                                "radar_ble_coasting_objects": sum(
+                                    1 for obj in out_objects if obj["source"] == "radar_ble_coasting"
+                                ),
                                 "radar_cluster_objects": sum(1 for obj in out_objects if obj["source"] == "radar_cluster"),
                                 "ble_1_tags": ble_1_count,
                                 "ble_2_tags": ble_2_count,

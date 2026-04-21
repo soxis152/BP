@@ -7,7 +7,7 @@ radarova a BLE mereni.
 Diky tomu scenare pouzivaji stejnou vstupni cestu jako realny system:
 
 - radarove body jdou do `sensors/raw/radar_*`,
-- BLE azimuty jdou do `sensors/raw/ble_*`,
+- BLE azimuty a elevace jdou do `sensors/raw/ble_*`,
 - fusion vrstva je nerozlisuje od skutecnych senzoru.
 """
 
@@ -20,14 +20,14 @@ import time
 import paho.mqtt.client as mqtt
 
 try:
-    from Four.config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIGS
+    from Four.config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIGS, RUN_ID
     from Four.db_handler import db_handler
 except ImportError:
     try:
-        from four.config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIGS
+        from four.config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIGS, RUN_ID
         from four.db_handler import db_handler
     except ImportError:
-        from config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIGS
+        from config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIGS, RUN_ID
         from db_handler import db_handler
 
 # Tento modul je společná testovací infrastruktura pro všechny scénáře ve složce test_soubory.
@@ -74,6 +74,7 @@ class ObjectState:
         self.radar_noise_xy = 0.0
         self.radar_noise_z = 0.0
         self.ble_azimuth_noise = 0.0
+        self.ble_elevation_noise = 0.0
         self.ble_rssi_noise = 0.0
 
 
@@ -204,7 +205,8 @@ def build_ble_records(objects, cfg, timestamp):
     Vrací:
     - identitu tagu,
     - RSSI,
-    - azimut.
+    - azimut,
+    - elevaci.
 
     Proto je BLE v testech vhodné hlavně jako zdroj identity
     a hrubého směrového omezení, nikoli jako přesný zdroj polohy.
@@ -221,17 +223,24 @@ def build_ble_records(objects, cfg, timestamp):
         distance = math.sqrt(dx**2 + dy**2 + dz**2)
         world_angle = math.degrees(math.atan2(dy, dx))
         relative_azimuth = normalize_angle(world_angle - cfg["rotation"])
+        horizontal_distance = math.hypot(dx, dy)
+        relative_elevation = math.degrees(math.atan2(dz, horizontal_distance))
 
         # Jednoduchý model viditelnosti BLE kotvy.
-        if distance > 8.0 or abs(relative_azimuth) > 85.0:
+        if distance > 8.0 or abs(relative_azimuth) > 85.0 or abs(relative_elevation) > 65.0:
             continue
 
         cluster_size = random.randint(3, 5)
         expected_rssi = -45.0 - distance * 9.0
         for _ in range(cluster_size):
             azimuth = relative_azimuth + random.uniform(-3.5, 3.5) + random.gauss(0.0, obj.ble_azimuth_noise)
+            elevation = (
+                relative_elevation
+                + random.uniform(-2.0, 2.0)
+                + random.gauss(0.0, obj.ble_elevation_noise)
+            )
             rssi = int(round(expected_rssi + random.uniform(-2.0, 2.0) + random.gauss(0.0, obj.ble_rssi_noise)))
-            records.append((timestamp, obj.tag_id, rssi, round(azimuth, 2)))
+            records.append((timestamp, obj.tag_id, rssi, round(azimuth, 2), round(elevation, 2)))
 
     return records
 
@@ -259,12 +268,14 @@ async def publish_and_store(mqtt_client, sensor_name, records, is_radar):
                 "tag_id": record[1],
                 "rssi": record[2],
                 "azimuth": record[3],
+                "elevation": record[4],
             }
 
         mqtt_client.publish(f"sensors/raw/{sensor_name}", json.dumps(payload))
 
     if records:
-        await db_handler.insert_batch(sensor_name, records)
+        db_records = [(RUN_ID, *record) for record in records]
+        await db_handler.insert_batch(sensor_name, db_records)
 
 
 async def run_scenario(scenario_name, objects, update_fn):

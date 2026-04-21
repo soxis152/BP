@@ -191,10 +191,18 @@ def ble_worker(cfg):
                     tag_id = match.group(1).upper()
                     rssi = int(match.group(2))
                     azimuth = int(match.group(3))
+                    elevation = int(match.group(4))
+                    timestamp = time.time()
 
-                    payload = {"timestamp": time.time(), "tag_id": tag_id, "rssi": rssi, "azimuth": azimuth}
+                    payload = {
+                        "timestamp": timestamp,
+                        "tag_id": tag_id,
+                        "rssi": rssi,
+                        "azimuth": azimuth,
+                        "elevation": elevation,
+                    }
                     mqtt_client.publish(f"sensors/raw/{cfg['id']}", json.dumps(payload))
-                    db_queue.put((cfg["id"], (RUN_ID, time.time(), tag_id, rssi, azimuth)))
+                    db_queue.put((cfg["id"], (RUN_ID, timestamp, tag_id, rssi, azimuth, elevation)))
 
         except Exception as exc:
             print(f"BLE {cfg['id']} Error: {exc}. Restart za 5s...")

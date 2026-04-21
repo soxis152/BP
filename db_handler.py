@@ -45,7 +45,8 @@ class AsyncDBHandler:
                 "timestamp DOUBLE PRECISION, "
                 "tag_id TEXT, "
                 "rssi INT, "
-                "azimuth DOUBLE PRECISION)"
+                "azimuth DOUBLE PRECISION, "
+                "elevation DOUBLE PRECISION)"
             )
             await conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.ble_2 ("
@@ -54,7 +55,8 @@ class AsyncDBHandler:
                 "timestamp DOUBLE PRECISION, "
                 "tag_id TEXT, "
                 "rssi INT, "
-                "azimuth DOUBLE PRECISION)"
+                "azimuth DOUBLE PRECISION, "
+                "elevation DOUBLE PRECISION)"
             )
 
             await conn.execute(
@@ -97,6 +99,14 @@ class AsyncDBHandler:
                     f"ALTER TABLE {DB_SCHEMA}.{table_name} "
                     "ADD COLUMN IF NOT EXISTS run_id TEXT"
                 )
+            await conn.execute(
+                f"ALTER TABLE {DB_SCHEMA}.ble_1 "
+                "ADD COLUMN IF NOT EXISTS elevation DOUBLE PRECISION"
+            )
+            await conn.execute(
+                f"ALTER TABLE {DB_SCHEMA}.ble_2 "
+                "ADD COLUMN IF NOT EXISTS elevation DOUBLE PRECISION"
+            )
 
             # Casove indexy jsou hlavni pro pozdejsi analyzu prubehu mereni.
             await conn.execute(
@@ -152,8 +162,8 @@ class AsyncDBHandler:
         cols = {
             "radar_1": "(run_id, timestamp, x, y, z, snr, doppler)",
             "radar_2": "(run_id, timestamp, x, y, z, snr, doppler)",
-            "ble_1": "(run_id, timestamp, tag_id, rssi, azimuth)",
-            "ble_2": "(run_id, timestamp, tag_id, rssi, azimuth)",
+            "ble_1": "(run_id, timestamp, tag_id, rssi, azimuth, elevation)",
+            "ble_2": "(run_id, timestamp, tag_id, rssi, azimuth, elevation)",
             "fused_data": "(run_id, timestamp, tag_id, x, y, z, confidence)",
         }
 
