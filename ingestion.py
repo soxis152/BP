@@ -20,11 +20,31 @@ import paho.mqtt.client as mqtt
 import serial
 
 try:
-    from config import BLE_CONFIGS, DB_BATCH_SIZE, MQTT_HOST, MQTT_PORT, RADAR_CONFIG_FILE, RADAR_CONFIGS, RUN_ID
+    from config import (
+        BLE_CONFIGS,
+        DB_BATCH_SIZE,
+        ENABLED_SENSORS,
+        INGEST_ENABLE_DB,
+        MQTT_HOST,
+        MQTT_PORT,
+        RADAR_CONFIG_FILE,
+        RADAR_CONFIGS,
+        RUN_ID,
+    )
     from db_handler import db_handler
     from radar.radar_interface import RadarInterface
 except ImportError:
-    from .config import BLE_CONFIGS, DB_BATCH_SIZE, MQTT_HOST, MQTT_PORT, RADAR_CONFIG_FILE, RADAR_CONFIGS, RUN_ID
+    from .config import (
+        BLE_CONFIGS,
+        DB_BATCH_SIZE,
+        ENABLED_SENSORS,
+        INGEST_ENABLE_DB,
+        MQTT_HOST,
+        MQTT_PORT,
+        RADAR_CONFIG_FILE,
+        RADAR_CONFIGS,
+        RUN_ID,
+    )
     from .db_handler import db_handler
     from .radar.radar_interface import RadarInterface
 
@@ -157,7 +177,8 @@ def radar_worker(cfg):
                         "doppler": doppler,
                     }
                     mqtt_client.publish(f"sensors/raw/{cfg['id']}", json.dumps(payload))
-                    db_queue.put((cfg["id"], (RUN_ID, time.time(), x_g, y_g, z_g, snr, doppler)))
+                    if INGEST_ENABLE_DB:
+                        db_queue.put((cfg["id"], (RUN_ID, time.time(), x_g, y_g, z_g, snr, doppler)))
 
                 if detections_for_print:
                     formatted = ", ".join(
@@ -202,7 +223,8 @@ def ble_worker(cfg):
                         "elevation": elevation,
                     }
                     mqtt_client.publish(f"sensors/raw/{cfg['id']}", json.dumps(payload))
-                    db_queue.put((cfg["id"], (RUN_ID, timestamp, tag_id, rssi, azimuth, elevation)))
+                    if INGEST_ENABLE_DB:
+                        db_queue.put((cfg["id"], (RUN_ID, timestamp, tag_id, rssi, azimuth, elevation)))
 
         except Exception as exc:
             print(f"BLE {cfg['id']} Error: {exc}. Restart za 5s...")
@@ -210,12 +232,22 @@ def ble_worker(cfg):
 
 
 if __name__ == "__main__":
-    threading.Thread(target=db_worker, daemon=True).start()
+    if INGEST_ENABLE_DB:
+        threading.Thread(target=db_worker, daemon=True).start()
+        print("DB worker enabled")
+    else:
+        print("DB worker disabled by FOUR_INGEST_ENABLE_DB=0")
 
     for cfg in RADAR_CONFIGS:
+        if cfg["id"] not in ENABLED_SENSORS:
+            print(f"Skipping radar worker: {cfg['id']}")
+            continue
         threading.Thread(target=radar_worker, args=(cfg,), daemon=True).start()
 
     for cfg in BLE_CONFIGS:
+        if cfg["id"] not in ENABLED_SENSORS:
+            print(f"Skipping BLE worker: {cfg['id']}")
+            continue
         threading.Thread(target=ble_worker, args=(cfg,), daemon=True).start()
 
     print("Sber dat spusten. Ukoncete pomoci Ctrl+C.")

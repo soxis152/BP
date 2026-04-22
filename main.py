@@ -18,9 +18,9 @@ import time
 import uvicorn
 
 try:
-    from config import API_HOST, API_PORT
+    from config import API_HOST, API_PORT, ENABLED_SENSORS, INGEST_ENABLE_DB, NODE_ROLE
 except ImportError:
-    from .config import API_HOST, API_PORT
+    from .config import API_HOST, API_PORT, ENABLED_SENSORS, INGEST_ENABLE_DB, NODE_ROLE
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -39,9 +39,17 @@ def ingestion_thread() -> None:
     """Spusti workery pro sber raw dat."""
     print("[thread-1] Starting ingestion workers")
 
-    threading.Thread(target=ingestion.db_worker, daemon=True, name="db_worker").start()
+    if INGEST_ENABLE_DB:
+        threading.Thread(target=ingestion.db_worker, daemon=True, name="db_worker").start()
+        print("[thread-1] DB worker enabled")
+    else:
+        print("[thread-1] DB worker disabled by FOUR_INGEST_ENABLE_DB=0")
 
     for cfg in ingestion.RADAR_CONFIGS:
+        if cfg["id"] not in ENABLED_SENSORS:
+            print(f"[thread-1] Skipping radar worker: {cfg['id']}")
+            continue
+
         print(f"[thread-1] Starting radar worker: {cfg['id']}")
         threading.Thread(
             target=ingestion.radar_worker,
@@ -52,6 +60,10 @@ def ingestion_thread() -> None:
         time.sleep(2)
 
     for cfg in ingestion.BLE_CONFIGS:
+        if cfg["id"] not in ENABLED_SENSORS:
+            print(f"[thread-1] Skipping BLE worker: {cfg['id']}")
+            continue
+
         print(f"[thread-1] Starting BLE worker: {cfg['id']}")
         threading.Thread(
             target=ingestion.ble_worker,
@@ -96,18 +108,29 @@ def api_thread() -> None:
 
 
 def main() -> None:
-    """Spusti vsechny hlavni casti a hlida, jestli vlakna nezemrela."""
-    threads = [
-        threading.Thread(target=ingestion_thread, name="ingestion_thread", daemon=True),
-        threading.Thread(target=fusion_thread, name="fusion_thread", daemon=True),
-        threading.Thread(target=api_thread, name="api_thread", daemon=True),
-    ]
+    """Spusti vybrane casti podle role uzlu a hlida, jestli vlakna nezemrela."""
+    threads = []
+
+    if NODE_ROLE in ("all", "central", "edge", "ingestion"):
+        threads.append(threading.Thread(target=ingestion_thread, name="ingestion_thread", daemon=True))
+
+    if NODE_ROLE in ("all", "central", "fusion"):
+        threads.append(threading.Thread(target=fusion_thread, name="fusion_thread", daemon=True))
+
+    if NODE_ROLE in ("all", "central", "api"):
+        threads.append(threading.Thread(target=api_thread, name="api_thread", daemon=True))
+
+    if not threads:
+        raise RuntimeError(
+            f"FOUR_NODE_ROLE='{NODE_ROLE}' did not enable any thread. "
+            "Use one of: all, central, edge, ingestion, fusion, api."
+        )
 
     for thread in threads:
         print(f"[main] Launching {thread.name}")
         thread.start()
 
-    print("[main] All 3 threads started. Press Ctrl+C to stop.")
+    print(f"[main] Started {len(threads)} thread(s) for role '{NODE_ROLE}'. Press Ctrl+C to stop.")
 
     try:
         while True:

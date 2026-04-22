@@ -50,6 +50,19 @@ DB_BATCH_SIZE = env_int("FOUR_DB_BATCH_SIZE", 100)
 DB_FLUSH_SECONDS = env_float("FOUR_DB_FLUSH_SECONDS", 1.0)
 RUN_ID = os.getenv("FOUR_RUN_ID", DEFAULT_RUN_ID)
 
+NODE_ROLE = os.getenv("FOUR_NODE_ROLE", "all").strip().lower()
+
+ENABLED_SENSORS = {
+    sensor_id.strip()
+    for sensor_id in os.getenv(
+        "FOUR_ENABLED_SENSORS",
+        "radar_1,radar_2,ble_1,ble_2",
+    ).split(",")
+    if sensor_id.strip()
+}
+
+INGEST_ENABLE_DB = os.getenv("FOUR_INGEST_ENABLE_DB", "1").strip() == "1"
+
 RADAR_CONFIG_FILE = env_path(
     "FOUR_RADAR_CONFIG_FILE",
     BASE_DIR / "radar" / "tdm" / "AWR294X_profile_2025_11_07T16_27_59_226 copy2.cfg",
