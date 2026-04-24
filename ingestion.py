@@ -46,26 +46,46 @@ INGEST_GATE_Z_MAX = 2.5
 
 RADAR_CONFIG_COMMAND_DELAY_SECONDS = 0.12
 RADAR_CONFIG_CONTROL_DELAY_SECONDS = 0.50
+RADAR_CFG_BAUD = 115200
+RADAR_DATA_BAUD = 921600
+RADAR_CONFIG_DATA_PORT_COMMAND = f"configDataPort {RADAR_DATA_BAUD} 0"
 
 
 def send_radar_config(cfg):
     """Posle do radaru konfiguracni profil."""
     try:
         print(f"Radar {cfg['id']}: Posilam konfiguraci na {cfg['cfg_port']}...")
-        with serial.Serial(cfg["cfg_port"], 115200, timeout=1) as ser:
+        with serial.Serial(cfg["cfg_port"], RADAR_CFG_BAUD, timeout=1) as ser:
             ser.reset_input_buffer()
             ser.reset_output_buffer()
-            with open(RADAR_CONFIG_FILE, "r") as file_handle:
-                for line in file_handle:
-                    cmd = line.strip()
-                    if cmd and not cmd.startswith("%"):
-                        ser.write((cmd + "\n").encode())
-                        delay = (
-                            RADAR_CONFIG_CONTROL_DELAY_SECONDS
-                            if cmd in {"sensorStop", "flushCfg", "sensorStart"}
-                            else RADAR_CONFIG_COMMAND_DELAY_SECONDS
-                        )
-                        time.sleep(delay)
+            with open(RADAR_CONFIG_FILE, "r", encoding="utf-8", errors="ignore") as file_handle:
+                commands = [
+                    line.strip()
+                    for line in file_handle
+                    if line.strip() and not line.strip().startswith("%")
+                ]
+
+            sensor_start_index = next(
+                (index for index, command in enumerate(commands) if command == "sensorStart"),
+                None,
+            )
+            insert_index = len(commands) if sensor_start_index is None else sensor_start_index
+            commands.insert(insert_index, RADAR_CONFIG_DATA_PORT_COMMAND)
+
+            for cmd in commands:
+                ser.write((cmd + "\n").encode())
+                delay = (
+                    RADAR_CONFIG_CONTROL_DELAY_SECONDS
+                    if cmd in {"sensorStop", "flushCfg", "sensorStart"}
+                    else RADAR_CONFIG_COMMAND_DELAY_SECONDS
+                )
+                time.sleep(delay)
+
+                response = [line.decode(errors="ignore").strip() for line in ser.readlines()]
+                if response and not any("Done" in line for line in response):
+                    raise RuntimeError(
+                        f"Prikaz '{cmd}' nebyl potvrzen. Odpoved radaru: {response}"
+                    )
             print(f"Radar {cfg['id']}: Konfigurace uspesne odeslana.")
             return True
     except Exception as exc:
@@ -119,7 +139,7 @@ def radar_worker(cfg):
 
     while True:
         try:
-            radar = RadarInterface(port=cfg["dat_port"], baudrate=921600)
+            radar = RadarInterface(port=cfg["dat_port"], baudrate=RADAR_DATA_BAUD)
             print(f"Radar {cfg['id']}: Pripojen.")
 
             while True:

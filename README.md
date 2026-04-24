@@ -15,9 +15,9 @@ radar/BLE senzory -> ingestion.py -> MQTT -> fusion.py -> MQTT -> app.py -> WebS
 - PostgreSQL dostupny na `127.0.0.1:5432`
 - Databaze `sensor_data`
 - Databazovy uzivatel `postgres` s heslem `postgres`
-- Pro ostry beh fyzicke senzory na COM portech nastavenych v `ingestion.py`
+- Pro ostry beh fyzicke senzory na COM portech nastavenych v `config.py`
 
-Projekt aktualne pouziva lokalni konfiguraci natvrdo ve zdrojovych souborech. Hlavni mista:
+Projekt aktualne pouziva lokalni konfiguraci v `config.py`, kterou lze prepsat pres environment variables. Hlavni mista:
 
 - `config.py`: DB, MQTT, API, COM porty, pozice senzoru a cesta k radarovemu profilu
 - `fusion.py`: parametry parovani/fuze
@@ -34,8 +34,10 @@ $env:FOUR_DB_PORT = "5432"
 $env:FOUR_DB_NAME = "sensor_data"
 $env:FOUR_DB_USER = "postgres"
 $env:FOUR_DB_PASSWORD = "postgres"
+$env:FOUR_DB_SCHEMA = "public"
 $env:FOUR_API_HOST = "127.0.0.1"
 $env:FOUR_API_PORT = "8000"
+$env:FOUR_RUN_ID = "run_manual_001"
 ```
 
 Porty senzoru:
@@ -55,6 +57,12 @@ Cestu k radarovemu profilu lze prepsat pres:
 $env:FOUR_RADAR_CONFIG_FILE = "C:\path\to\profile.cfg"
 ```
 
+Poznamka k radarum:
+
+- `ingestion.py` pri startu sam posila profil do obou radaru pres jejich `cfg_port`.
+- Pred `sensorStart` automaticky doplni prikaz `configDataPort 921600 0`, takze datovy UART neni potreba predem rucne rozbihat pres `radar/rad.py`.
+- `radar/rad.py` zustava jako pomocny diagnosticky skript pro rucni oziveni jednoho radaru a jednoduche zobrazeni bodu.
+
 ## Instalace
 
 Z korenove slozky projektu:
@@ -66,6 +74,21 @@ python -m venv .venv
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
+
+## PostgreSQL pres Docker
+
+V koreni workspace je `docker-compose.yml`, ale jeho vychozi hodnoty neodpovidaji aplikaci ve `Four`. Pokud ho chces pouzit bez uprav `config.py`, spust ho z korene repozitare s temito promennymi:
+
+```powershell
+cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD
+$env:POSTGRES_DB = "sensor_data"
+$env:POSTGRES_USER = "postgres"
+$env:POSTGRES_PASSWORD = "postgres"
+$env:POSTGRES_PORT = "5432"
+docker compose up -d
+```
+
+Tenhle `docker-compose.yml` zveda jen PostgreSQL. MQTT broker je potreba spustit zvlast.
 
 ## Databaze
 
@@ -97,7 +120,7 @@ sensors/fused
 
 ## Spusteni ostreho behu
 
-Pred spustenim musi bezet PostgreSQL a MQTT broker. Take musi odpovidat COM porty v `ingestion.py`.
+Pred spustenim musi bezet PostgreSQL a MQTT broker. Take musi odpovidat COM porty a cesta k radarovemu profilu v `config.py` nebo v environment variables `FOUR_*`.
 
 ```powershell
 cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD\Four
@@ -117,6 +140,12 @@ http://127.0.0.1:8000
 - fusion loop pro clustering a parovani radar/BLE dat
 - FastAPI server s dashboardem
 
+Prakticky dopad:
+
+- pokud nebezi MQTT broker, ingestion a fusion se nepripoji
+- pokud nebezi PostgreSQL, spadne DB zapis v ingestion vrstve a `app.py` se pri startu nepripoji
+- pokud neodpovidaji COM porty, radar/BLE workery se budou stale pokouset o reconnect
+
 ## Samostatne spusteni casti
 
 Fusion:
@@ -130,6 +159,8 @@ Web/API:
 ```powershell
 uvicorn app:app --host 127.0.0.1 --port 8000
 ```
+
+Poznamka: i samostatne `app.py` potrebuje pri startu dostupnou databazi, protoze v `lifespan` vytvari `asyncpg` pool.
 
 Ingestion:
 
@@ -164,10 +195,10 @@ python db_stats.py
 
 ## Overeni syntaxe
 
-Rychla kontrola, ze se vsechny Python soubory parsuji:
+Rychla kontrola, ze se vsechny Python soubory ve slozce `Four` parsuji. Spoustet z adresare `Four`:
 
 ```powershell
-python -c "import ast, pathlib; [ast.parse(p.read_text(encoding='utf-8'), filename=str(p)) for p in pathlib.Path('Four').rglob('*.py')]; print('OK')"
+python -c "import ast, pathlib; [ast.parse(p.read_text(encoding='utf-8'), filename=str(p)) for p in pathlib.Path('.').rglob('*.py')]; print('OK')"
 ```
 
 ## Zname technicke dluhy
