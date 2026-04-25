@@ -1,0 +1,13 @@
+{
+  "run_id": "laborator_02",
+  "created_at_iso": "2026-04-25T17:59:31.988915",
+  "capture_raw_serial": true,
+  "ble_ids": [
+    "ble_1",
+    "ble_2"
+  ],
+  "radar_ids": [
+    "radar_1",
+    "radar_2"
+  ]
+}

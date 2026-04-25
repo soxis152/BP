@@ -1,0 +1,20 @@
+{
+  "label": "laborator_01",
+  "run_id": "laborator_01",
+  "note": "",
+  "mqtt_host": "127.0.0.1",
+  "mqtt_port": 1883,
+  "topics": [
+    "sensors/raw/#",
+    "sensors/fused"
+  ],
+  "started_at": 1777132497.9189625,
+  "started_at_iso": "2026-04-25T17:54:57.918962",
+  "raw_file": "raw.ndjson",
+  "fused_file": "fused.ndjson",
+  "ended_at": 1777132584.55505,
+  "ended_at_iso": "2026-04-25T17:56:24.555050",
+  "duration_seconds": 86.63608741760254,
+  "raw_messages": 1161,
+  "fused_messages": 777
+}
