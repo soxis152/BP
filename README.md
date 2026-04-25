@@ -15,7 +15,8 @@ Four/
 +- data/
 |  \- optitrack/           # OptiTrack workbooky a dalsi vstupni data
 +- docs/
-|  \- ARENA_CHECKLIST.md   # checklist pro mereni v arene
+|  +- ARENA_CHECKLIST.md   # checklist pro mereni v arene
+|  \- UPBOARD_START.md     # start pro 2x UP Board
 +- experiment_tools/       # recorder, replay a evaluator
 +- radar/                  # radar parser a pomocne utility
 +- runs/
@@ -38,7 +39,7 @@ Four/
 - PostgreSQL na `127.0.0.1:5432`
 - databaze `sensor_data`
 - uzivatel `postgres` / heslo `postgres`
-- pro ostry beh fyzicke senzory na COM portech nastavenych v `config.py` nebo `FOUR_*`
+- pro ostry beh fyzicke senzory na portech nastavenych v `config.py` nebo `FOUR_*`
 
 ## Instalace
 
@@ -68,6 +69,9 @@ $env:FOUR_DB_USER = "postgres"
 $env:FOUR_DB_PASSWORD = "postgres"
 $env:FOUR_API_HOST = "127.0.0.1"
 $env:FOUR_API_PORT = "8000"
+$env:FOUR_NODE_ROLE = "all"
+$env:FOUR_ENABLED_SENSORS = "radar_1,radar_2,ble_1,ble_2"
+$env:FOUR_INGEST_ENABLE_DB = "1"
 $env:FOUR_RUN_ID = "run_manual_001"
 $env:FOUR_EXPERIMENT_LABEL = "dronarena"
 $env:FOUR_CAPTURE_RAW_SERIAL = "1"
@@ -99,8 +103,11 @@ $env:FOUR_RADAR_CONFIG_FILE = "C:\path\to\profile.cfg"
 Poznamky:
 
 - `FOUR_CAPTURE_RAW_SERIAL` je aktualne vychozim nastavenim zapnute i bez env promenne.
-- `record_experiment.py --label ...` samo nastavi aktivni runtime `run_id` pro bezici `main.py`.
+- `record_experiment.py --label ...` samo nastavi aktivni runtime `run_id` pro bezici procesy na stejnem filesystemu.
 - `run_context.py` je interni mechanismus, nespousti se rucne.
+- `FOUR_NODE_ROLE` umi oddelit rezimy `all`, `central`, `edge`, `ingestion`, `fusion`, `api`.
+- `FOUR_ENABLED_SENSORS` omezi, ktere radar/BLE workery se opravdu spusti.
+- `FOUR_INGEST_ENABLE_DB=0` vypne raw zapis do PostgreSQL, kdyz na edge nodu DB neni.
 
 ## PostgreSQL Pres Docker
 
@@ -149,7 +156,44 @@ Prakticky:
 
 - kdyz nebezi MQTT broker, ingestion a fusion se nepripoji
 - kdyz nebezi PostgreSQL, DB zapis nebude fungovat a `app.py` pri startu spadne
-- kdyz neodpovidaji COM porty, workery se budou stale pokouset o reconnect
+- kdyz neodpovidaji porty senzoru, workery se budou stale pokouset o reconnect
+
+## Rezim 2x UP Board
+
+Projekt umi bezet i rozdeleny na dva Linux nody:
+
+- `central`: lokalni senzory `radar_1,ble_1`, MQTT broker, PostgreSQL, fusion a API
+- `edge`: lokalni senzory `radar_2,ble_2`, jen ingestion a publish do MQTT na centralu
+
+Doporuceny zpusob startu je pres hotove shell skripty:
+
+Centralni UP board:
+
+```bash
+cd /cesta/k/Four
+chmod +x scripts/start_up_central.sh
+./scripts/start_up_central.sh
+```
+
+Edge UP board:
+
+```bash
+cd /cesta/k/Four
+chmod +x scripts/start_up_edge.sh
+./scripts/start_up_edge.sh <ip_centralniho_up>
+```
+
+Stejneho vysledku dosahnes i pres `python main.py`, ale jen kdyz predem spravne nastavis `FOUR_NODE_ROLE`, `FOUR_ENABLED_SENSORS`, `FOUR_INGEST_ENABLE_DB` a na edge i `FOUR_MQTT_HOST`. Samotne `python main.py` bez env promennych na `2x UP Board` neni spravny start, protoze vychozi role je `all`.
+
+Poznamky:
+
+- `edge` spousti jen ingestion.
+- `central` spousti ingestion, fusion i API.
+- na `central` musi pred startem bezet MQTT broker a PostgreSQL.
+- na `edge` se DB nespousti a `FOUR_INGEST_ENABLE_DB` ma zustat `0`.
+- vychozi Linux porty pro `radar_1` a `ble_1` v `config.py` odpovidaji beznemu laboratornimu zapojeni.
+- vychozi Linux porty pro `radar_2` a `ble_2` jsou v `config.py` jen placeholdery a na edge je skoro vzdy potreba je prepsat pres `FOUR_RADAR_2_CFG_PORT`, `FOUR_RADAR_2_DAT_PORT` a `FOUR_BLE_2_PORT`.
+- podrobny start je v `docs/UPBOARD_START.md`.
 
 ## Samostatne Spusteni Casti
 
@@ -183,7 +227,7 @@ python -m Four.test_soubory.test_01_linear_pass
 ```
 
 Popis simulacnich scenaru je v `test_soubory/Popis_testu.md`. Prakticky checklist
-pro mereni v arene je v [docs/ARENA_CHECKLIST.md](/C:/Users/kabup/OneDrive/Plocha/BP_/KÓD/Four/docs/ARENA_CHECKLIST.md:1).
+pro mereni v arene je v `docs/ARENA_CHECKLIST.md`.
 
 ## Replay OptiTrack XLSX
 
@@ -216,18 +260,23 @@ Uzitecne volby:
 
 Workflow pro realne ladeni v Dronarene:
 
-1. spustit `main.py`
+1. spustit system
 2. pro kazdy test spustit `record_experiment --label ...`
 3. od OptiTracku vzit odpovidajici `.xlsx`
 4. doma pustit `replay_raw`
 5. vyhodnotit novy fused vystup proti OptiTracku
 
-Nejpohodlnejsi prakticky rezim:
+Nejpohodlnejsi prakticky rezim pro single-node:
 
 ```powershell
 cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD\Four
 python main.py
 ```
+
+V rezimu `2x UP Board` timto krokem mysli:
+
+- na `central` spustit `./scripts/start_up_central.sh`
+- na `edge` spustit `./scripts/start_up_edge.sh <ip_centralu>`
 
 Pak pro kazdy jednotlivi beh:
 
@@ -245,7 +294,13 @@ python -m Four.experiment_tools.record_experiment --label "crossing_01"
 `record_experiment.py` udela dve veci najednou:
 
 - zacne nahravat MQTT provoz
-- prepne aktivni `run_id` bez restartu `main.py`
+- prepne aktivni `run_id` bez restartu bezicich procesu na stejnem filesystemu
+
+V praxi:
+
+- pro `raw.ndjson` a `fused.ndjson` staci recorder pusteny jen na centralu, protoze tam vidi cely MQTT provoz
+- pro diagnostiku v `runs/diagnostic` se zmena `run_id` sama projevi jen na nodu, kde je zmenen stavovy soubor
+- pokud bezi `edge` na vlastnim filesystemu, jeho serial diagnostika se sama na novy label neprepne
 
 Vystup se uklada do:
 
@@ -282,7 +337,7 @@ Evaluator umi:
 
 ## Hlubsi Diagnostika Senzoru
 
-Kdyz chces sbirat i nerozparserovana data z COM portu, nech zapnute `FOUR_CAPTURE_RAW_SERIAL=1` a spust normalne `main.py`.
+Kdyz chces sbirat i nerozparserovana data ze seriovych portu, nech zapnute `FOUR_CAPTURE_RAW_SERIAL=1` a spust normalne `main.py`.
 
 Diagnosticke soubory se ukladaji do:
 
@@ -290,7 +345,13 @@ Diagnosticke soubory se ukladaji do:
 Four\runs\diagnostic\<RUN_ID>\
 ```
 
-Pri zmene `--label` v recorderu se dalsi diagnosticke zaznamy automaticky zacnou zapisovat do nove slozky bez restartu `main.py`.
+Pri zmene `--label` v recorderu se dalsi diagnosticke zaznamy automaticky zacnou zapisovat do nove slozky bez restartu `main.py`, ale jen na nodu, ktery vidi stejny `ACTIVE_RUN_ID_FILE`.
+
+Prakticky:
+
+- single-node nebo vse v jednom adresari: diagnostika se prepne automaticky
+- `2x UP Board` s oddelenym filesystemem: recorder na centralu automaticky prepne central diagnostiku, ale ne edge diagnostiku
+- pokud chces mit na edge diagnostiku rozdelenou po behach stejne jako na centralu, musis `run_id` synchronizovat i na edge nebo edge diagnostiku vypnout
 
 Vzniknou soubory:
 
@@ -309,9 +370,10 @@ Tohle je vhodne pro ladeni situaci, kdy neni jasne, jestli problem vznikl uz na 
 
 ## Dulezite Cesty
 
-- checklist do areny: [docs/ARENA_CHECKLIST.md](/C:/Users/kabup/OneDrive/Plocha/BP_/KÓD/Four/docs/ARENA_CHECKLIST.md:1)
-- OptiTrack vstup: [data/optitrack/test_dronaren.xlsx](/C:/Users/kabup/OneDrive/Plocha/BP_/KÓD/Four/data/optitrack/test_dronaren.xlsx)
-- experiment tools: [experiment_tools](/C:/Users/kabup/OneDrive/Plocha/BP_/KÓD/Four/experiment_tools)
+- checklist do areny: `docs/ARENA_CHECKLIST.md`
+- start pro 2x UP Board: `docs/UPBOARD_START.md`
+- OptiTrack vstup: `data/optitrack/test_dronaren.xlsx`
+- experiment tools: `experiment_tools/`
 
 ## Overeni Syntaxe
 

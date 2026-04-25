@@ -27,11 +27,14 @@ try:
         CAPTURE_RAW_SERIAL,
         DB_BATCH_SIZE,
         DIAGNOSTIC_CAPTURE_DIR,
+        ENABLED_SENSORS,
+        INGEST_ENABLE_DB,
         MQTT_HOST,
         MQTT_PORT,
+        RADAR_CFG_BAUD,
         RADAR_CONFIG_FILE,
         RADAR_CONFIGS,
-        RUN_ID,
+        RADAR_DATA_BAUD,
     )
     from db_handler import db_handler
     from radar.radar_interface import RadarInterface
@@ -42,11 +45,14 @@ except ImportError:
         CAPTURE_RAW_SERIAL,
         DB_BATCH_SIZE,
         DIAGNOSTIC_CAPTURE_DIR,
+        ENABLED_SENSORS,
+        INGEST_ENABLE_DB,
         MQTT_HOST,
         MQTT_PORT,
+        RADAR_CFG_BAUD,
         RADAR_CONFIG_FILE,
         RADAR_CONFIGS,
-        RUN_ID,
+        RADAR_DATA_BAUD,
     )
     from .db_handler import db_handler
     from .radar.radar_interface import RadarInterface
@@ -70,8 +76,8 @@ INGEST_GATE_Z_MAX = 2.5
 
 RADAR_CONFIG_COMMAND_DELAY_SECONDS = 0.12
 RADAR_CONFIG_CONTROL_DELAY_SECONDS = 0.50
-RADAR_CFG_BAUD = 115200
-RADAR_DATA_BAUD = 921600
+RADAR_CONFIG_RESPONSE_TIMEOUT_SECONDS = 2.0
+RADAR_CONFIG_RESPONSE_POLL_SECONDS = 0.05
 RADAR_CONFIG_DATA_PORT_COMMAND = f"configDataPort {RADAR_DATA_BAUD} 0"
 DIAGNOSTIC_FLUSH_EVERY = 25
 diagnostic_init_lock = threading.Lock()
@@ -138,6 +144,51 @@ class DiagnosticCapture:
         self.active_run_id = None
 
 
+def load_radar_config_commands():
+    """Nacte radar cfg, odstrani komentare a doplni spravny configDataPort."""
+    with open(RADAR_CONFIG_FILE, "r", encoding="utf-8", errors="ignore") as file_handle:
+        commands = []
+        for line in file_handle:
+            command = line.strip()
+            if not command or command.startswith("%") or command.startswith("configDataPort "):
+                continue
+            commands.append(command)
+
+    for index, command in enumerate(commands):
+        if command == "sensorStart":
+            commands.insert(index, RADAR_CONFIG_DATA_PORT_COMMAND)
+            break
+    else:
+        commands.append(RADAR_CONFIG_DATA_PORT_COMMAND)
+
+    return commands
+
+
+def read_radar_command_response(ser):
+    """Nacte odpoved CLI po jednom prikazu a pocka na finalni potvrzeni."""
+    response = []
+    deadline = time.monotonic() + RADAR_CONFIG_RESPONSE_TIMEOUT_SECONDS
+
+    while time.monotonic() < deadline:
+        if ser.in_waiting <= 0:
+            time.sleep(RADAR_CONFIG_RESPONSE_POLL_SECONDS)
+            continue
+
+        raw_line = ser.readline()
+        if not raw_line:
+            continue
+
+        line = raw_line.decode(errors="ignore").strip()
+        if not line:
+            continue
+
+        response.append(line)
+        if "Done" in line or "Error" in line:
+            break
+
+    return response
+
+
 def send_radar_config(cfg):
     """Posle do radaru konfiguracni profil."""
     try:
@@ -145,22 +196,11 @@ def send_radar_config(cfg):
         with serial.Serial(cfg["cfg_port"], RADAR_CFG_BAUD, timeout=1) as ser:
             ser.reset_input_buffer()
             ser.reset_output_buffer()
-            with open(RADAR_CONFIG_FILE, "r", encoding="utf-8", errors="ignore") as file_handle:
-                commands = [
-                    line.strip()
-                    for line in file_handle
-                    if line.strip() and not line.strip().startswith("%")
-                ]
-
-            sensor_start_index = next(
-                (index for index, command in enumerate(commands) if command == "sensorStart"),
-                None,
-            )
-            insert_index = len(commands) if sensor_start_index is None else sensor_start_index
-            commands.insert(insert_index, RADAR_CONFIG_DATA_PORT_COMMAND)
-
+            commands = load_radar_config_commands()
             for cmd in commands:
+                ser.reset_input_buffer()
                 ser.write((cmd + "\n").encode())
+                ser.flush()
                 delay = (
                     RADAR_CONFIG_CONTROL_DELAY_SECONDS
                     if cmd in {"sensorStop", "flushCfg", "sensorStart"}
@@ -168,8 +208,8 @@ def send_radar_config(cfg):
                 )
                 time.sleep(delay)
 
-                response = [line.decode(errors="ignore").strip() for line in ser.readlines()]
-                if response and not any("Done" in line for line in response):
+                response = read_radar_command_response(ser)
+                if not any("Done" in line for line in response):
                     raise RuntimeError(
                         f"Prikaz '{cmd}' nebyl potvrzen. Odpoved radaru: {response}"
                     )
@@ -226,6 +266,7 @@ def radar_worker(cfg):
     diagnostic_capture = DiagnosticCapture(cfg["id"], "serial")
 
     while True:
+        radar = None
         try:
             radar = RadarInterface(port=cfg["dat_port"], baudrate=RADAR_DATA_BAUD)
             print(f"Radar {cfg['id']}: Pripojen.")
@@ -276,7 +317,8 @@ def radar_worker(cfg):
                         "doppler": doppler,
                     }
                     mqtt_client.publish(f"sensors/raw/{cfg['id']}", json.dumps(payload))
-                    db_queue.put((cfg["id"], (get_current_run_id(), time.time(), x_g, y_g, z_g, snr, doppler)))
+                    if INGEST_ENABLE_DB:
+                        db_queue.put((cfg["id"], (get_current_run_id(), time.time(), x_g, y_g, z_g, snr, doppler)))
 
                 if detections_for_print:
                     formatted = ", ".join(
@@ -287,6 +329,11 @@ def radar_worker(cfg):
 
         except Exception as exc:
             print(f"Radar {cfg['id']} Error: {exc}. Restart za 5s...")
+            if radar is not None:
+                try:
+                    radar.close()
+                except Exception:
+                    pass
             time.sleep(5)
         finally:
             diagnostic_capture.close()
@@ -338,7 +385,8 @@ def ble_worker(cfg):
                         "elevation": elevation,
                     }
                     mqtt_client.publish(f"sensors/raw/{cfg['id']}", json.dumps(payload))
-                    db_queue.put((cfg["id"], (get_current_run_id(), timestamp, tag_id, rssi, azimuth, elevation)))
+                    if INGEST_ENABLE_DB:
+                        db_queue.put((cfg["id"], (get_current_run_id(), timestamp, tag_id, rssi, azimuth, elevation)))
 
         except Exception as exc:
             print(f"BLE {cfg['id']} Error: {exc}. Restart za 5s...")
@@ -348,12 +396,22 @@ def ble_worker(cfg):
 
 
 if __name__ == "__main__":
-    threading.Thread(target=db_worker, daemon=True).start()
+    if INGEST_ENABLE_DB:
+        threading.Thread(target=db_worker, daemon=True).start()
+        print("DB worker enabled")
+    else:
+        print("DB worker disabled by FOUR_INGEST_ENABLE_DB=0")
 
     for cfg in RADAR_CONFIGS:
+        if cfg["id"] not in ENABLED_SENSORS:
+            print(f"Skipping radar worker: {cfg['id']}")
+            continue
         threading.Thread(target=radar_worker, args=(cfg,), daemon=True).start()
 
     for cfg in BLE_CONFIGS:
+        if cfg["id"] not in ENABLED_SENSORS:
+            print(f"Skipping BLE worker: {cfg['id']}")
+            continue
         threading.Thread(target=ble_worker, args=(cfg,), daemon=True).start()
 
     print("Sber dat spusten. Ukoncete pomoci Ctrl+C.")
