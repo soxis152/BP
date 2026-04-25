@@ -27,8 +27,10 @@ try:
         INGEST_ENABLE_DB,
         MQTT_HOST,
         MQTT_PORT,
+        RADAR_CFG_BAUD,
         RADAR_CONFIG_FILE,
         RADAR_CONFIGS,
+        RADAR_DATA_BAUD,
         RUN_ID,
     )
     from db_handler import db_handler
@@ -41,8 +43,10 @@ except ImportError:
         INGEST_ENABLE_DB,
         MQTT_HOST,
         MQTT_PORT,
+        RADAR_CFG_BAUD,
         RADAR_CONFIG_FILE,
         RADAR_CONFIGS,
+        RADAR_DATA_BAUD,
         RUN_ID,
     )
     from .db_handler import db_handler
@@ -66,26 +70,80 @@ INGEST_GATE_Z_MAX = 2.5
 
 RADAR_CONFIG_COMMAND_DELAY_SECONDS = 0.12
 RADAR_CONFIG_CONTROL_DELAY_SECONDS = 0.50
+RADAR_CONFIG_RESPONSE_TIMEOUT_SECONDS = 2.0
+RADAR_CONFIG_RESPONSE_POLL_SECONDS = 0.05
+RADAR_CONFIG_DATA_PORT_COMMAND = f"configDataPort {RADAR_DATA_BAUD} 0"
+
+
+def load_radar_config_commands():
+    """Nacte radar cfg, odstrani komentare a doplni spravny configDataPort."""
+    with open(RADAR_CONFIG_FILE, "r", encoding="utf-8", errors="ignore") as file_handle:
+        commands = []
+        for line in file_handle:
+            cmd = line.strip()
+            if not cmd or cmd.startswith("%") or cmd.startswith("configDataPort "):
+                continue
+            commands.append(cmd)
+
+    for index, cmd in enumerate(commands):
+        if cmd == "sensorStart":
+            commands.insert(index, RADAR_CONFIG_DATA_PORT_COMMAND)
+            break
+    else:
+        commands.append(RADAR_CONFIG_DATA_PORT_COMMAND)
+
+    return commands
+
+
+def read_radar_command_response(ser):
+    """Nacte odpoved CLI po jednom prikazu a pocka na finalni potvrzeni."""
+    response = []
+    deadline = time.monotonic() + RADAR_CONFIG_RESPONSE_TIMEOUT_SECONDS
+
+    while time.monotonic() < deadline:
+        if ser.in_waiting <= 0:
+            time.sleep(RADAR_CONFIG_RESPONSE_POLL_SECONDS)
+            continue
+
+        raw_line = ser.readline()
+        if not raw_line:
+            continue
+
+        line = raw_line.decode(errors="ignore").strip()
+        if not line:
+            continue
+
+        response.append(line)
+        if "Done" in line or "Error" in line:
+            break
+
+    return response
 
 
 def send_radar_config(cfg):
     """Posle do radaru konfiguracni profil."""
     try:
         print(f"Radar {cfg['id']}: Posilam konfiguraci na {cfg['cfg_port']}...")
-        with serial.Serial(cfg["cfg_port"], 115200, timeout=1) as ser:
+        with serial.Serial(cfg["cfg_port"], RADAR_CFG_BAUD, timeout=1) as ser:
             ser.reset_input_buffer()
             ser.reset_output_buffer()
-            with open(RADAR_CONFIG_FILE, "r") as file_handle:
-                for line in file_handle:
-                    cmd = line.strip()
-                    if cmd and not cmd.startswith("%"):
-                        ser.write((cmd + "\n").encode())
-                        delay = (
-                            RADAR_CONFIG_CONTROL_DELAY_SECONDS
-                            if cmd in {"sensorStop", "flushCfg", "sensorStart"}
-                            else RADAR_CONFIG_COMMAND_DELAY_SECONDS
-                        )
-                        time.sleep(delay)
+            commands = load_radar_config_commands()
+            for cmd in commands:
+                ser.reset_input_buffer()
+                ser.write((cmd + "\n").encode())
+                ser.flush()
+                delay = (
+                    RADAR_CONFIG_CONTROL_DELAY_SECONDS
+                    if cmd in {"sensorStop", "flushCfg", "sensorStart"}
+                    else RADAR_CONFIG_COMMAND_DELAY_SECONDS
+                )
+                time.sleep(delay)
+
+                response = read_radar_command_response(ser)
+                if not any("Done" in line for line in response):
+                    raise RuntimeError(
+                        f"Prikaz '{cmd}' nebyl potvrzen. Odpoved radaru: {response}"
+                    )
             print(f"Radar {cfg['id']}: Konfigurace uspesne odeslana.")
             return True
     except Exception as exc:
@@ -138,8 +196,9 @@ def radar_worker(cfg):
     mqtt_client.loop_start()
 
     while True:
+        radar = None
         try:
-            radar = RadarInterface(port=cfg["dat_port"], baudrate=921600)
+            radar = RadarInterface(port=cfg["dat_port"], baudrate=RADAR_DATA_BAUD)
             print(f"Radar {cfg['id']}: Pripojen.")
 
             while True:
@@ -189,6 +248,11 @@ def radar_worker(cfg):
 
         except Exception as exc:
             print(f"Radar {cfg['id']} Error: {exc}. Restart za 5s...")
+            if radar is not None:
+                try:
+                    radar.close()
+                except Exception:
+                    pass
             time.sleep(5)
 
 

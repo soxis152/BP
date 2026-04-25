@@ -76,6 +76,8 @@ RADAR_CONFIG_FILE = env_path(
     "FOUR_RADAR_CONFIG_FILE",
     BASE_DIR / "radar" / "tdm" / "AWR294X_profile_2025_11_07T16_27_59_226 copy2.cfg",
 )
+RADAR_CFG_BAUD = env_int("FOUR_RADAR_CFG_BAUD", 115200)
+RADAR_DATA_BAUD = env_int("FOUR_RADAR_DATA_BAUD", 921600)
 
 BLE_CONFIGS = [
     {
