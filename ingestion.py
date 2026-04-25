@@ -9,6 +9,8 @@ ladit oddelene.
 """
 
 import asyncio
+import base64
+from datetime import datetime
 import json
 import math
 import re
@@ -20,13 +22,35 @@ import paho.mqtt.client as mqtt
 import serial
 
 try:
-    from config import BLE_CONFIGS, DB_BATCH_SIZE, MQTT_HOST, MQTT_PORT, RADAR_CONFIG_FILE, RADAR_CONFIGS, RUN_ID
+    from config import (
+        BLE_CONFIGS,
+        CAPTURE_RAW_SERIAL,
+        DB_BATCH_SIZE,
+        DIAGNOSTIC_CAPTURE_DIR,
+        MQTT_HOST,
+        MQTT_PORT,
+        RADAR_CONFIG_FILE,
+        RADAR_CONFIGS,
+        RUN_ID,
+    )
     from db_handler import db_handler
     from radar.radar_interface import RadarInterface
+    from run_context import get_current_run_id
 except ImportError:
-    from .config import BLE_CONFIGS, DB_BATCH_SIZE, MQTT_HOST, MQTT_PORT, RADAR_CONFIG_FILE, RADAR_CONFIGS, RUN_ID
+    from .config import (
+        BLE_CONFIGS,
+        CAPTURE_RAW_SERIAL,
+        DB_BATCH_SIZE,
+        DIAGNOSTIC_CAPTURE_DIR,
+        MQTT_HOST,
+        MQTT_PORT,
+        RADAR_CONFIG_FILE,
+        RADAR_CONFIGS,
+        RUN_ID,
+    )
     from .db_handler import db_handler
     from .radar.radar_interface import RadarInterface
+    from .run_context import get_current_run_id
 
 
 db_queue = Queue()
@@ -49,6 +73,69 @@ RADAR_CONFIG_CONTROL_DELAY_SECONDS = 0.50
 RADAR_CFG_BAUD = 115200
 RADAR_DATA_BAUD = 921600
 RADAR_CONFIG_DATA_PORT_COMMAND = f"configDataPort {RADAR_DATA_BAUD} 0"
+DIAGNOSTIC_FLUSH_EVERY = 25
+diagnostic_init_lock = threading.Lock()
+diagnostic_run_dirs = {}
+
+
+def get_diagnostic_run_dir():
+    """Vrati adresar pro diagnosticky dump senzoru a vytvori ho pri prvnim pouziti."""
+    if not CAPTURE_RAW_SERIAL:
+        return None
+
+    current_run_id = get_current_run_id()
+    with diagnostic_init_lock:
+        if current_run_id not in diagnostic_run_dirs:
+            run_dir = DIAGNOSTIC_CAPTURE_DIR / current_run_id
+            run_dir.mkdir(parents=True, exist_ok=True)
+            metadata_path = run_dir / "metadata.json"
+            metadata = {
+                "run_id": current_run_id,
+                "created_at_iso": datetime.now().isoformat(),
+                "capture_raw_serial": True,
+                "ble_ids": [cfg["id"] for cfg in BLE_CONFIGS],
+                "radar_ids": [cfg["id"] for cfg in RADAR_CONFIGS],
+            }
+            metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+            diagnostic_run_dirs[current_run_id] = run_dir
+        return diagnostic_run_dirs[current_run_id]
+
+
+class DiagnosticCapture:
+    """Jednoduchy NDJSON logger pro nerozparserovana data jednoho senzoru."""
+
+    def __init__(self, sensor_id, file_suffix):
+        self.sensor_id = sensor_id
+        self.file_suffix = file_suffix
+        self.handle = None
+        self.write_count = 0
+        self.active_run_id = None
+
+    def write_record(self, record):
+        if not CAPTURE_RAW_SERIAL:
+            return
+
+        current_run_id = get_current_run_id()
+        if self.handle is None or self.active_run_id != current_run_id:
+            self.close()
+            run_dir = get_diagnostic_run_dir()
+            if run_dir is None:
+                return
+            path = run_dir / f"{self.sensor_id}_{self.file_suffix}.ndjson"
+            self.handle = path.open("a", encoding="utf-8")
+            self.active_run_id = current_run_id
+
+        self.handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        self.write_count += 1
+        if self.write_count % DIAGNOSTIC_FLUSH_EVERY == 0:
+            self.handle.flush()
+
+    def close(self):
+        if self.handle:
+            self.handle.flush()
+            self.handle.close()
+            self.handle = None
+        self.active_run_id = None
 
 
 def send_radar_config(cfg):
@@ -136,6 +223,7 @@ def radar_worker(cfg):
     mqtt_client = mqtt.Client(client_id=f"ingest_{cfg['id']}")
     mqtt_client.connect(MQTT_HOST, MQTT_PORT)
     mqtt_client.loop_start()
+    diagnostic_capture = DiagnosticCapture(cfg["id"], "serial")
 
     while True:
         try:
@@ -148,6 +236,17 @@ def radar_worker(cfg):
                     continue
 
                 parsed = radar.parse_frame(raw_data)
+                diagnostic_capture.write_record(
+                    {
+                        "recorded_at": time.time(),
+                        "sensor_id": cfg["id"],
+                        "port": cfg["dat_port"],
+                        "baudrate": RADAR_DATA_BAUD,
+                        "bytes_len": len(raw_data),
+                        "data_base64": base64.b64encode(raw_data).decode("ascii"),
+                        "parsed_ok": bool(parsed),
+                    }
+                )
                 if not parsed or len(parsed) < 11:
                     continue
 
@@ -177,7 +276,7 @@ def radar_worker(cfg):
                         "doppler": doppler,
                     }
                     mqtt_client.publish(f"sensors/raw/{cfg['id']}", json.dumps(payload))
-                    db_queue.put((cfg["id"], (RUN_ID, time.time(), x_g, y_g, z_g, snr, doppler)))
+                    db_queue.put((cfg["id"], (get_current_run_id(), time.time(), x_g, y_g, z_g, snr, doppler)))
 
                 if detections_for_print:
                     formatted = ", ".join(
@@ -189,6 +288,8 @@ def radar_worker(cfg):
         except Exception as exc:
             print(f"Radar {cfg['id']} Error: {exc}. Restart za 5s...")
             time.sleep(5)
+        finally:
+            diagnostic_capture.close()
 
 
 def ble_worker(cfg):
@@ -196,6 +297,7 @@ def ble_worker(cfg):
     mqtt_client = mqtt.Client(client_id=f"ingest_{cfg['id']}")
     mqtt_client.connect(MQTT_HOST, MQTT_PORT)
     mqtt_client.loop_start()
+    diagnostic_capture = DiagnosticCapture(cfg["id"], "serial")
 
     while True:
         try:
@@ -203,8 +305,23 @@ def ble_worker(cfg):
                 print(f"BLE {cfg['id']}: Pripojen.")
 
                 while True:
-                    line = ser.readline().decode("utf-8", errors="ignore").strip()
+                    raw_line = ser.readline()
+                    if not raw_line:
+                        continue
+                    timestamp = time.time()
+                    line = raw_line.decode("utf-8", errors="ignore").strip()
                     match = AZIMUTH_PATTERN.match(line)
+                    diagnostic_capture.write_record(
+                        {
+                            "recorded_at": timestamp,
+                            "sensor_id": cfg["id"],
+                            "port": cfg["port"],
+                            "baudrate": cfg["baud"],
+                            "decoded_text": line,
+                            "data_base64": base64.b64encode(raw_line).decode("ascii"),
+                            "matched_pattern": bool(match),
+                        }
+                    )
                     if not match:
                         continue
 
@@ -212,7 +329,6 @@ def ble_worker(cfg):
                     rssi = int(match.group(2))
                     azimuth = int(match.group(3))
                     elevation = int(match.group(4))
-                    timestamp = time.time()
 
                     payload = {
                         "timestamp": timestamp,
@@ -222,11 +338,13 @@ def ble_worker(cfg):
                         "elevation": elevation,
                     }
                     mqtt_client.publish(f"sensors/raw/{cfg['id']}", json.dumps(payload))
-                    db_queue.put((cfg["id"], (RUN_ID, timestamp, tag_id, rssi, azimuth, elevation)))
+                    db_queue.put((cfg["id"], (get_current_run_id(), timestamp, tag_id, rssi, azimuth, elevation)))
 
         except Exception as exc:
             print(f"BLE {cfg['id']} Error: {exc}. Restart za 5s...")
             time.sleep(5)
+        finally:
+            diagnostic_capture.close()
 
 
 if __name__ == "__main__":

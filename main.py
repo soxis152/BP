@@ -14,13 +14,14 @@ import asyncio
 import sys
 import threading
 import time
-
 import uvicorn
 
 try:
     from config import API_HOST, API_PORT
+    from run_context import initialize_run_id_file
 except ImportError:
     from .config import API_HOST, API_PORT
+    from .run_context import initialize_run_id_file
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -97,6 +98,8 @@ def api_thread() -> None:
 
 def main() -> None:
     """Spusti vsechny hlavni casti a hlida, jestli vlakna nezemrela."""
+    active_run_id = initialize_run_id_file()
+    print(f"[main] Active run_id = {active_run_id}")
     threads = [
         threading.Thread(target=ingestion_thread, name="ingestion_thread", daemon=True),
         threading.Thread(target=fusion_thread, name="fusion_thread", daemon=True),

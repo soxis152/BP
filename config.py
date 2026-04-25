@@ -24,6 +24,13 @@ def env_float(name, default):
     return default if value in (None, "") else float(value)
 
 
+def env_bool(name, default):
+    value = os.getenv(name)
+    if value in (None, ""):
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def env_path(name, default):
     value = os.getenv(name)
     return Path(default if value in (None, "") else value)
@@ -49,6 +56,13 @@ DB_SCHEMA = os.getenv("FOUR_DB_SCHEMA", "public")
 DB_BATCH_SIZE = env_int("FOUR_DB_BATCH_SIZE", 100)
 DB_FLUSH_SECONDS = env_float("FOUR_DB_FLUSH_SECONDS", 1.0)
 RUN_ID = os.getenv("FOUR_RUN_ID", DEFAULT_RUN_ID)
+DEFAULT_EXPERIMENT_LABEL = os.getenv("FOUR_EXPERIMENT_LABEL", "laborator_02")
+ACTIVE_RUN_ID_FILE = env_path("FOUR_ACTIVE_RUN_ID_FILE", BASE_DIR / ".active_run_id")
+CAPTURE_RAW_SERIAL = env_bool("FOUR_CAPTURE_RAW_SERIAL", True)
+DIAGNOSTIC_CAPTURE_DIR = env_path(
+    "FOUR_DIAGNOSTIC_CAPTURE_DIR",
+    BASE_DIR / "runs" / "diagnostic",
+)
 
 RADAR_CONFIG_FILE = env_path(
     "FOUR_RADAR_CONFIG_FILE",

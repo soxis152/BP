@@ -24,11 +24,13 @@ import time
 import aiomqtt
 
 try:
-    from config import BLE_CONFIGS, DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST, RUN_ID
+    from config import BLE_CONFIGS, DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST
     from db_handler import AsyncDBHandler
+    from run_context import get_current_run_id
 except ImportError:
-    from .config import BLE_CONFIGS, DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST, RUN_ID
+    from .config import BLE_CONFIGS, DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST
     from .db_handler import AsyncDBHandler
+    from .run_context import get_current_run_id
 
 RAW_RADAR_HISTORY_SECONDS = 1.7
 MAX_RAW_RADAR_HISTORY_POINTS = 700
@@ -113,7 +115,7 @@ def build_fused_db_rows(objects, timestamp):
 
         rows.append(
             (
-                RUN_ID,
+                get_current_run_id(),
                 timestamp,
                 tag_id,
                 safe_float(obj.get("x")),
