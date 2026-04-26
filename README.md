@@ -165,6 +165,11 @@ Projekt umi bezet i rozdeleny na dva Linux nody:
 - `central`: lokalni senzory `radar_1,ble_1`, MQTT broker, PostgreSQL, fusion a API
 - `edge`: lokalni senzory `radar_2,ble_2`, jen ingestion a publish do MQTT na centralu
 
+Aktualni laboratorni mapovani:
+
+- `central` = `soniot@192.168.137.2`
+- `edge` = `soniot1@192.168.138.2`
+
 Doporuceny zpusob startu je pres hotove shell skripty:
 
 Centralni UP board:
@@ -278,7 +283,7 @@ V rezimu `2x UP Board` timto krokem mysli:
 - na `central` spustit `./scripts/start_up_central.sh`
 - na `edge` spustit `./scripts/start_up_edge.sh <ip_centralu>`
 
-Pak pro kazdy jednotlivi beh:
+Pak pro kazdy jednotlivi beh na PC nebo single-node:
 
 ```powershell
 cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD
@@ -301,6 +306,26 @@ V praxi:
 - pro `raw.ndjson` a `fused.ndjson` staci recorder pusteny jen na centralu, protoze tam vidi cely MQTT provoz
 - pro diagnostiku v `runs/diagnostic` se zmena `run_id` sama projevi jen na nodu, kde je zmenen stavovy soubor
 - pokud bezi `edge` na vlastnim filesystemu, jeho serial diagnostika se sama na novy label neprepne
+
+Pro `2x UP Board` je proto doporuceny start recorderu pres `scripts/record_sync.sh`, ktery:
+
+- na `edge` zapise stejny label do `.active_run_id`
+- na `centralu` spusti `record_experiment`
+
+Priklad na `centralu` z rootu projektu:
+
+```bash
+cd ~/Four/Dronarena
+chmod +x scripts/record_sync.sh
+./scripts/record_sync.sh test_01 soniot1@192.168.138.2
+```
+
+Pokud projekt na Linuxu nelezi ve slozce `Four`, pouzivej lokalni modulovou cestu z rootu projektu:
+
+```bash
+cd /cesta/k/projektu
+python -m experiment_tools.record_experiment --label "test_01"
+```
 
 Vystup se uklada do:
 

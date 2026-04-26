@@ -1,5 +1,10 @@
 # Start pro 2x UP Board
 
+Aktualni laboratorni mapovani:
+
+- `central` = `soniot@192.168.137.2`
+- `edge` = `soniot1@192.168.138.2`
+
 ## Centralni UP board
 
 Na centralnim nodu musi bezet:
@@ -54,7 +59,7 @@ Spusteni:
 ```bash
 cd /cesta/k/Four
 chmod +x scripts/start_up_edge.sh
-./scripts/start_up_edge.sh 192.168.1.10
+./scripts/start_up_edge.sh 192.168.137.2
 ```
 
 Kde `192.168.137.2` je IP centralniho UP boardu s MQTT brokerem.
@@ -90,10 +95,11 @@ ls /dev/ttyACM* /dev/ttyUSB*
 - raw data z obou UP boardu pres MQTT
 - fused vystup
 
-Priklad:
+Pokud chces jen MQTT zaznam a nevadi ti, ze edge diagnostika zustane pod svym puvodnim `run_id`, staci klasicky recorder:
 
 ```bash
-python -m Four.experiment_tools.record_experiment --label "test_01"
+cd /cesta/k/projektu
+python -m experiment_tools.record_experiment --label "test_01"
 ```
 
 Prakticky dopad:
@@ -102,6 +108,30 @@ Prakticky dopad:
 - zmena `--label` prepne `run_id` jen na nodu, ktery vidi stejny `ACTIVE_RUN_ID_FILE`
 - pokud sbiras serial diagnostiku i na edge, ta se bez dalsi synchronizace na novy label sama neprepne
 
+Pokud chces synchronizovat i edge diagnostiku, pouzij na `centralu` `scripts/record_sync.sh`:
+
+```bash
+cd /cesta/k/projektu
+chmod +x scripts/record_sync.sh
+./scripts/record_sync.sh test_01 soniot1@192.168.138.2
+```
+
+Skript udela dve veci:
+
+- pres `ssh` zapise stejny label do `edge/.active_run_id`
+- na `centralu` spusti `python -m experiment_tools.record_experiment --label ...`
+
+Volitelne promenne:
+
+- `EDGE_RUN_FILE` pokud ma `edge` jinou cestu k `.active_run_id`
+- `PYTHON_BIN` pokud nechces pouzit vychozi `python`
+
+Priklad s explicitni cestou:
+
+```bash
+EDGE_RUN_FILE=~/Four/Dronarena/.active_run_id ./scripts/record_sync.sh test_01 soniot1@192.168.138.2
+```
+
 ## Co otestovat zitra
 
 1. Na centralu spustit `./scripts/start_up_central.sh`
@@ -109,4 +139,4 @@ Prakticky dopad:
 3. Overit skutecne `/dev/ttyACM*` a `/dev/ttyUSB*` na obou nodech a pripadne exportovat porty rucne
 4. Overit, ze central vidi `sensors/raw/radar_1`, `sensors/raw/radar_2`, `sensors/raw/ble_1`, `sensors/raw/ble_2`
 5. Overit, ze se na centralu generuje `sensors/fused`
-6. Spustit recorder jen na centralu
+6. Pro synchronizovany beh spustit `./scripts/record_sync.sh <label> <edge_host>` na centralu

@@ -72,7 +72,7 @@ ENABLED_SENSORS = env_csv_set(
     ("radar_1", "radar_2", "ble_1", "ble_2"),
 )
 INGEST_ENABLE_DB = env_bool("FOUR_INGEST_ENABLE_DB", True)
-DEFAULT_EXPERIMENT_LABEL = os.getenv("FOUR_EXPERIMENT_LABEL", "laborator_02")
+DEFAULT_EXPERIMENT_LABEL = os.getenv("FOUR_EXPERIMENT_LABEL", "laborator_03")
 ACTIVE_RUN_ID_FILE = env_path("FOUR_ACTIVE_RUN_ID_FILE", BASE_DIR / ".active_run_id")
 CAPTURE_RAW_SERIAL = env_bool("FOUR_CAPTURE_RAW_SERIAL", True)
 DIAGNOSTIC_CAPTURE_DIR = env_path(
