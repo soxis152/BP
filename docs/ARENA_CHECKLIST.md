@@ -3,6 +3,11 @@
 Checklist pro mereni v Dronarene. Cilem je odvezt si kazdy beh tak, aby sel
 doma prehrat a vyhodnotit proti OptiTracku bez dalsiho dohadovani.
 
+Aktualni laboratorni mapovani:
+
+- `central` = `soniot@192.168.137.2`
+- `edge` = `soniot1@192.168.138.2`
+
 ## Co Se Spousti
 
 V rezimu single-node:
@@ -13,7 +18,7 @@ V rezimu `2x UP Board`:
 
 - na `central` spustis `./scripts/start_up_central.sh`
 - na `edge` spustis `./scripts/start_up_edge.sh <IP_centralu>`
-- recorder spoustis jen na `central`
+- synchronizovany recorder spoustis jen na `central` pres `./scripts/record_sync.sh <label> <edge_host>`
 
 Pro kazdy jednotlivi test:
 
@@ -28,7 +33,8 @@ Pro kazdy jednotlivi test:
 Poznamka pro `2x UP Board`:
 
 - recorder na `centralu` korektne nahraje `raw` i `fused` MQTT data z celeho systemu
-- recorder na `centralu` ale automaticky neprepina edge diagnostiku v `runs\diagnostic`, pokud edge bezi na vlastnim filesystemu
+- `record_sync.sh` na `centralu` prepise i `edge/.active_run_id`, takze edge diagnostika muze mit stejny label
+- bez `record_sync.sh` recorder na `centralu` automaticky neprepina edge diagnostiku v `runs\diagnostic`, pokud edge bezi na vlastnim filesystemu
 
 ## Pred Odjezdem
 
@@ -36,7 +42,7 @@ Poznamka pro `2x UP Board`:
 - [ ] Otestovat, ze na centralnim nodu bezi PostgreSQL a aplikace se do ni pripoji.
 - [ ] Otestovat start ve stejnem rezimu, ve kterem pojedu v arene.
 - [ ] Pro `2x UP Board` otestovat `./scripts/start_up_central.sh` i `./scripts/start_up_edge.sh <IP_centralu>`.
-- [ ] Otestovat `python -m Four.experiment_tools.record_experiment --label test --duration 10`.
+- [ ] Otestovat `./scripts/record_sync.sh test soniot1@192.168.138.2`.
 - [ ] Otestovat, ze se vytvori `runs\experiment\...`.
 - [ ] Pokud chci hlubsi diagnostiku, nechat zapnute `FOUR_CAPTURE_RAW_SERIAL=1`.
 - [ ] Otestovat, ze se pri zapnute diagnostice vytvori `runs\diagnostic\...`.
@@ -76,7 +82,7 @@ Poznamka pro `2x UP Board`:
 - [ ] Zapsat, ktery OptiTrack rigid body patri kteremu objektu.
 - [ ] Zkontrolovat, ze stale bezi `central` i `edge`.
 - [ ] Zkontrolovat dashboard a pritok dat na `centralu`.
-- [ ] Spustit `record_experiment.py` s jasnym `--label` jen na `centralu`.
+- [ ] Spustit `./scripts/record_sync.sh <label> soniot1@192.168.138.2` na `centralu`.
 - [ ] Overit, ze label odpovida planovanemu nazvu testu.
 - [ ] Pokud je potreba hlubsi diagnostika, overit `FOUR_CAPTURE_RAW_SERIAL=1` a vedet, jestli chci i edge diagnostiku.
 - [ ] Nechat recorder bezet jeste pred prvnim pohybem aspon 3-5 s.
@@ -98,11 +104,11 @@ Poznamka pro `2x UP Board`:
 ## Po Skonceni Kazdeho Behu
 
 - [ ] Nechat recorder bezet jeste 3-5 s po poslednim pohybu.
-- [ ] Zastavit `record_experiment.py`.
+- [ ] Zastavit `record_sync.sh` nebo `record_experiment.py`.
 - [ ] Zapsat poznamky: co se povedlo, co se nepovedlo, vypadky, kolize, zakryti.
 - [ ] Overit, ze vznikla nova slozka v `runs\experiment\...`.
 - [ ] Pokud byla zapnuta diagnostika, overit i `runs\diagnostic\<RUN_ID>\...` na `centralu`.
-- [ ] Pokud jsem sbiral i edge diagnostiku, pocitat s tim, ze bez synchronizace `run_id` nemusi mit stejny label jako central.
+- [ ] Pokud jsem sbiral i edge diagnostiku, overit i `runs\diagnostic\<RUN_ID>\...` na `edge`.
 - [ ] Poznamenat si, ktery OptiTrack export patri ke kteremu behu.
 
 ## Co Si Odvezt Domu
@@ -127,8 +133,8 @@ Poznamka pro `2x UP Board`:
 ## Minimalni Prakticky Postup
 
 1. Na `central` spustit `./scripts/start_up_central.sh`.
-2. Na `edge` spustit `./scripts/start_up_edge.sh <IP_centralu>`.
-3. Na `central` spustit `python -m Four.experiment_tools.record_experiment --label "static_01"`.
+2. Na `edge` spustit `./scripts/start_up_edge.sh 192.168.137.2`.
+3. Na `central` spustit `./scripts/record_sync.sh static_01 soniot1@192.168.138.2`.
 4. Udelat mereni.
 5. Zastavit recorder `Ctrl+C`.
 6. Pro dalsi test spustit recorder znovu s novym `--label`.
