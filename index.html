@@ -31,6 +31,8 @@
             --source-radar-ble: #ef4444;
             --source-radar-ble-coasting: #f97316;
             --source-ble-only: #eab308;
+            --source-ble-1: #14b8a6;
+            --source-ble-2: #8b5cf6;
             --source-diagnostics: #16a34a;
         }
 
@@ -81,17 +83,30 @@
 
         .legend-dot { width: 10px; height: 10px; border-radius: 999px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7); }
 
-        .view-controls { display: flex; gap: 10px; }
-
-        .view-controls button {
-            background-color: var(--bg-card); border: 1px solid var(--border);
-            padding: 10px 18px; font-weight: 700; text-transform: uppercase;
-            border-radius: 8px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.03em;
+        .controls-group { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+        .control-block {
+            display: flex; align-items: center; gap: 8px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 8px; box-shadow: 0 5px 14px rgba(15, 23, 42, 0.06);
+        }
+        .control-label {
+            font-size: 11px; font-weight: 800; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.05em; padding: 0 4px;
+        }
+        .view-controls, .data-controls {
+            display: flex; gap: 6px; flex-wrap: wrap;
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 4px;
         }
 
-        .view-controls button.active {
-            background-color: var(--accent); color: white; border-color: var(--accent);
-            box-shadow: 0 8px 22px rgba(51, 65, 85, 0.22);
+        .view-controls button, .data-controls button {
+            background-color: transparent; border: 0;
+            padding: 9px 12px; font-weight: 800; color: #475569;
+            border-radius: 8px; cursor: pointer; transition: all 0.18s; letter-spacing: 0.02em;
+        }
+
+        .view-controls button.active, .data-controls button.active {
+            background-color: var(--accent); color: white;
+            box-shadow: 0 8px 22px rgba(51, 65, 85, 0.18);
         }
 
         .dashboard { display: flex; flex-direction: row; gap: 20px; justify-content: center; width: 100%; max-width: 1000px; margin-bottom: 14px; }
@@ -144,6 +159,8 @@
         .tile.source-radar-ble { border-left-color: var(--source-radar-ble); }
         .tile.source-radar-ble-coasting { border-left-color: var(--source-radar-ble-coasting); }
         .tile.source-ble-only { border-left-color: var(--source-ble-only); }
+        .tile.source-ble-1-raw { border-left-color: var(--source-ble-1); }
+        .tile.source-ble-2-raw { border-left-color: var(--source-ble-2); }
         .tile.source-radar-cluster { border-left-color: var(--source-radar); }
         .tile.source-diagnostics { border-left-color: var(--source-diagnostics); }
 
@@ -158,6 +175,8 @@
         .badge-radar-ble { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
         .badge-radar-ble-coasting { color: #9a3412; background: #ffedd5; border-color: #fdba74; }
         .badge-ble-only { color: #854d0e; background: #fef3c7; border-color: #fde68a; }
+        .badge-ble-1-raw { color: #115e59; background: #ccfbf1; border-color: #99f6e4; }
+        .badge-ble-2-raw { color: #5b21b6; background: #ede9fe; border-color: #ddd6fe; }
         .badge-type { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }
 
         .tile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
@@ -224,11 +243,29 @@
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar-ble);"></span>Radar + BLE</span>
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar-ble-coasting);"></span>Radar + BLE coasting</span>
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-ble-only);"></span>BLE only</span>
+        <span class="legend-chip"><span class="legend-dot" style="background: var(--source-ble-1);"></span>BLE 1 ray</span>
+        <span class="legend-chip"><span class="legend-dot" style="background: var(--source-ble-2);"></span>BLE 2 ray</span>
     </div>
 
-    <div class="view-controls">
-        <button id="btn2d" class="active" onclick="switchView('2d')">2D Pohled</button>
-        <button id="btn3d" onclick="switchView('3d')">3D Pohled</button>
+    <div class="controls-group">
+        <div class="control-block">
+            <span class="control-label">Pohled</span>
+            <div class="view-controls">
+                <button id="btn2d" class="active" onclick="switchView('2d')">2D</button>
+                <button id="btn3d" onclick="switchView('3d')">3D</button>
+            </div>
+        </div>
+        <div class="control-block">
+            <span class="control-label">Data</span>
+            <div class="data-controls">
+                <button id="btnModeFused" class="active" onclick="switchDataMode('fused')">Fused</button>
+                <button id="btnModeRaw" onclick="switchDataMode('raw_radar')">Raw Radar</button>
+                <button id="btnModeClusters" onclick="switchDataMode('radar_clusters')">Clustery</button>
+                <button id="btnModeBle" onclick="switchDataMode('ble')">BLE Triang</button>
+                <button id="btnModeBle1" onclick="switchDataMode('ble_1')">BLE 1</button>
+                <button id="btnModeBle2" onclick="switchDataMode('ble_2')">BLE 2</button>
+            </div>
+        </div>
     </div>
 
     <!-- Hlavni plocha: vlevo mapa/scena, vpravo textovy seznam aktualnich objektu. -->
@@ -258,10 +295,15 @@
         // latest* je posledni surovy stav z backendu, displayState je vyhlazeny
         // stav pouzivany jen pro kresleni. Tim oddeluju realna data od animace.
         let currentMode = '2d';
+        let currentDataMode = 'fused';
         let latestObjects = [];
         let latestStats = null;
         let displayState = {};
         let latestRadarPoints = [];
+        let latestRadarClusters = [];
+        let latestBlePoints = [];
+        let latestBle1Rays = [];
+        let latestBle2Rays = [];
         let lastAnimationTimeSec = performance.now() / 1000;
 
         // Vyhlazeni je ciste vizualni. Backendova data se tim nemeni.
@@ -270,7 +312,6 @@
         const TRACK_MAX_VISUAL_SPEED_MPS = 1.10;
         const BLE_MAX_VISUAL_SPEED_MPS = 0.55;
         const VISUAL_HOLD_SECONDS = 3.0;
-        const SHOW_RAW_RADAR_POINTS = false;
 
         const canvas = document.getElementById('radarCanvas');
         const ctx = canvas.getContext('2d');
@@ -279,7 +320,7 @@
 
         function mountToolbar() {
             const legend = document.querySelector('.legend-row');
-            const controls = document.querySelector('.view-controls');
+            const controls = document.querySelector('.controls-group');
             if (!legend || !controls) return;
 
             const toolbar = document.createElement('div');
@@ -318,6 +359,16 @@
             document.getElementById('view3d').style.display = mode === '3d' ? 'block' : 'none';
         }
 
+        function switchDataMode(mode) {
+            currentDataMode = mode;
+            document.getElementById('btnModeFused').classList.toggle('active', mode === 'fused');
+            document.getElementById('btnModeRaw').classList.toggle('active', mode === 'raw_radar');
+            document.getElementById('btnModeClusters').classList.toggle('active', mode === 'radar_clusters');
+            document.getElementById('btnModeBle').classList.toggle('active', mode === 'ble');
+            document.getElementById('btnModeBle1').classList.toggle('active', mode === 'ble_1');
+            document.getElementById('btnModeBle2').classList.toggle('active', mode === 'ble_2');
+        }
+
         function normalizeTagId(tagId) {
             if (tagId === null || tagId === undefined) return "";
             return String(tagId).trim().toUpperCase().replace(/[^A-Z0-9_]/g, "");
@@ -350,6 +401,8 @@
             const type = getObjectType(obj);
             const id = String(obj.tag_id || '').toUpperCase();
 
+            if (sourceRaw.includes('ble_1_raw')) return 'ble_1_raw';
+            if (sourceRaw.includes('ble_2_raw')) return 'ble_2_raw';
             if (sourceRaw.includes('ble_only') || sourceRaw.includes('ble only')) return 'ble_only';
             if (sourceRaw.includes('radar_cluster') || type === 'radar_cluster') return 'radar_cluster';
             if (sourceRaw.includes('radar_raw') || type === 'radar_raw') return 'radar_raw';
@@ -365,6 +418,8 @@
 
         function getSourceLabel(obj) {
             const source = getSourceCategory(obj);
+            if (source === 'ble_1_raw') return 'BLE 1';
+            if (source === 'ble_2_raw') return 'BLE 2';
             if (source === 'radar_cluster') return 'Radar cluster';
             if (source === 'radar_ble') return 'Radar + BLE';
             if (source === 'radar_ble_coasting') return 'Radar + BLE coasting';
@@ -375,6 +430,7 @@
         function getTypeLabel(obj) {
             const type = getObjectType(obj);
             if (type === 'radar_raw') return 'Raw';
+            if (type === 'ble_anchor_ray') return 'Ray';
             if (type === 'radar_cluster') return 'Cluster';
             if (type === 'radar_ble') return 'Fused';
             if (type === 'radar_ble_coasting') return 'Coasting';
@@ -387,6 +443,8 @@
 
         function getSourceBadgeClass(obj) {
             const source = getSourceCategory(obj);
+            if (source === 'ble_1_raw') return 'badge-ble-1-raw';
+            if (source === 'ble_2_raw') return 'badge-ble-2-raw';
             if (source === 'radar_cluster') return 'badge-radar-cluster';
             if (source === 'radar_ble') return 'badge-radar-ble';
             if (source === 'radar_ble_coasting') return 'badge-radar-ble-coasting';
@@ -396,6 +454,8 @@
 
         function getTileClass(obj) {
             const source = getSourceCategory(obj);
+            if (source === 'ble_1_raw') return 'source-ble-1-raw';
+            if (source === 'ble_2_raw') return 'source-ble-2-raw';
             if (source === 'radar_cluster') return 'source-radar-cluster';
             if (source === 'radar_ble') return 'source-radar-ble';
             if (source === 'radar_ble_coasting') return 'source-radar-ble-coasting';
@@ -404,6 +464,7 @@
         }
 
         function isBLEOnly(obj) { return getSourceCategory(obj) === 'ble_only'; }
+        function isBleRay(obj) { const source = getSourceCategory(obj); return source === 'ble_1_raw' || source === 'ble_2_raw'; }
 
         function isRadarRaw(obj) {
             return String(obj.object_type || '').toLowerCase() === 'radar_raw' || String(obj.source || '').toLowerCase() === 'radar_raw';
@@ -416,7 +477,7 @@
             // citelnejsi plynule dojeti k cilove poloze, proto tu drzim
             // samostatny display stav.
             const isBle = isBLEOnly(targetObj);
-            if (isRadarRaw(targetObj)) {
+            if (isRadarRaw(targetObj) || isBleRay(targetObj)) {
                 // Surovy radar se nevyhlazuje, chci videt okamzite body.
                 displayObj.x = safeNum(targetObj.x, safeNum(displayObj.x));
                 displayObj.y = safeNum(targetObj.y, safeNum(displayObj.y));
@@ -459,6 +520,10 @@
 
         function formatMeters(value) { return `${safeNum(value).toFixed(2)} m`; }
         function formatConf(value) { return safeNum(value).toFixed(2); }
+        function formatDegrees(value) { return `${safeNum(value).toFixed(1)}°`; }
+        function getVisualOpacity3D(obj) {
+            return 1.0;
+        }
         function escapeHtml(value) {
             return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
@@ -466,6 +531,24 @@
         function updateDebugPanel(stats) {
             if (!stats) return;
             latestStats = stats;
+        }
+
+        function getCurrentDrawList() {
+            if (currentDataMode === 'raw_radar') return latestRadarPoints;
+            if (currentDataMode === 'radar_clusters') return latestRadarClusters;
+            if (currentDataMode === 'ble') return latestBlePoints;
+            if (currentDataMode === 'ble_1') return latestBle1Rays;
+            if (currentDataMode === 'ble_2') return latestBle2Rays;
+            return Object.values(displayState);
+        }
+
+        function getEmptyStateMessage() {
+            if (currentDataMode === 'raw_radar') return 'Raw radar rezim: body se zobrazuji jen ve vizualizaci.';
+            if (currentDataMode === 'radar_clusters') return 'Zadne radar clustery v aktualnim okne.';
+            if (currentDataMode === 'ble') return 'Zadne BLE pozice v aktualnim okne.';
+            if (currentDataMode === 'ble_1') return 'BLE 1 zatim neposila zadny ray.';
+            if (currentDataMode === 'ble_2') return 'BLE 2 zatim neposila zadny ray.';
+            return 'Zadne sledovane cile.';
         }
 
         function syncDisplayMetadata(displayObj, targetObj) {
@@ -570,26 +653,42 @@
 
         function drawObjects2D(objects) {
             drawMap2D();
-            const order = { radar_raw: 0, radar_cluster: 1, ble_only: 2, radar_ble_coasting: 3, radar_ble: 4, radar: 1 };
+            const order = { radar_raw: 0, ble_1_raw: 1, ble_2_raw: 1, radar_cluster: 2, ble_only: 3, radar_ble_coasting: 4, radar_ble: 5, radar: 2 };
             objects.sort((a, b) => (order[getSourceCategory(a)] ?? 0) - (order[getSourceCategory(b)] ?? 0));
 
             objects.forEach(obj => {
                 const x = safeNum(obj.x); const y = safeNum(obj.y);
                 const px = OFFSET + (x * PIXELS_PER_METER); const py = (600 - OFFSET) - (y * PIXELS_PER_METER);
                 const source = getSourceCategory(obj); const color = getSourceColor(obj);
-                const conf = Math.max(0.10, safeNum(obj.confidence, 1));
                 const rawRadar = isRadarRaw(obj);
+                const bleRay = isBleRay(obj);
                 const isCluster = source === 'radar_cluster';
-                const radius = rawRadar ? 8 : (isCluster ? 17 : (source === 'ble_only' ? 15 : 11));
+                const radius = rawRadar ? 8 : (bleRay ? 10 : (isCluster ? 17 : (source === 'ble_only' ? 15 : 11)));
 
-                ctx.globalAlpha = conf;
+                if (bleRay) {
+                    const sensorPx = OFFSET + (safeNum(obj.sensor_x) * PIXELS_PER_METER);
+                    const sensorPy = (600 - OFFSET) - (safeNum(obj.sensor_y) * PIXELS_PER_METER);
+                    ctx.globalAlpha = 0.9;
+                    ctx.beginPath();
+                    ctx.moveTo(sensorPx, sensorPy);
+                    ctx.lineTo(px, py);
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = color;
+                    ctx.setLineDash([10, 6]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                ctx.globalAlpha = 1.0;
                 ctx.beginPath(); ctx.arc(px, py, radius, 0, 2 * Math.PI);
                 ctx.fillStyle = color; ctx.fill();
 
-                ctx.lineWidth = rawRadar ? 2 : (isCluster ? 4 : 3);
+                ctx.lineWidth = rawRadar ? 2 : (bleRay ? 3 : (isCluster ? 4 : 3));
                 ctx.strokeStyle = rawRadar ? 'rgba(255, 255, 255, 0.85)' : '#ffffff';
-                ctx.shadowColor = rawRadar ? 'rgba(14, 165, 233, 0.85)' : (isCluster ? 'rgba(14, 165, 233, 0.75)' : 'rgba(0, 0, 0, 0.35)');
-                ctx.shadowBlur = rawRadar ? 12 : (isCluster ? 14 : 6); ctx.stroke();
+                ctx.shadowColor = rawRadar
+                    ? 'rgba(14, 165, 233, 0.85)'
+                    : (bleRay ? 'rgba(15, 23, 42, 0.18)' : (isCluster ? 'rgba(14, 165, 233, 0.75)' : 'rgba(0, 0, 0, 0.35)'));
+                ctx.shadowBlur = rawRadar ? 12 : (bleRay ? 8 : (isCluster ? 14 : 6)); ctx.stroke();
                 ctx.shadowColor = 'transparent';
                 ctx.shadowBlur = 0;
 
@@ -601,7 +700,7 @@
                     ctx.fillText(String(obj.points ?? ''), px, py);
                 }
 
-                if (source !== 'radar' && !rawRadar && !isCluster) {
+                if (source !== 'radar' && !rawRadar && !bleRay && !isCluster) {
                     ctx.beginPath(); ctx.arc(px, py, source === 'ble_only' ? 22 : 18, 0, 2 * Math.PI);
                     ctx.lineWidth = 2; ctx.strokeStyle = source === 'ble_only' ? 'rgba(234, 179, 8, 0.55)' : 'rgba(239, 68, 68, 0.45)';
                     ctx.stroke();
@@ -734,26 +833,36 @@
         const meshes3D = {};
 
         function createTrackMesh(source) {
-            const isBleOnly = source === 'ble_only'; const isRawRadar = source === 'radar_raw';
-            const radius = isRawRadar ? 0.055 : (isBleOnly ? 0.17 : 0.13);
+            const isBleOnly = source === 'ble_only';
+            const isRawRadar = source === 'radar_raw';
+            const isBleRay = source === 'ble_1_raw' || source === 'ble_2_raw';
+            const radius = isRawRadar ? 0.055 : (isBleRay ? 0.08 : (isBleOnly ? 0.17 : 0.13));
             const colorHex = getSourceColor({ source, object_type: source === 'ble_only' ? 'ble_only' : 'tagged' });
             const group = new THREE.Group();
 
             const sphereGeo = new THREE.SphereGeometry(radius, 24, 24);
-            const sphereMat = new THREE.MeshStandardMaterial({ color: colorHex, emissive: colorHex, emissiveIntensity: isBleOnly ? 0.25 : 0.20, roughness: 0.28, metalness: 0.02, transparent: true });
+            const sphereMat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: false, opacity: 1.0 });
             const sphere = new THREE.Mesh(sphereGeo, sphereMat); group.add(sphere);
+            const stemLine = new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, -1, 0)]),
+                new THREE.LineBasicMaterial({ color: colorHex, transparent: true, opacity: 0.28 })
+            );
+            group.add(stemLine);
 
-            if (!isRawRadar) {
+            if (isBleRay) {
+                const rayLine = new THREE.Line(
+                    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+                    new THREE.LineBasicMaterial({ color: colorHex, transparent: true, opacity: 0.8 })
+                );
+                group.add(rayLine);
+                group.userData = { sphere, ring: null, rayLine, stemLine, source };
+            } else if (!isRawRadar) {
                 const ringRadius = isBleOnly ? 0.34 : 0.29;
                 const ring = new THREE.Mesh(new THREE.RingGeometry(ringRadius - 0.02, ringRadius, 40), new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, transparent: true, opacity: isBleOnly ? 0.58 : 0.50 }));
                 ring.rotation.x = -Math.PI / 2; ring.position.y = -radius + 0.02; group.add(ring);
-                if (!isBleOnly) {
-                    const outline = new THREE.LineSegments(new THREE.EdgesGeometry(sphereGeo), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.90 }));
-                    group.add(outline);
-                }
-                group.userData = { sphere, ring, source };
+                group.userData = { sphere, ring, rayLine: null, stemLine, source };
             } else {
-                group.userData = { sphere, ring: null, source };
+                group.userData = { sphere, ring: null, rayLine: null, stemLine, source };
             }
             return group;
         }
@@ -769,15 +878,25 @@
                     if (meshes3D[id]) scene.remove(meshes3D[id]);
                     meshes3D[id] = createTrackMesh(source); scene.add(meshes3D[id]);
                 }
-                const meshGroup = meshes3D[id]; const sphere = meshGroup.userData.sphere; const ring = meshGroup.userData.ring;
-                const color = getSourceColor(obj); const conf = Math.max(0.10, safeNum(obj.confidence, 1));
-                meshGroup.position.set(safeNum(obj.x), safeNum(obj.z, 0.5), -safeNum(obj.y));
-                sphere.material.color.set(color); sphere.material.emissive.set(color); sphere.material.opacity = conf;
+                const meshGroup = meshes3D[id]; const sphere = meshGroup.userData.sphere; const ring = meshGroup.userData.ring; const rayLine = meshGroup.userData.rayLine; const stemLine = meshGroup.userData.stemLine;
+                const color = getSourceColor(obj); const visualOpacity = getVisualOpacity3D(obj);
+                const objectHeight = Math.max(0.02, safeNum(obj.z, 0.5));
+                meshGroup.position.set(safeNum(obj.x), objectHeight, -safeNum(obj.y));
+                sphere.material.color.set(color); sphere.material.opacity = 1.0;
+                stemLine.geometry.setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -objectHeight, 0)]);
+                stemLine.material.color.set(color);
+                stemLine.material.opacity = 0.34;
 
-                if (ring) {
+                if (rayLine && obj.sensor_x !== undefined && obj.sensor_y !== undefined) {
+                    const start = toScenePosition(safeNum(obj.sensor_x), safeNum(obj.sensor_y), safeNum(obj.sensor_z, 0.8));
+                    const end = toScenePosition(safeNum(obj.x), safeNum(obj.y), safeNum(obj.z, 0.8));
+                    rayLine.geometry.setFromPoints([start.clone().sub(meshGroup.position), end.clone().sub(meshGroup.position)]);
+                    rayLine.material.color.set(color);
+                    rayLine.material.opacity = 0.92;
+                } else if (ring) {
                     const pulse = 0.92 + 0.12 * Math.sin(nowSec * 4 + id.length * 0.35);
                     ring.scale.setScalar(pulse); ring.material.color.set(color);
-                    ring.material.opacity = Math.max(0.25, conf * (source === 'radar' ? 0.45 : 0.62));
+                    ring.material.opacity = source === 'radar' ? 0.5 : 0.7;
                 }
             });
             Object.keys(meshes3D).forEach(id => {
@@ -803,7 +922,7 @@
                 // nevypisuju do karet, protoze by DOM zahltily stovky bodu.
                 if (data.radar && Array.isArray(data.radar)) {
                     latestRadarPoints = data.radar.map((r, index) => ({
-                            tag_id: 'RAW_R_' + Math.random().toString(36).substr(2, 6),
+                            tag_id: `RAW_R_${index}`,
                             object_type: 'radar_raw',
                             source: 'radar_raw',
                             x: r.x, y: r.y, z: r.z,
@@ -811,36 +930,74 @@
                     }));
                 }
 
+                latestRadarClusters = Array.isArray(data.radar_clusters)
+                    ? data.radar_clusters.map(cluster => ({
+                        tag_id: cluster.id,
+                        object_type: 'radar_cluster',
+                        source: 'radar_cluster',
+                        x: cluster.x,
+                        y: cluster.y,
+                        z: cluster.z,
+                        points: cluster.points,
+                        confidence: Math.min(0.85, 0.45 + (cluster.points * 0.06))
+                    }))
+                    : [];
+
+                latestBlePoints = Array.isArray(data.ble)
+                    ? data.ble.map(point => ({
+                        tag_id: point.tag_id,
+                        object_type: 'ble_only',
+                        source: 'ble_only',
+                        x: point.x,
+                        y: point.y,
+                        z: point.z,
+                        confidence: 0.6
+                    }))
+                    : [];
+
+                latestBle1Rays = Array.isArray(data.ble_1_raw)
+                    ? data.ble_1_raw.map(point => ({
+                        tag_id: point.tag_id,
+                        object_type: 'ble_anchor_ray',
+                        source: 'ble_1_raw',
+                        sensor_id: point.sensor_id,
+                        sensor_x: point.sensor_x,
+                        sensor_y: point.sensor_y,
+                        sensor_z: point.sensor_z,
+                        x: point.x,
+                        y: point.y,
+                        z: point.z,
+                        azimuth: point.azimuth,
+                        elevation: point.elevation,
+                        confidence: 0.82
+                    }))
+                    : [];
+
+                latestBle2Rays = Array.isArray(data.ble_2_raw)
+                    ? data.ble_2_raw.map(point => ({
+                        tag_id: point.tag_id,
+                        object_type: 'ble_anchor_ray',
+                        source: 'ble_2_raw',
+                        sensor_id: point.sensor_id,
+                        sensor_x: point.sensor_x,
+                        sensor_y: point.sensor_y,
+                        sensor_z: point.sensor_z,
+                        x: point.x,
+                        y: point.y,
+                        z: point.z,
+                        azimuth: point.azimuth,
+                        elevation: point.elevation,
+                        confidence: 0.82
+                    }))
+                    : [];
+
                 if (Array.isArray(data.objects)) {
                     combined = data.objects;
                 } else {
-                    if (data.radar_clusters && Array.isArray(data.radar_clusters)) {
-                        data.radar_clusters.forEach(cluster => {
-                            combined.push({
-                                tag_id: cluster.id,
-                                object_type: 'radar_cluster',
-                                source: 'radar_cluster',
-                                x: cluster.x,
-                                y: cluster.y,
-                                z: cluster.z,
-                                points: cluster.points,
-                                confidence: Math.min(0.85, 0.45 + (cluster.points * 0.06))
-                            });
-                        });
-                    }
+                    combined = [...latestRadarClusters];
 
                     // Fallback pro starsi payload bez `objects`.
-                    if (data.ble && Array.isArray(data.ble)) {
-                        data.ble.forEach(b => {
-                            combined.push({
-                                tag_id: b.tag_id,
-                                object_type: 'ble_only',
-                                source: 'ble_only',
-                                x: b.x, y: b.y, z: b.z,
-                                confidence: 0.6
-                            });
-                        });
-                    }
+                    combined.push(...latestBlePoints);
                 }
 
                 latestObjects = combined;
@@ -863,7 +1020,7 @@
             // Surove radarove body nevypisuju do karet, aby zbytecne nerostl DOM.
             const filteredForTiles = drawList.filter(obj => !isRadarRaw(obj));
             if (filteredForTiles.length === 0) {
-                tilesContainer.innerHTML = '<div class="empty-state">Žádné sledované cíle (Surová data z radaru nezobrazujeme v seznamu)</div>';
+                tilesContainer.innerHTML = `<div class="empty-state">${escapeHtml(getEmptyStateMessage())}</div>`;
                 return;
             }
 
@@ -883,6 +1040,9 @@
                             <div class="metric"><span class="metric-label">Confidence</span><span class="metric-value">${formatConf(conf)}</span></div>
                             ${obj.points !== undefined ? `<div class="metric"><span class="metric-label">Body clusteru</span><span class="metric-value">${escapeHtml(obj.points)}</span></div>` : ''}
                             ${obj.pair_distance !== undefined ? `<div class="metric"><span class="metric-label">BLE-Radar</span><span class="metric-value">${formatMeters(obj.pair_distance)}</span></div>` : ''}
+                            ${obj.sensor_id ? `<div class="metric"><span class="metric-label">Kotva</span><span class="metric-value">${escapeHtml(obj.sensor_id)}</span></div>` : ''}
+                            ${obj.azimuth !== undefined ? `<div class="metric"><span class="metric-label">Azimut</span><span class="metric-value">${formatDegrees(obj.azimuth)}</span></div>` : ''}
+                            ${obj.elevation !== undefined ? `<div class="metric"><span class="metric-label">Elevace</span><span class="metric-value">${formatDegrees(obj.elevation)}</span></div>` : ''}
                             ${obj.pair_mode ? `<div class="metric"><span class="metric-label">Párování</span><span class="metric-value">${escapeHtml(obj.pair_mode)}</span></div>` : ''}
                         </div>
                         <div class="conf-wrap"><span class="conf-label">Spolehlivost detekce</span><span class="conf-value">${confPct.toFixed(0)}%</span></div>
@@ -930,7 +1090,7 @@
                 obj.confidence = Math.max(minHoldConfidence, baseConf * (1 - (age / VISUAL_HOLD_SECONDS)));
             });
 
-            const drawList = (SHOW_RAW_RADAR_POINTS ? latestRadarPoints : []).concat(Object.values(displayState));
+            const drawList = getCurrentDrawList();
             if (currentMode === '2d') { drawObjects2D(drawList); } else { controls.update(); updateObjects3D(drawList); renderer.render(scene, camera); }
             renderTiles(drawList);
         }

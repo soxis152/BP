@@ -32,7 +32,7 @@ except ImportError:
     from .db_handler import AsyncDBHandler
     from .run_context import get_current_run_id
 
-RAW_RADAR_HISTORY_SECONDS = 1.7
+RAW_RADAR_HISTORY_SECONDS = 1.0
 MAX_RAW_RADAR_HISTORY_POINTS = 700
 MAX_RADAR_POINTS_IN_MQTT_PAYLOAD = 250
 FUSED_PUBLISH_INTERVAL_SECONDS = 0.1
@@ -57,6 +57,9 @@ RADAR_CLUSTER_CONFIDENCE_MIN = 0.45
 RADAR_CLUSTER_CONFIDENCE_MAX = 0.85
 MAX_BAD_MESSAGE_LOGS = 20
 MAX_PAYLOAD_PREVIEW_CHARS = 240
+ROOM_DEBUG_BOUNDS_MIN = -0.5
+ROOM_DEBUG_BOUNDS_MAX = 3.5
+BLE_DEBUG_FALLBACK_RAY_LENGTH = 3.5
 FUSED_DB_SAMPLE_SECONDS = 0.25
 FUSED_DB_FLUSH_SECONDS = DB_FLUSH_SECONDS
 FUSED_DB_BATCH_SIZE = DB_BATCH_SIZE
@@ -262,6 +265,65 @@ def ble_direction_vector(sensor, measurement):
     return tuple(component / length for component in vector)
 
 
+def ray_box_exit_distance(origin, direction, bounds_min=ROOM_DEBUG_BOUNDS_MIN, bounds_max=ROOM_DEBUG_BOUNDS_MAX):
+    """Vrati vzdalenost k prvnimu pruseciku paprsku s hranou debug boxu."""
+    best_t = None
+
+    for axis in range(3):
+        component = direction[axis]
+        if abs(component) < 1e-6:
+            continue
+
+        boundary = bounds_max if component > 0 else bounds_min
+        t = (boundary - origin[axis]) / component
+        if t <= 0:
+            continue
+
+        hit = add(origin, scale(direction, t))
+        if all(bounds_min - 1e-6 <= hit[i] <= bounds_max + 1e-6 for i in range(3)):
+            if best_t is None or t < best_t:
+                best_t = t
+
+    return best_t
+
+
+def build_ble_debug_rays(sensor_id, measurements):
+    """Prevede raw BLE azimut/elevaci na globalni debug paprsky pro dashboard."""
+    sensor = SENSORS.get(sensor_id)
+    if not sensor:
+        return []
+
+    origin = (sensor["x"], sensor["y"], sensor["z"])
+    rays = []
+
+    for tag_id, measurement in sorted(measurements.items()):
+        direction = ble_direction_vector(sensor, measurement)
+        if not direction:
+            continue
+
+        distance = ray_box_exit_distance(origin, direction)
+        if distance is None:
+            distance = BLE_DEBUG_FALLBACK_RAY_LENGTH
+
+        endpoint = add(origin, scale(direction, distance))
+        rays.append(
+            {
+                "tag_id": tag_id,
+                "sensor_id": sensor_id,
+                "sensor_x": origin[0],
+                "sensor_y": origin[1],
+                "sensor_z": origin[2],
+                "x": endpoint[0],
+                "y": endpoint[1],
+                "z": endpoint[2],
+                "azimuth": safe_float(measurement.get("azimuth")),
+                "elevation": safe_float(measurement.get("elevation")),
+            }
+        )
+
+    return rays
+
+
 def triangulate_3d(tag_id):
     """Vrati 3D odhad polohy tagu jako midpoint nejblizsiho priblizeni dvou paprsku."""
     b1 = shared_state["ble_tags"]["ble_1"].get(tag_id)
@@ -306,7 +368,11 @@ def triangulate_3d(tag_id):
     midpoint = tuple((p1 + p2) / 2.0 for p1, p2 in zip(closest_1, closest_2))
     x, y, z = midpoint
 
-    if -0.5 <= x <= 3.5 and -0.5 <= y <= 3.5 and -0.5 <= z <= 3.5:
+    if (
+        ROOM_DEBUG_BOUNDS_MIN <= x <= ROOM_DEBUG_BOUNDS_MAX
+        and ROOM_DEBUG_BOUNDS_MIN <= y <= ROOM_DEBUG_BOUNDS_MAX
+        and ROOM_DEBUG_BOUNDS_MIN <= z <= ROOM_DEBUG_BOUNDS_MAX
+    ):
         return {"x": x, "y": y, "z": z}
     return None
 
@@ -607,6 +673,8 @@ async def fused_publisher():
                         ble_2_count = len(shared_state["ble_tags"]["ble_2"])
                         ble_1_ids = sorted(shared_state["ble_tags"]["ble_1"].keys())
                         ble_2_ids = sorted(shared_state["ble_tags"]["ble_2"].keys())
+                        out_ble_1_raw = build_ble_debug_rays("ble_1", shared_state["ble_tags"]["ble_1"])
+                        out_ble_2_raw = build_ble_debug_rays("ble_2", shared_state["ble_tags"]["ble_2"])
                         out_ble = []
                         common_tags = set(shared_state["ble_tags"]["ble_1"].keys()) & set(
                             shared_state["ble_tags"]["ble_2"].keys()
@@ -645,6 +713,8 @@ async def fused_publisher():
                             "radar": out_radar_payload,
                             "radar_clusters": out_clusters,
                             "ble": out_ble,
+                            "ble_1_raw": out_ble_1_raw,
+                            "ble_2_raw": out_ble_2_raw,
                             "objects": out_objects,
                             "stats": {
                                 "timestamp": now,
