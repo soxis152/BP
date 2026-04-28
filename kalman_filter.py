@@ -14,12 +14,24 @@ import numpy as np
 class KalmanObject:
     """Jedna sledovana stopa s modelem konstantni rychlosti."""
 
-    def __init__(self, tag_id, x0, y0, z0, dt=0.1):
+    def __init__(
+        self,
+        tag_id,
+        x0,
+        y0,
+        z0,
+        dt=0.1,
+        process_noise=0.01,
+        measurement_noise=1.5,
+        initial_covariance=1.0,
+        z_smoothing_alpha=0.35,
+    ):
         self.tag_id = tag_id
         self.state = np.array([x0, y0, 0, 0], dtype=float)
         self.z = z0
+        self.z_smoothing_alpha = float(z_smoothing_alpha)
 
-        self.P = np.eye(4) * 1.0
+        self.P = np.eye(4) * float(initial_covariance)
         self.F = np.array([
             [1, 0, dt, 0],
             [0, 1, 0, dt],
@@ -32,10 +44,10 @@ class KalmanObject:
         ])
 
         # Q urcuje, jak moc pripoustim necekane zmeny pohybu.
-        self.Q = np.eye(4) * 0.01
+        self.Q = np.eye(4) * float(process_noise)
 
         # R urcuje, jak moc verim jednomu mereni proti predikci.
-        self.R = np.eye(2) * 1.5
+        self.R = np.eye(2) * float(measurement_noise)
 
         self.missed_frames = 0
         self.update_count = 1
@@ -47,6 +59,12 @@ class KalmanObject:
     @property
     def y(self):
         return self.state[1]
+
+    def set_process_noise(self, process_noise):
+        self.Q = np.eye(4) * float(process_noise)
+
+    def set_measurement_noise(self, measurement_noise):
+        self.R = np.eye(2) * float(measurement_noise)
 
     def predict(self, dt=0.1):
         """Predikuje dalsi stav bez noveho mereni."""
@@ -61,7 +79,11 @@ class KalmanObject:
 
     def update(self, meas_x, meas_y, meas_z):
         """Opravi predikovany stav podle noveho mereni."""
-        self.z = meas_z
+        if self.update_count <= 1:
+            self.z = meas_z
+        else:
+            alpha = self.z_smoothing_alpha
+            self.z = (self.z * (1.0 - alpha)) + (meas_z * alpha)
         z_meas = np.array([meas_x, meas_y])
 
         innovation = z_meas - (self.H @ self.state)
@@ -71,3 +93,6 @@ class KalmanObject:
         self.state = self.state + (kalman_gain @ innovation)
         identity = np.eye(self.P.shape[0])
         self.P = (identity - kalman_gain @ self.H) @ self.P
+        self.missed_frames = 0
+        self.update_count += 1
+        return float(self.x), float(self.y), float(self.z)

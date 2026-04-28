@@ -7,8 +7,8 @@ a azimut/elevace z jednotlivych kotev.
 Vystupem je jeden pravidelne publikovany JSON snapshot do `sensors/fused`.
 Dashboard potom nemusi znat detaily triangulace, clusteringu ani parovani.
 
-Aktualni verze neni plny tracker s Kalman filtrem. Je to prakticka online
-heuristika:
+Aktualni verze neni plny multi-target tracker. Je to prakticka online
+heuristika s lehkym Kalman vyhlazenim na vystupu:
 
 - BLE tag se trianguluje z dvojice 3D smeru.
 - Radarove body se seskupi do shluku podle vzdalenosti.
@@ -26,16 +26,18 @@ import aiomqtt
 try:
     from config import BLE_CONFIGS, DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST
     from db_handler import AsyncDBHandler
+    from kalman_filter import KalmanObject
     from run_context import get_current_run_id
 except ImportError:
     from .config import BLE_CONFIGS, DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST
     from .db_handler import AsyncDBHandler
+    from .kalman_filter import KalmanObject
     from .run_context import get_current_run_id
 
-RAW_RADAR_HISTORY_SECONDS = 1.0
+RAW_RADAR_HISTORY_SECONDS = 0.4
 MAX_RAW_RADAR_HISTORY_POINTS = 700
 MAX_RADAR_POINTS_IN_MQTT_PAYLOAD = 250
-FUSED_PUBLISH_INTERVAL_SECONDS = 0.1
+FUSED_PUBLISH_INTERVAL_SECONDS = 0.05
 MQTT_RECONNECT_SECONDS = 2
 # Prahy jsou zatim ladene pro malou 3x3m mistnost. Drzim je pohromade tady,
 # aby bylo jasne, ktere konstanty meni chovani fuzni logiky.
@@ -60,6 +62,21 @@ MAX_PAYLOAD_PREVIEW_CHARS = 240
 ROOM_DEBUG_BOUNDS_MIN = -0.5
 ROOM_DEBUG_BOUNDS_MAX = 3.5
 BLE_DEBUG_FALLBACK_RAY_LENGTH = 3.5
+KALMAN_TRACKABLE_SOURCES = {"radar_ble", "radar_ble_coasting", "ble_only", "radar_cluster"}
+KALMAN_PROCESS_NOISE = 0.035
+KALMAN_CLUSTER_PROCESS_NOISE = 0.10
+KALMAN_INITIAL_COVARIANCE = 0.35
+KALMAN_CLUSTER_INITIAL_COVARIANCE = 0.45
+KALMAN_Z_SMOOTHING_ALPHA = 0.26
+KALMAN_MEASUREMENT_NOISE = {
+    "radar_ble": 0.20,
+    "radar_ble_coasting": 0.50,
+    "ble_only": 0.75,
+    "radar_cluster": 0.16,
+}
+KALMAN_TRACK_MAX_IDLE_SECONDS = 1.2
+KALMAN_CLUSTER_MATCH_MAX_DISTANCE = 0.75
+KALMAN_CLUSTER_TRACK_PREFIX = "RADAR_TRACK_"
 FUSED_DB_SAMPLE_SECONDS = 0.25
 FUSED_DB_FLUSH_SECONDS = DB_FLUSH_SECONDS
 FUSED_DB_BATCH_SIZE = DB_BATCH_SIZE
@@ -173,6 +190,139 @@ def radar_cluster_confidence(point_count):
     """
     confidence = RADAR_CLUSTER_CONFIDENCE_MIN + (point_count * 0.06)
     return round(clamp(confidence, RADAR_CLUSTER_CONFIDENCE_MIN, RADAR_CLUSTER_CONFIDENCE_MAX), 3)
+
+
+def kalman_measurement_noise(source):
+    """Vrati hladinu sumu mereni podle typu fused objektu."""
+    return KALMAN_MEASUREMENT_NOISE.get(source, KALMAN_MEASUREMENT_NOISE["ble_only"])
+
+
+def apply_kalman_tracking(objects, trackers, now, dt):
+    """Vyhladi fused objekty a radar clusterum doplni stabilnejsi track ID."""
+    dt = clamp(dt, 0.02, 0.20)
+    named_trackers = trackers["named"]
+    cluster_trackers = trackers["clusters"]
+    observed_named_ids = set()
+    observed_cluster_ids = set()
+
+    for tracker_state in named_trackers.values():
+        tracker_state["filter"].predict(dt)
+    for tracker_state in cluster_trackers.values():
+        tracker_state["filter"].predict(dt)
+
+    for obj in objects:
+        source = str(obj.get("source", "")).strip().lower()
+        if source not in KALMAN_TRACKABLE_SOURCES:
+            continue
+
+        if source == "radar_cluster":
+            best_tracker_id = None
+            best_distance = None
+            for tracker_id, tracker_state in cluster_trackers.items():
+                if tracker_id in observed_cluster_ids:
+                    continue
+
+                tracker = tracker_state["filter"]
+                distance = math.hypot(
+                    safe_float(obj.get("x")) - float(tracker.x),
+                    safe_float(obj.get("y")) - float(tracker.y),
+                )
+                if distance > KALMAN_CLUSTER_MATCH_MAX_DISTANCE:
+                    continue
+
+                if best_distance is None or distance < best_distance:
+                    best_tracker_id = tracker_id
+                    best_distance = distance
+
+            measurement_noise = kalman_measurement_noise(source)
+            if best_tracker_id is None:
+                cluster_index = trackers["next_cluster_id"]
+                trackers["next_cluster_id"] += 1
+                best_tracker_id = f"{KALMAN_CLUSTER_TRACK_PREFIX}{cluster_index}"
+                tracker = KalmanObject(
+                    tag_id=best_tracker_id,
+                    x0=safe_float(obj.get("x")),
+                    y0=safe_float(obj.get("y")),
+                    z0=safe_float(obj.get("z")),
+                    dt=dt,
+                    process_noise=KALMAN_CLUSTER_PROCESS_NOISE,
+                    measurement_noise=measurement_noise,
+                    initial_covariance=KALMAN_CLUSTER_INITIAL_COVARIANCE,
+                    z_smoothing_alpha=KALMAN_Z_SMOOTHING_ALPHA,
+                )
+                cluster_trackers[best_tracker_id] = {"filter": tracker, "last_seen": now}
+            else:
+                tracker = cluster_trackers[best_tracker_id]["filter"]
+                tracker.set_process_noise(KALMAN_CLUSTER_PROCESS_NOISE)
+                tracker.set_measurement_noise(measurement_noise)
+                tracker.update(
+                    safe_float(obj.get("x")),
+                    safe_float(obj.get("y")),
+                    safe_float(obj.get("z")),
+                )
+                cluster_trackers[best_tracker_id]["last_seen"] = now
+
+            observed_cluster_ids.add(best_tracker_id)
+            obj["tag_id"] = best_tracker_id
+            obj["x"] = round(float(cluster_trackers[best_tracker_id]["filter"].x), 4)
+            obj["y"] = round(float(cluster_trackers[best_tracker_id]["filter"].y), 4)
+            obj["z"] = round(float(cluster_trackers[best_tracker_id]["filter"].z), 4)
+            continue
+
+        tag_id = str(obj.get("tag_id", "")).strip()
+        if not tag_id:
+            continue
+
+        measurement_noise = kalman_measurement_noise(source)
+        tracker_state = named_trackers.get(tag_id)
+
+        if not tracker_state:
+            tracker = KalmanObject(
+                tag_id=tag_id,
+                x0=safe_float(obj.get("x")),
+                y0=safe_float(obj.get("y")),
+                z0=safe_float(obj.get("z")),
+                dt=dt,
+                process_noise=KALMAN_PROCESS_NOISE,
+                measurement_noise=measurement_noise,
+                initial_covariance=KALMAN_INITIAL_COVARIANCE,
+                z_smoothing_alpha=KALMAN_Z_SMOOTHING_ALPHA,
+            )
+            tracker_state = {"filter": tracker, "last_seen": now}
+            named_trackers[tag_id] = tracker_state
+        else:
+            tracker = tracker_state["filter"]
+            tracker.set_process_noise(KALMAN_PROCESS_NOISE)
+            tracker.set_measurement_noise(measurement_noise)
+            tracker.update(
+                safe_float(obj.get("x")),
+                safe_float(obj.get("y")),
+                safe_float(obj.get("z")),
+            )
+            tracker_state["last_seen"] = now
+
+        observed_named_ids.add(tag_id)
+        obj["x"] = round(float(tracker_state["filter"].x), 4)
+        obj["y"] = round(float(tracker_state["filter"].y), 4)
+        obj["z"] = round(float(tracker_state["filter"].z), 4)
+
+    named_trackers_to_remove = [
+        tag_id
+        for tag_id, tracker_state in named_trackers.items()
+        if tag_id not in observed_named_ids and now - tracker_state.get("last_seen", now) > KALMAN_TRACK_MAX_IDLE_SECONDS
+    ]
+    for tag_id in named_trackers_to_remove:
+        named_trackers.pop(tag_id, None)
+
+    cluster_trackers_to_remove = [
+        tag_id
+        for tag_id, tracker_state in cluster_trackers.items()
+        if tag_id not in observed_cluster_ids and now - tracker_state.get("last_seen", now) > KALMAN_TRACK_MAX_IDLE_SECONDS
+    ]
+    for tag_id in cluster_trackers_to_remove:
+        cluster_trackers.pop(tag_id, None)
+
+    return objects
 
 
 async def ensure_fused_db_ready(fusion_db_handler, last_retry_at):
@@ -641,6 +791,8 @@ async def fused_publisher():
     last_db_retry = 0.0
     last_db_sample = 0.0
     last_db_flush = time.time()
+    last_publish_at = time.time()
+    kalman_trackers = {"named": {}, "clusters": {}, "next_cluster_id": 1}
     # asyncpg pool patri konkretnimu asyncio event loopu. Handler proto vzniká
     # az tady uvnitr publisheru, aby po restartu fusion loopu nepouzil stary
     # pool navazany na uz zavreny event loop.
@@ -703,6 +855,13 @@ async def fused_publisher():
                     out_radar_payload = out_radar[-MAX_RADAR_POINTS_IN_MQTT_PAYLOAD:]
                     out_clusters = cluster_radar_points(out_radar)
                     out_objects, paired_count = build_fused_objects(out_clusters, out_ble, now)
+                    out_objects = apply_kalman_tracking(
+                        out_objects,
+                        kalman_trackers,
+                        now,
+                        now - last_publish_at,
+                    )
+                    last_publish_at = now
 
                     # Payload je navrzeny tak, aby frontend dostal zaroven
                     # surovy radar, clustery, vysledne objekty i diagnostiku.
