@@ -94,7 +94,7 @@ BLE_CONFIGS = [
         "baud": env_int("FOUR_BLE_1_BAUD", 115200),
         "pos_x": env_float("FOUR_BLE_1_POS_X", 1.5),
         "pos_y": env_float("FOUR_BLE_1_POS_Y", 0.0),
-        "pos_z": env_float("FOUR_BLE_1_POS_Z", 0.8),
+        "pos_z": env_float("FOUR_BLE_1_POS_Z", 1.0),
         "rotation": env_float("FOUR_BLE_1_ROTATION", 90),
     },
     {
@@ -103,7 +103,7 @@ BLE_CONFIGS = [
         "baud": env_int("FOUR_BLE_2_BAUD", 115200),
         "pos_x": env_float("FOUR_BLE_2_POS_X", 0.0),
         "pos_y": env_float("FOUR_BLE_2_POS_Y", 1.5),
-        "pos_z": env_float("FOUR_BLE_2_POS_Z", 0.8),
+        "pos_z": env_float("FOUR_BLE_2_POS_Z", 1.0),
         "rotation": env_float("FOUR_BLE_2_ROTATION", 0),
     },
 ]
@@ -115,7 +115,7 @@ RADAR_CONFIGS = [
         "dat_port": os.getenv("FOUR_RADAR_1_DAT_PORT", platform_default("COM14", "/dev/ttyACM1")),
         "pos_x": env_float("FOUR_RADAR_1_POS_X", 1.5),
         "pos_y": env_float("FOUR_RADAR_1_POS_Y", 0.0),
-        "pos_z": env_float("FOUR_RADAR_1_POS_Z", 0.8),
+        "pos_z": env_float("FOUR_RADAR_1_POS_Z", 1.0),
         "rotation": env_float("FOUR_RADAR_1_ROTATION", 0),
     },
     {
@@ -124,7 +124,7 @@ RADAR_CONFIGS = [
         "dat_port": os.getenv("FOUR_RADAR_2_DAT_PORT", platform_default("COM12", "/dev/ttyACM99")),
         "pos_x": env_float("FOUR_RADAR_2_POS_X", 0.0),
         "pos_y": env_float("FOUR_RADAR_2_POS_Y", 1.5),
-        "pos_z": env_float("FOUR_RADAR_2_POS_Z", 0.8),
+        "pos_z": env_float("FOUR_RADAR_2_POS_Z", 1.0),
         "rotation": env_float("FOUR_RADAR_2_ROTATION", -90),
     },
 ]
