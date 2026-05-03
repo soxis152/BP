@@ -12,7 +12,6 @@ import asyncio
 import base64
 from datetime import datetime
 import json
-import math
 import re
 import threading
 import time
@@ -29,6 +28,12 @@ try:
         DIAGNOSTIC_CAPTURE_DIR,
         ENABLED_SENSORS,
         INGEST_ENABLE_DB,
+        INGEST_GATE_X_MAX,
+        INGEST_GATE_X_MIN,
+        INGEST_GATE_Y_MAX,
+        INGEST_GATE_Y_MIN,
+        INGEST_GATE_Z_MAX,
+        INGEST_GATE_Z_MIN,
         MQTT_HOST,
         MQTT_PORT,
         RADAR_CFG_BAUD,
@@ -47,6 +52,12 @@ except ImportError:
         DIAGNOSTIC_CAPTURE_DIR,
         ENABLED_SENSORS,
         INGEST_ENABLE_DB,
+        INGEST_GATE_X_MAX,
+        INGEST_GATE_X_MIN,
+        INGEST_GATE_Y_MAX,
+        INGEST_GATE_Y_MIN,
+        INGEST_GATE_Z_MAX,
+        INGEST_GATE_Z_MIN,
         MQTT_HOST,
         MQTT_PORT,
         RADAR_CFG_BAUD,
@@ -64,15 +75,6 @@ db_queue = Queue()
 AZIMUTH_PATTERN = re.compile(
     r'\+UUDF:([0-9A-Fa-f]{12}),(-?\d+),(-?\d+),(-?\d+),(\d+),(\d+),"([0-9A-Fa-f]{12})","",(\d+),(\d+)'
 )
-
-# Lehky gate pred publikaci do MQTT. Cilem je zahodit zjevne odrazy mimo
-# sledovanou 3x3m oblast, ne delat finalni filtraci objektu.
-INGEST_GATE_X_MIN = -0.5
-INGEST_GATE_X_MAX = 3.5
-INGEST_GATE_Y_MIN = -0.5
-INGEST_GATE_Y_MAX = 3.5
-INGEST_GATE_Z_MIN = 0.0
-INGEST_GATE_Z_MAX = 2.5
 
 RADAR_CONFIG_COMMAND_DELAY_SECONDS = 0.12
 RADAR_CONFIG_CONTROL_DELAY_SECONDS = 0.50

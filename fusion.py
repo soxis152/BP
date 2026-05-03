@@ -24,12 +24,42 @@ import time
 import aiomqtt
 
 try:
-    from config import BLE_CONFIGS, DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST
+    from config import (
+        BLE_CONFIGS,
+        DB_BATCH_SIZE,
+        DB_FLUSH_SECONDS,
+        MAP_VIEW_X_MAX,
+        MAP_VIEW_X_MIN,
+        MAP_VIEW_Y_MAX,
+        MAP_VIEW_Y_MIN,
+        MQTT_HOST,
+        TEST_AREA_X_MAX,
+        TEST_AREA_X_MIN,
+        TEST_AREA_Y_MAX,
+        TEST_AREA_Y_MIN,
+        TEST_AREA_Z_MAX,
+        TEST_AREA_Z_MIN,
+    )
     from db_handler import AsyncDBHandler
     from kalman_filter import KalmanObject
     from run_context import get_current_run_id
 except ImportError:
-    from .config import BLE_CONFIGS, DB_BATCH_SIZE, DB_FLUSH_SECONDS, MQTT_HOST
+    from .config import (
+        BLE_CONFIGS,
+        DB_BATCH_SIZE,
+        DB_FLUSH_SECONDS,
+        MAP_VIEW_X_MAX,
+        MAP_VIEW_X_MIN,
+        MAP_VIEW_Y_MAX,
+        MAP_VIEW_Y_MIN,
+        MQTT_HOST,
+        TEST_AREA_X_MAX,
+        TEST_AREA_X_MIN,
+        TEST_AREA_Y_MAX,
+        TEST_AREA_Y_MIN,
+        TEST_AREA_Z_MAX,
+        TEST_AREA_Z_MIN,
+    )
     from .db_handler import AsyncDBHandler
     from .kalman_filter import KalmanObject
     from .run_context import get_current_run_id
@@ -59,9 +89,15 @@ RADAR_CLUSTER_CONFIDENCE_MIN = 0.45
 RADAR_CLUSTER_CONFIDENCE_MAX = 0.85
 MAX_BAD_MESSAGE_LOGS = 20
 MAX_PAYLOAD_PREVIEW_CHARS = 240
-ROOM_DEBUG_BOUNDS_MIN = -0.5
-ROOM_DEBUG_BOUNDS_MAX = 3.5
-BLE_DEBUG_FALLBACK_RAY_LENGTH = 3.5
+BLE_DEBUG_BOUNDS_MIN = (MAP_VIEW_X_MIN, MAP_VIEW_Y_MIN, TEST_AREA_Z_MIN)
+BLE_DEBUG_BOUNDS_MAX = (MAP_VIEW_X_MAX, MAP_VIEW_Y_MAX, max(TEST_AREA_Z_MAX, 3.0))
+TRIANGULATION_BOUNDS_MIN = (TEST_AREA_X_MIN, TEST_AREA_Y_MIN, TEST_AREA_Z_MIN)
+TRIANGULATION_BOUNDS_MAX = (TEST_AREA_X_MAX, TEST_AREA_Y_MAX, TEST_AREA_Z_MAX)
+BLE_DEBUG_FALLBACK_RAY_LENGTH = math.sqrt(
+    ((MAP_VIEW_X_MAX - MAP_VIEW_X_MIN) ** 2)
+    + ((MAP_VIEW_Y_MAX - MAP_VIEW_Y_MIN) ** 2)
+    + ((BLE_DEBUG_BOUNDS_MAX[2] - BLE_DEBUG_BOUNDS_MIN[2]) ** 2)
+)
 KALMAN_TRACKABLE_SOURCES = {"radar_ble", "radar_ble_coasting", "ble_only", "radar_cluster"}
 KALMAN_PROCESS_NOISE = 0.035
 KALMAN_CLUSTER_PROCESS_NOISE = 0.10
@@ -415,7 +451,7 @@ def ble_direction_vector(sensor, measurement):
     return tuple(component / length for component in vector)
 
 
-def ray_box_exit_distance(origin, direction, bounds_min=ROOM_DEBUG_BOUNDS_MIN, bounds_max=ROOM_DEBUG_BOUNDS_MAX):
+def ray_box_exit_distance(origin, direction, bounds_min=BLE_DEBUG_BOUNDS_MIN, bounds_max=BLE_DEBUG_BOUNDS_MAX):
     """Vrati vzdalenost k prvnimu pruseciku paprsku s hranou debug boxu."""
     best_t = None
 
@@ -424,13 +460,13 @@ def ray_box_exit_distance(origin, direction, bounds_min=ROOM_DEBUG_BOUNDS_MIN, b
         if abs(component) < 1e-6:
             continue
 
-        boundary = bounds_max if component > 0 else bounds_min
+        boundary = bounds_max[axis] if component > 0 else bounds_min[axis]
         t = (boundary - origin[axis]) / component
         if t <= 0:
             continue
 
         hit = add(origin, scale(direction, t))
-        if all(bounds_min - 1e-6 <= hit[i] <= bounds_max + 1e-6 for i in range(3)):
+        if all(bounds_min[i] - 1e-6 <= hit[i] <= bounds_max[i] + 1e-6 for i in range(3)):
             if best_t is None or t < best_t:
                 best_t = t
 
@@ -519,9 +555,9 @@ def triangulate_3d(tag_id):
     x, y, z = midpoint
 
     if (
-        ROOM_DEBUG_BOUNDS_MIN <= x <= ROOM_DEBUG_BOUNDS_MAX
-        and ROOM_DEBUG_BOUNDS_MIN <= y <= ROOM_DEBUG_BOUNDS_MAX
-        and ROOM_DEBUG_BOUNDS_MIN <= z <= ROOM_DEBUG_BOUNDS_MAX
+        TRIANGULATION_BOUNDS_MIN[0] <= x <= TRIANGULATION_BOUNDS_MAX[0]
+        and TRIANGULATION_BOUNDS_MIN[1] <= y <= TRIANGULATION_BOUNDS_MAX[1]
+        and TRIANGULATION_BOUNDS_MIN[2] <= z <= TRIANGULATION_BOUNDS_MAX[2]
     ):
         return {"x": x, "y": y, "z": z}
     return None

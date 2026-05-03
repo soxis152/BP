@@ -206,7 +206,7 @@
     <!-- Horni panel drzi stav spojeni a kratky popis aktualniho pohledu. -->
     <div class="header-panel">
         <div class="title-wrap">
-            <h1>Senzorová fúze 3x3m</h1>
+            <h1>Senzorová fúze 4x6m</h1>
             <p>Přehled tras a zdrojů: radar vs. radar+BLE vs. BLE-only</p>
         </div>
         <div class="status-wrap">STATUS: <span id="status" class="status disconnected">OFFLINE</span></div>
@@ -277,6 +277,7 @@
         <div id="tiles-container" class="tiles-container"></div>
     </div>
 
+    <script id="four-dashboard-config" type="application/json">__FOUR_DASHBOARD_VIEW_CONFIG__</script>
     <script>
         /*
             Frontend nepocita fuzni logiku. Jen prijme snapshot z backendu,
@@ -290,7 +291,6 @@
             radar_ble_coasting: '#f97316',
             ble_only: '#eab308'
         };
-        const SENSOR_NODES = [ { id: "S1", x: 1.5, y: 0.0, z: 0.8 }, { id: "S2", x: 0.0, y: 1.5, z: 0.8 } ];
 
         // latest* je posledni surovy stav z backendu, displayState je vyhlazeny
         // stav pouzivany jen pro kresleni. Tim oddeluju realna data od animace.
@@ -348,8 +348,44 @@
         mountToolbar();
         mountDiagnosticsPanel();
 
-        const PIXELS_PER_METER = 180;
-        const OFFSET = 30;
+        const dashboardConfig = JSON.parse(
+            document.getElementById('four-dashboard-config')?.textContent ?? '{}'
+        );
+        const SENSOR_NODES = dashboardConfig.sensor_nodes ?? [
+            { id: "S1", x: 2.0, y: 0.0, z: 1.0 },
+            { id: "S2", x: 0.0, y: 3.0, z: 1.0 }
+        ];
+        const CANVAS_SIZE = dashboardConfig.canvas_size ?? 600;
+        const OFFSET = dashboardConfig.offset ?? 30;
+        const MAP_X_MIN = dashboardConfig.map_x_min ?? -1;
+        const MAP_X_MAX = dashboardConfig.map_x_max ?? 5;
+        const MAP_Y_MIN = dashboardConfig.map_y_min ?? 0;
+        const MAP_Y_MAX = dashboardConfig.map_y_max ?? 6;
+        const TEST_AREA_X_MIN = dashboardConfig.test_area_x_min ?? 0;
+        const TEST_AREA_X_MAX = dashboardConfig.test_area_x_max ?? 4;
+        const TEST_AREA_Y_MIN = dashboardConfig.test_area_y_min ?? 0;
+        const TEST_AREA_Y_MAX = dashboardConfig.test_area_y_max ?? 6;
+        const MAP_WIDTH_METERS = MAP_X_MAX - MAP_X_MIN;
+        const MAP_HEIGHT_METERS = MAP_Y_MAX - MAP_Y_MIN;
+        const TEST_AREA_WIDTH_METERS = TEST_AREA_X_MAX - TEST_AREA_X_MIN;
+        const TEST_AREA_HEIGHT_METERS = TEST_AREA_Y_MAX - TEST_AREA_Y_MIN;
+        const PIXELS_PER_METER = Math.min(
+            (CANVAS_SIZE - (2 * OFFSET)) / MAP_WIDTH_METERS,
+            (CANVAS_SIZE - (2 * OFFSET)) / MAP_HEIGHT_METERS
+        );
+
+        const dashboardTitle = document.querySelector('.title-wrap h1');
+        if (dashboardTitle) {
+            dashboardTitle.textContent = `Senzorová fúze ${TEST_AREA_WIDTH_METERS}x${TEST_AREA_HEIGHT_METERS}m`;
+        }
+
+        function mapXToCanvas(x) {
+            return OFFSET + ((x - MAP_X_MIN) * PIXELS_PER_METER);
+        }
+
+        function mapYToCanvas(y) {
+            return CANVAS_SIZE - OFFSET - ((y - MAP_Y_MIN) * PIXELS_PER_METER);
+        }
 
         function switchView(mode) {
             currentMode = mode;
@@ -617,35 +653,57 @@
         }
 
         function drawMap2D() {
-            ctx.clearRect(0, 0, 600, 600);
+            ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
             const axisXColor = '#2563eb';
             const axisYColor = '#dc2626';
 
-            ctx.lineWidth = 1; ctx.strokeStyle = '#cbd5e1';
-            for (let i = 0; i <= 3; i++) {
-                const p = OFFSET + (i * PIXELS_PER_METER);
-                ctx.beginPath(); ctx.moveTo(p, 600 - OFFSET); ctx.lineTo(p, 600 - OFFSET - 3 * PIXELS_PER_METER); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(OFFSET, 600 - p); ctx.lineTo(OFFSET + 3 * PIXELS_PER_METER, 600 - p); ctx.stroke();
+            const mapLeft = mapXToCanvas(MAP_X_MIN);
+            const mapRight = mapXToCanvas(MAP_X_MAX);
+            const mapBottom = mapYToCanvas(MAP_Y_MIN);
+            const mapTop = mapYToCanvas(MAP_Y_MAX);
+            const testLeft = mapXToCanvas(TEST_AREA_X_MIN);
+            const testRight = mapXToCanvas(TEST_AREA_X_MAX);
+            const testBottom = mapYToCanvas(TEST_AREA_Y_MIN);
+            const testTop = mapYToCanvas(TEST_AREA_Y_MAX);
+
+            ctx.fillStyle = 'rgba(148, 163, 184, 0.22)';
+            ctx.fillRect(testLeft, testTop, testRight - testLeft, testBottom - testTop);
+
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = '#cbd5e1';
+            for (let x = MAP_X_MIN; x <= MAP_X_MAX; x++) {
+                const p = mapXToCanvas(x);
+                ctx.beginPath(); ctx.moveTo(p, mapBottom); ctx.lineTo(p, mapTop); ctx.stroke();
                 ctx.font = 'bold 12px Arial';
-                ctx.fillStyle = axisXColor; ctx.fillText(`${i}m`, p - 8, 600 - 10);
-                ctx.fillStyle = axisYColor; ctx.fillText(`${i}m`, 5, 600 - p + 4);
+                ctx.fillStyle = axisXColor; ctx.fillText(`${x}`, p - 8, CANVAS_SIZE - 10);
+            }
+            for (let y = MAP_Y_MIN; y <= MAP_Y_MAX; y++) {
+                const p = mapYToCanvas(y);
+                ctx.beginPath(); ctx.moveTo(mapLeft, p); ctx.lineTo(mapRight, p); ctx.stroke();
+                ctx.font = 'bold 12px Arial';
+                ctx.fillStyle = axisYColor; ctx.fillText(`${y}`, 8, p + 4);
             }
 
             ctx.lineWidth = 3;
             ctx.strokeStyle = axisXColor;
-            ctx.beginPath(); ctx.moveTo(OFFSET, 600 - OFFSET); ctx.lineTo(600 - OFFSET + 8, 600 - OFFSET); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(mapLeft, mapYToCanvas(0)); ctx.lineTo(mapRight + 8, mapYToCanvas(0)); ctx.stroke();
             ctx.strokeStyle = axisYColor;
-            ctx.beginPath(); ctx.moveTo(OFFSET, 600 - OFFSET); ctx.lineTo(OFFSET, OFFSET - 8); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(mapXToCanvas(0), mapBottom); ctx.lineTo(mapXToCanvas(0), mapTop - 8); ctx.stroke();
 
             ctx.font = 'bold 15px Arial';
-            ctx.fillStyle = axisXColor; ctx.fillText('X', 600 - OFFSET + 12, 600 - OFFSET + 5);
-            ctx.fillStyle = axisYColor; ctx.fillText('Y', OFFSET - 5, OFFSET - 14);
+            ctx.fillStyle = axisXColor; ctx.fillText('X', mapRight + 12, mapYToCanvas(0) + 5);
+            ctx.fillStyle = axisYColor; ctx.fillText('Y', mapXToCanvas(0) - 5, mapTop - 14);
 
-            ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1; ctx.strokeRect(OFFSET, OFFSET, 3 * PIXELS_PER_METER, 3 * PIXELS_PER_METER);
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(testLeft, testTop, testRight - testLeft, testBottom - testTop);
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(mapLeft, mapTop, mapRight - mapLeft, mapBottom - mapTop);
 
             SENSOR_NODES.forEach(s => {
-                const px = OFFSET + (s.x * PIXELS_PER_METER);
-                const py = (600 - OFFSET) - (s.y * PIXELS_PER_METER);
+                const px = mapXToCanvas(s.x);
+                const py = mapYToCanvas(s.y);
                 ctx.fillStyle = '#1e293b'; ctx.fillRect(px - 10, py - 10, 20, 20);
                 ctx.fillStyle = 'white'; ctx.font = 'bold 10px Arial'; ctx.fillText(s.id, px - 6, py + 4);
             });
@@ -658,7 +716,7 @@
 
             objects.forEach(obj => {
                 const x = safeNum(obj.x); const y = safeNum(obj.y);
-                const px = OFFSET + (x * PIXELS_PER_METER); const py = (600 - OFFSET) - (y * PIXELS_PER_METER);
+                const px = mapXToCanvas(x); const py = mapYToCanvas(y);
                 const source = getSourceCategory(obj); const color = getSourceColor(obj);
                 const rawRadar = isRadarRaw(obj);
                 const bleRay = isBleRay(obj);
@@ -666,8 +724,8 @@
                 const radius = rawRadar ? 8 : (bleRay ? 10 : (isCluster ? 17 : (source === 'ble_only' ? 15 : 11)));
 
                 if (bleRay) {
-                    const sensorPx = OFFSET + (safeNum(obj.sensor_x) * PIXELS_PER_METER);
-                    const sensorPy = (600 - OFFSET) - (safeNum(obj.sensor_y) * PIXELS_PER_METER);
+                    const sensorPx = mapXToCanvas(safeNum(obj.sensor_x));
+                    const sensorPy = mapYToCanvas(safeNum(obj.sensor_y));
                     ctx.globalAlpha = 0.9;
                     ctx.beginPath();
                     ctx.moveTo(sensorPx, sensorPy);
@@ -709,21 +767,34 @@
             });
         }
 
-        // 3D scena kopiruje stejnou 3x3m mapu jako 2D canvas. Osy jsou
+        // 3D scena kopiruje stejnou 6x6m mapu jako 2D canvas. Osy jsou
         // prevedene do Three.js souradnic pres helper `toScenePosition`.
         const scene = new THREE.Scene(); scene.background = new THREE.Color(0xf8fafc);
-        const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100); camera.position.set(3.9, 5.25, 4.2);
-        const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(600, 600);
+        const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100); camera.position.set(6.8, 7.1, 5.6);
+        const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(CANVAS_SIZE, CANVAS_SIZE);
         renderer.setPixelRatio(window.devicePixelRatio || 1); renderer.outputEncoding = THREE.sRGBEncoding;
         renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
         document.getElementById('view3d').appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.target.set(1.5, 1.0, -1.5); controls.enableDamping = true; controls.dampingFactor = 0.08;
-        controls.maxPolarAngle = Math.PI * 0.49; controls.minDistance = 2.2; controls.maxDistance = 8.5;
+        controls.target.set(2.0, 1.0, -3.0); controls.enableDamping = true; controls.dampingFactor = 0.08;
+        controls.maxPolarAngle = Math.PI * 0.49; controls.minDistance = 4.0; controls.maxDistance = 14.0;
 
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.95, metalness: 0.0 }));
-        floor.rotation.x = -Math.PI / 2; floor.position.set(1.5, 0, -1.5); scene.add(floor);
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(MAP_WIDTH_METERS, MAP_HEIGHT_METERS),
+            new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.95, metalness: 0.0 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.set((MAP_X_MIN + MAP_X_MAX) / 2, 0, -((MAP_Y_MIN + MAP_Y_MAX) / 2));
+        scene.add(floor);
+
+        const testAreaFloor = new THREE.Mesh(
+            new THREE.PlaneGeometry(TEST_AREA_WIDTH_METERS, TEST_AREA_HEIGHT_METERS),
+            new THREE.MeshStandardMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.20, roughness: 1.0, metalness: 0.0 })
+        );
+        testAreaFloor.rotation.x = -Math.PI / 2;
+        testAreaFloor.position.set((TEST_AREA_X_MIN + TEST_AREA_X_MAX) / 2, 0.002, -((TEST_AREA_Y_MIN + TEST_AREA_Y_MAX) / 2));
+        scene.add(testAreaFloor);
 
         function toScenePosition(x, y, z = 0) {
             return new THREE.Vector3(x, z, -y);
@@ -771,12 +842,12 @@
             const boxColor = 0x94a3b8;
 
             const bottom = [
-                toScenePosition(0, 0, 0), toScenePosition(3, 0, 0),
-                toScenePosition(3, 3, 0), toScenePosition(0, 3, 0)
+                toScenePosition(MAP_X_MIN, MAP_Y_MIN, 0), toScenePosition(MAP_X_MAX, MAP_Y_MIN, 0),
+                toScenePosition(MAP_X_MAX, MAP_Y_MAX, 0), toScenePosition(MAP_X_MIN, MAP_Y_MAX, 0)
             ];
             const top = [
-                toScenePosition(0, 0, 3), toScenePosition(3, 0, 3),
-                toScenePosition(3, 3, 3), toScenePosition(0, 3, 3)
+                toScenePosition(MAP_X_MIN, MAP_Y_MIN, 3), toScenePosition(MAP_X_MAX, MAP_Y_MIN, 3),
+                toScenePosition(MAP_X_MAX, MAP_Y_MAX, 3), toScenePosition(MAP_X_MIN, MAP_Y_MAX, 3)
             ];
             for (let i = 0; i < 4; i++) {
                 addLine(bottom[i], bottom[(i + 1) % 4], boxColor, 0.45);
@@ -784,18 +855,22 @@
                 addLine(bottom[i], top[i], boxColor, 0.28);
             }
 
-            addLine(toScenePosition(0, 0, 0.025), toScenePosition(3.25, 0, 0.025), xColor, 1);
-            addLine(toScenePosition(0, 0, 0.025), toScenePosition(0, 3.25, 0.025), yColor, 1);
+            addLine(toScenePosition(MAP_X_MIN, 0, 0.025), toScenePosition(MAP_X_MAX + 0.25, 0, 0.025), xColor, 1);
+            addLine(toScenePosition(0, MAP_Y_MIN, 0.025), toScenePosition(0, MAP_Y_MAX + 0.25, 0.025), yColor, 1);
             addLine(toScenePosition(0, 0, 0), toScenePosition(0, 0, 3.25), zColor, 1);
 
-            addTextLabel('X', toScenePosition(3.38, 0, 0.12), '#2563eb', 0.22);
-            addTextLabel('Y', toScenePosition(0, 3.38, 0.12), '#dc2626', 0.22);
+            addTextLabel('X', toScenePosition(MAP_X_MAX + 0.38, 0, 0.12), '#2563eb', 0.22);
+            addTextLabel('Y', toScenePosition(0, MAP_Y_MAX + 0.38, 0.12), '#dc2626', 0.22);
             addTextLabel('Z', toScenePosition(0, 0, 3.38), '#16a34a', 0.22);
 
-            for (let i = 0; i <= 3; i++) {
-                addTextLabel(`${i}m`, toScenePosition(i, -0.18, 0.04), '#1e3a8a', 0.13);
-                addTextLabel(`${i}m`, toScenePosition(-0.18, i, 0.04), '#7f1d1d', 0.13);
-                addTextLabel(`${i}m`, toScenePosition(-0.18, 0, i), '#14532d', 0.13);
+            for (let x = MAP_X_MIN; x <= MAP_X_MAX; x++) {
+                addTextLabel(`${x}`, toScenePosition(x, -0.18, 0.04), '#1e3a8a', 0.13);
+            }
+            for (let y = MAP_Y_MIN; y <= MAP_Y_MAX; y++) {
+                addTextLabel(`${y}`, toScenePosition(-0.18, y, 0.04), '#7f1d1d', 0.13);
+            }
+            for (let z = 0; z <= 3; z++) {
+                addTextLabel(`${z}`, toScenePosition(-0.18, 0, z), '#14532d', 0.13);
             }
 
             SENSOR_NODES.forEach(sensor => {
@@ -823,10 +898,16 @@
         }
 
         const roomOutline = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(0, 0.01, 0), new THREE.Vector3(3, 0.01, 0), new THREE.Vector3(3, 0.01, -3), new THREE.Vector3(0, 0.01, -3), new THREE.Vector3(0, 0.01, 0)
+            toScenePosition(MAP_X_MIN, MAP_Y_MIN, 0.01),
+            toScenePosition(MAP_X_MAX, MAP_Y_MIN, 0.01),
+            toScenePosition(MAP_X_MAX, MAP_Y_MAX, 0.01),
+            toScenePosition(MAP_X_MIN, MAP_Y_MAX, 0.01),
+            toScenePosition(MAP_X_MIN, MAP_Y_MIN, 0.01)
         ]);
         scene.add(new THREE.Line(roomOutline, new THREE.LineBasicMaterial({ color: 0x334155 })));
-        const grid = new THREE.GridHelper(3, 12, 0x94a3b8, 0xdbe5ee); grid.position.set(1.5, 0.001, -1.5); scene.add(grid);
+        const grid = new THREE.GridHelper(MAP_WIDTH_METERS, MAP_WIDTH_METERS * 4, 0x94a3b8, 0xdbe5ee);
+        grid.position.set((MAP_X_MIN + MAP_X_MAX) / 2, 0.001, -((MAP_Y_MIN + MAP_Y_MAX) / 2));
+        scene.add(grid);
         scene.add(new THREE.HemisphereLight(0xffffff, 0xe2e8f0, 0.72));
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.65); dirLight.position.set(4.2, 8, 3.1); scene.add(dirLight);
 

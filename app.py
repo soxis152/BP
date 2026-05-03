@@ -12,6 +12,7 @@ JSON format zpravy.
 """
 
 import asyncio
+import json
 import sys
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -22,9 +23,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
 try:
-    from config import DB_CONFIG, MQTT_HOST
+    from config import DASHBOARD_VIEW_CONFIG, DB_CONFIG, MQTT_HOST
 except ImportError:
-    from .config import DB_CONFIG, MQTT_HOST
+    from .config import DASHBOARD_VIEW_CONFIG, DB_CONFIG, MQTT_HOST
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -71,6 +72,15 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+def render_index_html(index_path: Path) -> str:
+    """Nacte dashboard HTML a doplni runtime konfiguraci z Pythonu."""
+    html = index_path.read_text(encoding="utf-8")
+    return html.replace(
+        "__FOUR_DASHBOARD_VIEW_CONFIG__",
+        json.dumps(DASHBOARD_VIEW_CONFIG, ensure_ascii=False),
+    )
+
+
 async def mqtt_listener():
     """Posloucha fused MQTT zpravy a rozesila je pripojenym dashboardum."""
     while True:
@@ -105,7 +115,7 @@ async def get():
         return HTMLResponse("<h1>Error: missing index.html</h1>")
 
     return HTMLResponse(
-        index_path.read_text(encoding="utf-8"),
+        render_index_html(index_path),
         headers={"Cache-Control": "no-store, max-age=0"},
     )
 
