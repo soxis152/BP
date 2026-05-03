@@ -12,6 +12,7 @@ import asyncio
 import base64
 from datetime import datetime
 import json
+import math
 import re
 import threading
 import time
@@ -36,6 +37,7 @@ try:
         INGEST_GATE_Z_MIN,
         MQTT_HOST,
         MQTT_PORT,
+        RADAR_BOOTSTRAP_CONFIG_FILE,
         RADAR_CFG_BAUD,
         RADAR_CONFIG_FILE,
         RADAR_CONFIGS,
@@ -60,6 +62,7 @@ except ImportError:
         INGEST_GATE_Z_MIN,
         MQTT_HOST,
         MQTT_PORT,
+        RADAR_BOOTSTRAP_CONFIG_FILE,
         RADAR_CFG_BAUD,
         RADAR_CONFIG_FILE,
         RADAR_CONFIGS,
@@ -95,7 +98,12 @@ def get_diagnostic_run_dir():
     with diagnostic_init_lock:
         if current_run_id not in diagnostic_run_dirs:
             run_dir = DIAGNOSTIC_CAPTURE_DIR / current_run_id
-            run_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                run_dir.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                print(f"Diagnostic capture disabled: cannot create '{run_dir}': {exc}")
+                diagnostic_run_dirs[current_run_id] = None
+                return None
             metadata_path = run_dir / "metadata.json"
             metadata = {
                 "run_id": current_run_id,
@@ -104,7 +112,12 @@ def get_diagnostic_run_dir():
                 "ble_ids": [cfg["id"] for cfg in BLE_CONFIGS],
                 "radar_ids": [cfg["id"] for cfg in RADAR_CONFIGS],
             }
-            metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+            try:
+                metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+            except OSError as exc:
+                print(f"Diagnostic capture disabled: cannot write '{metadata_path}': {exc}")
+                diagnostic_run_dirs[current_run_id] = None
+                return None
             diagnostic_run_dirs[current_run_id] = run_dir
         return diagnostic_run_dirs[current_run_id]
 
@@ -118,9 +131,10 @@ class DiagnosticCapture:
         self.handle = None
         self.write_count = 0
         self.active_run_id = None
+        self.disabled = False
 
     def write_record(self, record):
-        if not CAPTURE_RAW_SERIAL:
+        if not CAPTURE_RAW_SERIAL or self.disabled:
             return
 
         current_run_id = get_current_run_id()
@@ -128,15 +142,26 @@ class DiagnosticCapture:
             self.close()
             run_dir = get_diagnostic_run_dir()
             if run_dir is None:
+                self.disabled = True
                 return
             path = run_dir / f"{self.sensor_id}_{self.file_suffix}.ndjson"
-            self.handle = path.open("a", encoding="utf-8")
+            try:
+                self.handle = path.open("a", encoding="utf-8")
+            except OSError as exc:
+                print(f"Diagnostic capture disabled for {self.sensor_id}: cannot open '{path}': {exc}")
+                self.disabled = True
+                return
             self.active_run_id = current_run_id
 
-        self.handle.write(json.dumps(record, ensure_ascii=False) + "\n")
-        self.write_count += 1
-        if self.write_count % DIAGNOSTIC_FLUSH_EVERY == 0:
-            self.handle.flush()
+        try:
+            self.handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+            self.write_count += 1
+            if self.write_count % DIAGNOSTIC_FLUSH_EVERY == 0:
+                self.handle.flush()
+        except OSError as exc:
+            print(f"Diagnostic capture disabled for {self.sensor_id}: write failed: {exc}")
+            self.disabled = True
+            self.close()
 
     def close(self):
         if self.handle:
@@ -146,9 +171,9 @@ class DiagnosticCapture:
         self.active_run_id = None
 
 
-def load_radar_config_commands():
+def load_radar_config_commands(config_path):
     """Nacte radar cfg, odstrani komentare a doplni spravny configDataPort."""
-    with open(RADAR_CONFIG_FILE, "r", encoding="utf-8", errors="ignore") as file_handle:
+    with open(config_path, "r", encoding="utf-8", errors="ignore") as file_handle:
         commands = []
         for line in file_handle:
             command = line.strip()
@@ -156,10 +181,20 @@ def load_radar_config_commands():
                 continue
             commands.append(command)
 
+    insert_index = None
     for index, command in enumerate(commands):
-        if command == "sensorStart":
-            commands.insert(index, RADAR_CONFIG_DATA_PORT_COMMAND)
+        if command.startswith("calibData "):
+            insert_index = index
             break
+
+    if insert_index is None:
+        for index, command in enumerate(commands):
+            if command == "sensorStart":
+                insert_index = index
+                break
+
+    if insert_index is not None:
+        commands.insert(insert_index, RADAR_CONFIG_DATA_PORT_COMMAND)
     else:
         commands.append(RADAR_CONFIG_DATA_PORT_COMMAND)
 
@@ -185,10 +220,44 @@ def read_radar_command_response(ser):
             continue
 
         response.append(line)
-        if "Done" in line or "Error" in line:
+        if "Done" in line or "Error" in line or "mmwDemo:/>" in line:
             break
 
     return response
+
+
+def sync_radar_cli(ser):
+    """Vycte pripadne stare bajty a dostane CLI do promptu pred konfiguraci."""
+    ser.reset_input_buffer()
+    ser.reset_output_buffer()
+    ser.write(b"\n")
+    ser.flush()
+    time.sleep(RADAR_CONFIG_CONTROL_DELAY_SECONDS)
+    read_radar_command_response(ser)
+
+
+def send_radar_config_file(serial_handle, config_path):
+    """Posle jeden konkretni radarovy profil do jiz otevreneho CLI portu."""
+    commands = load_radar_config_commands(config_path)
+    for cmd in commands:
+        serial_handle.reset_input_buffer()
+        serial_handle.write((cmd + "\n").encode())
+        serial_handle.flush()
+        delay = (
+            RADAR_CONFIG_CONTROL_DELAY_SECONDS
+            if cmd in {"sensorStop", "flushCfg", "sensorStart"}
+            else RADAR_CONFIG_COMMAND_DELAY_SECONDS
+        )
+        time.sleep(delay)
+
+        response = read_radar_command_response(serial_handle)
+        has_done = any("Done" in line for line in response)
+        has_prompt = any("mmwDemo:/>" in line for line in response)
+        has_error = any("Error" in line or "not recognized as a CLI command" in line for line in response)
+        if not has_done and (has_error or not has_prompt):
+            raise RuntimeError(
+                f"Prikaz '{cmd}' nebyl potvrzen. Odpoved radaru: {response}"
+            )
 
 
 def send_radar_config(cfg):
@@ -196,25 +265,23 @@ def send_radar_config(cfg):
     try:
         print(f"Radar {cfg['id']}: Posilam konfiguraci na {cfg['cfg_port']}...")
         with serial.Serial(cfg["cfg_port"], RADAR_CFG_BAUD, timeout=1) as ser:
-            ser.reset_input_buffer()
-            ser.reset_output_buffer()
-            commands = load_radar_config_commands()
-            for cmd in commands:
-                ser.reset_input_buffer()
-                ser.write((cmd + "\n").encode())
-                ser.flush()
-                delay = (
-                    RADAR_CONFIG_CONTROL_DELAY_SECONDS
-                    if cmd in {"sensorStop", "flushCfg", "sensorStart"}
-                    else RADAR_CONFIG_COMMAND_DELAY_SECONDS
-                )
-                time.sleep(delay)
+            sync_radar_cli(ser)
+            try:
+                send_radar_config_file(ser, RADAR_CONFIG_FILE)
+            except Exception as primary_exc:
+                bootstrap_path = str(RADAR_BOOTSTRAP_CONFIG_FILE)
+                target_path = str(RADAR_CONFIG_FILE)
+                if not bootstrap_path or bootstrap_path == target_path:
+                    raise primary_exc
 
-                response = read_radar_command_response(ser)
-                if not any("Done" in line for line in response):
-                    raise RuntimeError(
-                        f"Prikaz '{cmd}' nebyl potvrzen. Odpoved radaru: {response}"
-                    )
+                print(
+                    f"Radar {cfg['id']}: Primarni profil selhal, zkousim bootstrap "
+                    f"'{RADAR_BOOTSTRAP_CONFIG_FILE.name}' a potom znovu '{RADAR_CONFIG_FILE.name}'."
+                )
+                sync_radar_cli(ser)
+                send_radar_config_file(ser, RADAR_BOOTSTRAP_CONFIG_FILE)
+                sync_radar_cli(ser)
+                send_radar_config_file(ser, RADAR_CONFIG_FILE)
             print(f"Radar {cfg['id']}: Konfigurace uspesne odeslana.")
             return True
     except Exception as exc:

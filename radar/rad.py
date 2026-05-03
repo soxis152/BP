@@ -21,7 +21,7 @@ from radar_interface import RadarInterface
 from radar_ui import RadarUI
 
 
-RADAR_CONFIG = r"C:\Users\kabup\OneDrive\Plocha\BP_\KÓD\BLE + RADAR\radar\tdm\AWR294X_profile_2025_11_07T16_27_59_226 copy2.cfg"
+RADAR_CONFIG = r"C:\Users\kabup\OneDrive\Plocha\BP_\KÓD\Four\radar\tdm\AWR294X_profile_room_balanced.cfg"
 
 BAUD_RATE_CON = 115200
 BAUD_RATE_DAT = 921600

@@ -6,7 +6,7 @@ otevření portu, načtení dat a předání bufferu parseru. Díky tomu nemusí
 """
 
 import serial
-from .parser_mmw_demo import parser_one_mmw_demo_output_packet
+from parser_mmw_demo import parser_one_mmw_demo_output_packet
 
 
 class RadarInterface:
