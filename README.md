@@ -103,7 +103,9 @@ $env:FOUR_EXPERIMENT_LABEL = "laborator_03"
 $env:FOUR_CAPTURE_RAW_SERIAL = "1"
 ```
 
-Senzory a jejich porty/geometrie:
+Senzory: porty a geometrie
+
+Porty:
 
 ```powershell
 $env:FOUR_BLE_1_PORT = "COM38"
@@ -112,12 +114,53 @@ $env:FOUR_RADAR_1_CFG_PORT = "COM13"
 $env:FOUR_RADAR_1_DAT_PORT = "COM14"
 $env:FOUR_RADAR_2_CFG_PORT = "COM11"
 $env:FOUR_RADAR_2_DAT_PORT = "COM12"
+```
 
-$env:FOUR_BLE_1_POS_X = "2.0"
+Aktualni defaulty geometrie v `config.py` pro laboratorni/Dronarena setup:
+
+```powershell
+$env:FOUR_BLE_1_POS_X = "3.15"
 $env:FOUR_BLE_1_POS_Y = "0.0"
 $env:FOUR_BLE_1_POS_Z = "1.0"
 $env:FOUR_BLE_1_ROTATION = "90"
+
+$env:FOUR_BLE_2_POS_X = "0.0"
+$env:FOUR_BLE_2_POS_Y = "3.95"
+$env:FOUR_BLE_2_POS_Z = "1.0"
+$env:FOUR_BLE_2_ROTATION = "0"
+
+$env:FOUR_RADAR_1_POS_X = "3.05"
+$env:FOUR_RADAR_1_POS_Y = "0.0"
+$env:FOUR_RADAR_1_POS_Z = "1.0"
+$env:FOUR_RADAR_1_ROTATION = "0"
+
+$env:FOUR_RADAR_2_POS_X = "0.0"
+$env:FOUR_RADAR_2_POS_Y = "4.05"
+$env:FOUR_RADAR_2_POS_Z = "1.0"
+$env:FOUR_RADAR_2_ROTATION = "-90"
 ```
+
+Vyznam poli:
+
+- `POS_X`, `POS_Y`, `POS_Z`: globalni poloha senzoru v metrech v mape mistnosti.
+- `ROTATION`: natoceni senzoru ve stupnich v rovine XY.
+- `0` znamena smer do `+X`, `90` do `+Y`, `-90` do `-Y`, `180` nebo `-180` do `-X`.
+
+Jak se to pouziva v kodu:
+
+- radar: lokalni souradnice bodu se otoci o `ROTATION` a pak se k nim pricte `POS_X/Y/Z`
+  v [ingestion.py](</C:/Users/kabup/OneDrive/Plocha/BP_/KÓD/Four/ingestion.py:292>)
+- BLE: `POS_X/Y/Z` je poloha kotvy a `ROTATION` je smer, od ktereho se pocita
+  azimut pro triangulaci v [fusion.py](</C:/Users/kabup/OneDrive/Plocha/BP_/KÓD/Four/fusion.py:438>)
+
+Dulezite:
+
+- tohle nejsou "spravne hodnoty obecne", ale aktualni defaulty z repozitare
+- v arene je potreba senzory zmerit a hodnoty prepsat pres `FOUR_*`
+- kdyz zmenis fyzicke rozmisteni senzoru a neprepises geometrii, fused vystup
+  bude posunuty nebo natoceny spatne
+- README neber jako kalibracni protokol; autoritativni zdroj je `config.py`
+  a skutecne zamerene pozice pri mereni
 
 Radarove profily:
 
