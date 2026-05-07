@@ -5,6 +5,21 @@ Aktualni laboratorni mapovani:
 - `central` = `soniot@192.168.137.2`
 - `edge` = `soniot1@192.168.138.2`
 
+Aktualni rozlozeni adresaru, ktere odpovida laboratornimu setupu:
+
+- projekt: `~/Four/Dronarena`
+- virtualenv: `~/Four/venv`
+
+Start skripty od teto verze automaticky zkusi:
+
+1. `~/Four/venv/bin/python`
+2. `~/Four/.venv/bin/python`
+3. `~/Four/Dronarena/.venv/bin/python`
+4. `python3`
+5. `python`
+
+Pokud chces pouzit konkretni interpreter rucne, predej `PYTHON_BIN=/cesta/k/python`.
+
 ## Centralni UP board
 
 Na centralnim nodu musi bezet:
@@ -13,12 +28,12 @@ Na centralnim nodu musi bezet:
 - PostgreSQL
 - `main.py` v roli `central`
 
-Skripty jsou doporuceny wrapper kolem `python main.py`. Muzes spoustet i `python main.py` rucne, ale jen kdyz predem nastavis stejne `FOUR_*` promenne jako skript.
+Skripty jsou doporuceny wrapper kolem `python3 main.py`. Muzes spoustet i `python3 main.py` rucne, ale jen kdyz predem nastavis stejne `FOUR_*` promenne jako skript.
 
 Spusteni:
 
 ```bash
-cd /cesta/k/Four
+cd ~/Four/Dronarena
 chmod +x scripts/start_up_central.sh
 ./scripts/start_up_central.sh
 ```
@@ -42,6 +57,12 @@ export FOUR_BLE_1_PORT=/dev/ttyUSB2
 ./scripts/start_up_central.sh
 ```
 
+Pokud mas interpreter pod jinym nazvem, lze prepsat:
+
+```bash
+PYTHON_BIN=../venv/bin/python ./scripts/start_up_central.sh
+```
+
 Pred prvnim startem si na centralu over skutecne porty senzoru, napriklad:
 
 ```bash
@@ -57,7 +78,7 @@ Na edge se nepripojuje PostgreSQL. Posila jen raw data do MQTT na centralnim nod
 Spusteni:
 
 ```bash
-cd /cesta/k/Four
+cd ~/Four/Dronarena
 chmod +x scripts/start_up_edge.sh
 ./scripts/start_up_edge.sh 192.168.137.2
 ```
@@ -82,6 +103,12 @@ export FOUR_BLE_2_PORT=/dev/ttyUSB2
 ./scripts/start_up_edge.sh 192.168.137.2
 ```
 
+Pripadne:
+
+```bash
+PYTHON_BIN=../venv/bin/python ./scripts/start_up_edge.sh 192.168.137.2
+```
+
 Pred prvnim startem si na edge over skutecne porty senzoru, napriklad:
 
 ```bash
@@ -95,11 +122,13 @@ ls /dev/ttyACM* /dev/ttyUSB*
 - raw data z obou UP boardu pres MQTT
 - fused vystup
 
+`record_sync.sh` se take spousti jen na `central`. Na `edge` ho nespoustej.
+
 Pokud chces jen MQTT zaznam a nevadi ti, ze edge diagnostika zustane pod svym puvodnim `run_id`, staci klasicky recorder:
 
 ```bash
-cd /cesta/k/projektu
-python -m experiment_tools.record_experiment --label "test_01"
+cd ~/Four/Dronarena
+../venv/bin/python -m experiment_tools.record_experiment --label "test_01"
 ```
 
 Prakticky dopad:
@@ -111,25 +140,105 @@ Prakticky dopad:
 Pokud chces synchronizovat i edge diagnostiku, pouzij na `centralu` `scripts/record_sync.sh`:
 
 ```bash
-cd /cesta/k/projektu
+cd ~/Four/Dronarena
 chmod +x scripts/record_sync.sh
 ./scripts/record_sync.sh test_01 soniot1@192.168.138.2
+```
+
+Pro aktualni rozlozeni s virtualenv v `~/Four/venv` funguje i explicitne:
+
+```bash
+cd ~/Four/Dronarena
+PYTHON_BIN=../venv/bin/python ./scripts/record_sync.sh test_01 soniot1@192.168.138.2
+```
+
+Kdyz skript na Linuxu spadne na `/usr/bin/env: 'bash\r'`, ma soubor Windows CRLF konce radku.
+Oprav je jednorazove:
+
+```bash
+sed -i 's/\r$//' scripts/record_sync.sh
+```
+
+Pripadne pro vsechny shell skripty v projektu:
+
+```bash
+find . -path '*/scripts/*.sh' -exec sed -i 's/\r$//' {} +
 ```
 
 Skript udela dve veci:
 
 - pres `ssh` zapise stejny label do `edge/.active_run_id`
-- na `centralu` spusti `python -m experiment_tools.record_experiment --label ...`
+- na `centralu` spusti recorder pres lokalni Python interpreter
 
 Volitelne promenne:
 
 - `EDGE_RUN_FILE` pokud ma `edge` jinou cestu k `.active_run_id`
-- `PYTHON_BIN` pokud nechces pouzit vychozi `python`
+- `PYTHON_BIN` pokud nechces pouzit interpreter autodetekovany skriptem
 
 Priklad s explicitni cestou:
 
 ```bash
-EDGE_RUN_FILE=~/Four/Dronarena/.active_run_id ./scripts/record_sync.sh test_01 soniot1@192.168.138.2
+EDGE_RUN_FILE=~/Four/Dronarena/.active_run_id PYTHON_BIN=../venv/bin/python ./scripts/record_sync.sh test_01 soniot1@192.168.138.2
+```
+
+## Kam se co uklada
+
+Jsou dve ruzne vetve vystupu a je potreba je neplest:
+
+- `runs/diagnostic/<run_id>/`
+  - serial diagnostika z dlouho beziciho `ingestion.py`
+  - typicky `radar_1_serial.ndjson`, `ble_1_serial.ndjson`, `metadata.json`
+- `runs/experiment/<timestamp>_<label>/`
+  - MQTT recorder z `record_experiment.py`
+  - `raw.ndjson`, `fused.ndjson`, `metadata.json`
+
+Zmena labelu pres `record_sync.sh` ovlivni obe vetve, ale kazda se uklada jinam.
+
+Kontrola po startu recorderu:
+
+```bash
+ls -lt ~/Four/Dronarena/runs/experiment | head
+tail -f ~/Four/Dronarena/runs/experiment/<timestamp>_<label>/raw.ndjson
+tail -f ~/Four/Dronarena/runs/experiment/<timestamp>_<label>/fused.ndjson
+```
+
+## Typicke problemy
+
+`/usr/bin/env: 'bash\r': No such file or directory`
+
+```bash
+find . -path '*/scripts/*.sh' -exec sed -i 's/\r$//' {} +
+chmod +x scripts/*.sh
+```
+
+`exec: python: not found`
+
+- skript je stara verze, nebo nenasel spravny interpreter
+- pouzij `PYTHON_BIN=../venv/bin/python ...`
+
+`ModuleNotFoundError: No module named 'aiomqtt'`
+
+- nespousti se Python z virtualenv
+- over:
+
+```bash
+../venv/bin/python --version
+../venv/bin/python -c "import aiomqtt; print('aiomqtt OK')"
+```
+
+`PermissionError` pri vytvareni `runs/experiment/...`
+
+- over vlastnika a prava:
+
+```bash
+ls -ld ~/Four/Dronarena/runs ~/Four/Dronarena/runs/experiment
+```
+
+- rychly test zapisu:
+
+```bash
+mkdir ~/Four/Dronarena/runs/experiment/test_write
+rmdir ~/Four/Dronarena/runs/experiment/test_write
 ```
 
 ## Co otestovat zitra

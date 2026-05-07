@@ -1,63 +1,89 @@
 # Four
 
-Projekt pro sber, fuzi a vizualizaci dat z radaru a BLE kotev.
+Four je pipeline pro sber, fuzi a vizualizaci dat z radarovych a BLE senzoru.
+Umi bezet jako jeden lokalni proces na Windows/Linuxu i rozdeleny mezi dva
+UP boardy.
 
-Datovy tok:
+Aktualni datovy tok:
 
 ```text
 radar/BLE senzory -> ingestion.py -> MQTT -> fusion.py -> MQTT -> app.py -> WebSocket -> index.html
 ```
 
-## Struktura Projektu
+`main.py` sklada ingestion, fusion a API do jednoho procesu. Jednotlive casti
+ale porad komunikuji pres MQTT, takze je lze spoustet i oddelene podle role
+uzlu.
+
+## Co je v projektu
 
 ```text
 Four/
-+- data/
-|  \- optitrack/           # OptiTrack workbooky a dalsi vstupni data
-+- docs/
-|  +- ARENA_CHECKLIST.md   # checklist pro mereni v arene
-|  \- UPBOARD_START.md     # start pro 2x UP Board
++- data/optitrack/         # OptiTrack XLSX/CSV vstupy
++- docs/                   # provozni navody pro mereni a 2x UP Board
 +- experiment_tools/       # recorder, replay a evaluator
-+- radar/                  # radar parser a pomocne utility
++- radar/                  # radar parser, interface a cfg profily
 +- runs/
-|  +- diagnostic/          # raw serial diagnostika
+|  +- diagnostic/          # raw serial dumpy senzoru
 |  \- experiment/          # raw/fused MQTT zaznamy experimentu
-+- test_soubory/           # simulacni a OptiTrack replay scenare
-+- app.py                  # FastAPI + WebSocket vrstva
-+- config.py               # centralni konfigurace
-+- db_handler.py           # PostgreSQL vrstva
-+- fusion.py               # online fusion logika
-+- ingestion.py            # cteni senzoru a publikace raw dat
-+- main.py                 # start celeho systemu
-\- run_context.py          # interni runtime run_id sdileny za behu
++- scripts/                # start a synchronizacni shell skripty
++- app.py                  # FastAPI + dashboard + WebSocket bridge
++- config.py               # centralni runtime konfigurace
++- db_handler.py           # inicializace tabulek a DB write vrstva
++- fusion.py               # online fuzni logika
++- ingestion.py            # cteni senzoru a publish raw dat
++- main.py                 # hlavni vstupni bod
+\- run_context.py          # sdilene runtime run_id mezi procesy
 ```
 
 ## Pozadavky
 
-- Python 3.11 nebo novejsi
-- MQTT broker na `127.0.0.1:1883`
-- PostgreSQL na `127.0.0.1:5432`
-- databaze `sensor_data`
-- uzivatel `postgres` / heslo `postgres`
-- pro ostry beh fyzicke senzory na portech nastavenych v `config.py` nebo `FOUR_*`
+- Python 3.11+
+- MQTT broker
+- PostgreSQL pro role `all`, `central`, `fusion` a `api`
+- fyzicke senzory nebo testovaci/replay vstup
+
+Poznamky k databazi:
+
+- `app.py` se pri startu vzdy pripojuje do PostgreSQL.
+- `db_handler.py` si schema, tabulky a indexy vytvori samo pres
+  `CREATE ... IF NOT EXISTS`.
+- `edge` muze bezet bez DB, pokud ma `FOUR_INGEST_ENABLE_DB=0`.
 
 ## Instalace
 
-Z korene projektu:
+Z adresare `Four/`:
 
 ```powershell
-cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD\Four
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
+## Zavisle sluzby
+
+V nadrazenem adresari je `docker-compose.yml` pouze pro PostgreSQL:
+
+```powershell
+cd ..
+$env:POSTGRES_DB = "sensor_data"
+$env:POSTGRES_USER = "postgres"
+$env:POSTGRES_PASSWORD = "postgres"
+$env:POSTGRES_PORT = "5432"
+docker compose up -d
+```
+
+Vychozi `docker-compose.yml` bez env promennych pouzije jmena `app_db`,
+`app_user`, `app_password`. Pokud chces vychozi `config.py` bez dalsich zmen,
+nastav promenne jako v prikladu vyse.
+
+MQTT broker se spousti zvlast. Vychozi konfigurace projektu ceka broker na
+`127.0.0.1:1883`.
+
 ## Konfigurace
 
-Vychozi hodnoty jsou v `config.py`. Vetsinu z nich lze prepsat pres `FOUR_*` environment variables.
-
-Nejdulezitejsi:
+Vetsinu runtime nastaveni lze prepsat pres `FOUR_*` environment variables.
+Hlavni jsou:
 
 ```powershell
 $env:FOUR_MQTT_HOST = "127.0.0.1"
@@ -73,12 +99,11 @@ $env:FOUR_NODE_ROLE = "all"
 $env:FOUR_ENABLED_SENSORS = "radar_1,radar_2,ble_1,ble_2"
 $env:FOUR_INGEST_ENABLE_DB = "1"
 $env:FOUR_RUN_ID = "run_manual_001"
-$env:FOUR_EXPERIMENT_LABEL = "dronarena"
+$env:FOUR_EXPERIMENT_LABEL = "laborator_03"
 $env:FOUR_CAPTURE_RAW_SERIAL = "1"
-$env:FOUR_DIAGNOSTIC_CAPTURE_DIR = "C:\path\to\runs\diagnostic"
 ```
 
-Porty a geometrie senzoru:
+Senzory a jejich porty/geometrie:
 
 ```powershell
 $env:FOUR_BLE_1_PORT = "COM38"
@@ -88,54 +113,33 @@ $env:FOUR_RADAR_1_DAT_PORT = "COM14"
 $env:FOUR_RADAR_2_CFG_PORT = "COM11"
 $env:FOUR_RADAR_2_DAT_PORT = "COM12"
 
-$env:FOUR_BLE_1_POS_X = "1.5"
+$env:FOUR_BLE_1_POS_X = "2.0"
 $env:FOUR_BLE_1_POS_Y = "0.0"
-$env:FOUR_BLE_1_POS_Z = "0.8"
+$env:FOUR_BLE_1_POS_Z = "1.0"
 $env:FOUR_BLE_1_ROTATION = "90"
 ```
 
-Cesta k radarovemu profilu:
+Radarove profily:
 
 ```powershell
 $env:FOUR_RADAR_CONFIG_FILE = "C:\path\to\profile.cfg"
+$env:FOUR_RADAR_BOOTSTRAP_CONFIG_FILE = "C:\path\to\bootstrap_profile.cfg"
 ```
 
-Poznamky:
+Role uzlu:
 
-- `FOUR_CAPTURE_RAW_SERIAL` je aktualne vychozim nastavenim zapnute i bez env promenne.
-- `record_experiment.py --label ...` samo nastavi aktivni runtime `run_id` pro bezici procesy na stejnem filesystemu.
-- `run_context.py` je interni mechanismus, nespousti se rucne.
-- `FOUR_NODE_ROLE` umi oddelit rezimy `all`, `central`, `edge`, `ingestion`, `fusion`, `api`.
-- `FOUR_ENABLED_SENSORS` omezi, ktere radar/BLE workery se opravdu spusti.
-- `FOUR_INGEST_ENABLE_DB=0` vypne raw zapis do PostgreSQL, kdyz na edge nodu DB neni.
+- `all`: ingestion + fusion + API
+- `central`: ingestion + fusion + API
+- `edge`: jen ingestion
+- `ingestion`: jen ingestion
+- `fusion`: jen fusion
+- `api`: jen FastAPI/dashboard
 
-## PostgreSQL Pres Docker
-
-V koreni nadrazeneho workspace je `docker-compose.yml`, ale zveda jen PostgreSQL. MQTT broker je potreba spustit zvlast.
-
-Priklad:
-
-```powershell
-cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD
-$env:POSTGRES_DB = "sensor_data"
-$env:POSTGRES_USER = "postgres"
-$env:POSTGRES_PASSWORD = "postgres"
-$env:POSTGRES_PORT = "5432"
-docker compose up -d
-```
-
-Pokud databaze `sensor_data` jeste neexistuje:
-
-```powershell
-psql -U postgres -h 127.0.0.1 -c "CREATE DATABASE sensor_data;"
-```
-
-## Spusteni Systemu
+## Rychly start: single-node
 
 Pred startem musi bezet PostgreSQL a MQTT broker.
 
 ```powershell
-cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD\Four
 .\.venv\Scripts\Activate.ps1
 python main.py
 ```
@@ -146,239 +150,171 @@ Dashboard:
 http://127.0.0.1:8000
 ```
 
-`main.py` spousti:
+`main.py` pri roli `all` spousti:
 
-- ingestion worker pro radar/BLE vstupy a zapis do DB
-- fusion loop pro clustering a parovani radar/BLE dat
+- ingestion worker pro radar/BLE vstupy
+- fusion loop
 - FastAPI server s dashboardem
 
-Prakticky:
+Pokud nebezi MQTT broker, ingestion ani fusion se nepripoji. Pokud nebezi
+PostgreSQL, `app.py` spadne pri startu.
 
-- kdyz nebezi MQTT broker, ingestion a fusion se nepripoji
-- kdyz nebezi PostgreSQL, DB zapis nebude fungovat a `app.py` pri startu spadne
-- kdyz neodpovidaji porty senzoru, workery se budou stale pokouset o reconnect
+## 2x UP Board
 
-## Rezim 2x UP Board
-
-Projekt umi bezet i rozdeleny na dva Linux nody:
+Projekt umi rozdeleni na dva uzly:
 
 - `central`: lokalni senzory `radar_1,ble_1`, MQTT broker, PostgreSQL, fusion a API
-- `edge`: lokalni senzory `radar_2,ble_2`, jen ingestion a publish do MQTT na centralu
+- `edge`: lokalni senzory `radar_2,ble_2`, jen ingestion a publish do MQTT na central
 
-Aktualni laboratorni mapovani:
-
-- `central` = `soniot@192.168.137.2`
-- `edge` = `soniot1@192.168.138.2`
-
-Doporuceny zpusob startu je pres hotove shell skripty:
-
-Centralni UP board:
+Start skripty:
 
 ```bash
-cd /cesta/k/Four
-chmod +x scripts/start_up_central.sh
 ./scripts/start_up_central.sh
+./scripts/start_up_edge.sh <ip_centralu>
 ```
 
-Edge UP board:
+Skripty nastavuji spravne `FOUR_NODE_ROLE`, `FOUR_ENABLED_SENSORS` a
+`FOUR_INGEST_ENABLE_DB`. Aktualni detaily jsou v `docs/UPBOARD_START.md`.
 
-```bash
-cd /cesta/k/Four
-chmod +x scripts/start_up_edge.sh
-./scripts/start_up_edge.sh <ip_centralniho_up>
-```
+Dulezite:
 
-Stejneho vysledku dosahnes i pres `python main.py`, ale jen kdyz predem spravne nastavis `FOUR_NODE_ROLE`, `FOUR_ENABLED_SENSORS`, `FOUR_INGEST_ENABLE_DB` a na edge i `FOUR_MQTT_HOST`. Samotne `python main.py` bez env promennych na `2x UP Board` neni spravny start, protoze vychozi role je `all`.
+- na `central` musi pred startem bezet MQTT broker a PostgreSQL
+- `edge` ma bezet s `FOUR_INGEST_ENABLE_DB=0`
+- vychozi Linux porty pro `radar_2` a `ble_2` jsou placeholdery a typicky je
+  nutne je prepsat pres env promenne
 
-Poznamky:
+## Samostatne spusteni casti
 
-- `edge` spousti jen ingestion.
-- `central` spousti ingestion, fusion i API.
-- na `central` musi pred startem bezet MQTT broker a PostgreSQL.
-- na `edge` se DB nespousti a `FOUR_INGEST_ENABLE_DB` ma zustat `0`.
-- vychozi Linux porty pro `radar_1` a `ble_1` v `config.py` odpovidaji beznemu laboratornimu zapojeni.
-- vychozi Linux porty pro `radar_2` a `ble_2` jsou v `config.py` jen placeholdery a na edge je skoro vzdy potreba je prepsat pres `FOUR_RADAR_2_CFG_PORT`, `FOUR_RADAR_2_DAT_PORT` a `FOUR_BLE_2_PORT`.
-- podrobny start je v `docs/UPBOARD_START.md`.
-
-## Samostatne Spusteni Casti
-
-Fusion:
-
-```powershell
-python fusion.py
-```
-
-Web/API:
-
-```powershell
-uvicorn app:app --host 127.0.0.1 --port 8000
-```
-
-Ingestion:
+Z adresare `Four/`:
 
 ```powershell
 python ingestion.py
+python fusion.py
+uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-## Testovaci Scenare
+Tohle je uzitecne hlavne pri ladeni jednotlivych vrstev.
 
-Ve `test_soubory/` jsou simulacni scenare, ktere generuji synteticka radarova a BLE mereni do stejneho MQTT rozhrani jako ostry system.
+## Experiment workflow
 
-Prvni sanity check:
+Prubeh realneho mereni:
+
+1. spustit system (`python main.py` nebo UP board skripty)
+2. spustit recorder s labelem behu
+3. po mereni pripadne prehrat `raw.ndjson`
+4. porovnat fused vystup s OptiTrack daty
+
+Recorder:
 
 ```powershell
-cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD
-python -m Four.test_soubory.test_01_linear_pass
+python -m experiment_tools.record_experiment --label "static_01"
 ```
 
-Popis simulacnich scenaru je v `test_soubory/Popis_testu.md`. Prakticky checklist
-pro mereni v arene je v `docs/ARENA_CHECKLIST.md`.
+Recorder:
 
-## Replay OptiTrack XLSX
+- zacne nahravat `sensors/raw/#` a `sensors/fused`
+- prepne aktivni `run_id` v `.active_run_id`
+- ulozi vystup do `runs/experiment/<timestamp>_<label>/`
 
-Pro data z Dronareny je pripraven replay OptiTrack exportu do stejne testovaci pipeline jako ostatni scenare.
-
-Vychozi mapovani os:
-
-- systemova `x <- x`
-- systemova `y <- -z`
-- systemova `z <- y`
-
-Priklad:
-
-```powershell
-cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD
-python -m Four.test_soubory.test_14_optitrack_replay --xlsx ".\Four\data\optitrack\test_dronaren.xlsx" --auto-fit-room
-```
-
-Uzitecne volby:
-
-- `--objects Robot03 Robot04`
-- `--frame-stride 6`
-- `--max-frames 2000`
-- `--speed 2.0`
-- `--axis-x/--axis-y/--axis-z`
-- `--offset-x/--offset-y/--offset-z`
-- `--room-size-x/--room-size-y`
-
-## Experiment Workflow
-
-Workflow pro realne ladeni v Dronarene:
-
-1. spustit system
-2. pro kazdy test spustit `record_experiment --label ...`
-3. od OptiTracku vzit odpovidajici `.xlsx`
-4. doma pustit `replay_raw`
-5. vyhodnotit novy fused vystup proti OptiTracku
-
-Nejpohodlnejsi prakticky rezim pro single-node:
-
-```powershell
-cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD\Four
-python main.py
-```
-
-V rezimu `2x UP Board` timto krokem mysli:
-
-- na `central` spustit `./scripts/start_up_central.sh`
-- na `edge` spustit `./scripts/start_up_edge.sh <ip_centralu>`
-
-Pak pro kazdy jednotlivi beh na PC nebo single-node:
-
-```powershell
-cd C:\Users\kabup\OneDrive\Plocha\BP_\KÓD
-python -m Four.experiment_tools.record_experiment --label "static_01"
-```
-
-Pri dalsim testu jen zmenis label:
-
-```powershell
-python -m Four.experiment_tools.record_experiment --label "crossing_01"
-```
-
-`record_experiment.py` udela dve veci najednou:
-
-- zacne nahravat MQTT provoz
-- prepne aktivni `run_id` bez restartu bezicich procesu na stejnem filesystemu
-
-V praxi:
-
-- pro `raw.ndjson` a `fused.ndjson` staci recorder pusteny jen na centralu, protoze tam vidi cely MQTT provoz
-- pro diagnostiku v `runs/diagnostic` se zmena `run_id` sama projevi jen na nodu, kde je zmenen stavovy soubor
-- pokud bezi `edge` na vlastnim filesystemu, jeho serial diagnostika se sama na novy label neprepne
-
-Pro `2x UP Board` je proto doporuceny start recorderu pres `scripts/record_sync.sh`, ktery:
-
-- na `edge` zapise stejny label do `.active_run_id`
-- na `centralu` spusti `record_experiment`
-
-Priklad na `centralu` z rootu projektu:
-
-```bash
-cd ~/Four/Dronarena
-chmod +x scripts/record_sync.sh
-./scripts/record_sync.sh test_01 soniot1@192.168.138.2
-```
-
-Pokud projekt na Linuxu nelezi ve slozce `Four`, pouzivej lokalni modulovou cestu z rootu projektu:
-
-```bash
-cd /cesta/k/projektu
-python -m experiment_tools.record_experiment --label "test_01"
-```
-
-Vystup se uklada do:
-
-```text
-Four\runs\experiment\<timestamp>_<label>\
-```
-
-Obsah:
+Vystup obsahuje:
 
 - `raw.ndjson`
 - `fused.ndjson`
 - `metadata.json`
 
-Replay raw dat:
+V rezimu `2x UP Board` je pro synchronizaci `run_id` na edge k dispozici:
+
+```bash
+./scripts/record_sync.sh test_01 <edge_host>
+```
+
+## Replay a vyhodnoceni
+
+Replay raw zaznamu:
 
 ```powershell
-python -m Four.experiment_tools.replay_raw --input-dir ".\Four\runs\experiment\20260425_150000_static_01" --rate 1.0
+python -m experiment_tools.replay_raw --input-dir ".\runs\experiment\20260425_150000_static_01" --rate 1.0
+```
+
+Replay raw zaznamu soucasne s OptiTrack referenci v samostatnem dashboard modu:
+
+```powershell
+python -m experiment_tools.replay_raw `
+  --input-dir ".\runs\experiment\20260425_150000_static_01" `
+  --rate 1.0 `
+  --with-optitrack-reference `
+  --optitrack-input ".\data\optitrack\Take 2026-05-05 11.47.22 AM.csv"
+```
+
+Jednim souborem pro porovnani v dashboardu:
+
+```powershell
+python .\experiment_tools\replay_compare.py
+```
+
+`replay_compare.py` je pohodlny wrapper nad `replay_raw.py` s predvyplnenym
+OptiTrack nastavenim pro aktualni Dronarenu. Dnes ma natvrdo vybrany vstupni
+CSV soubor, transformaci souradnic, casovy posun a `--optitrack-start-on-body Phantom4`.
+Pro jiny experiment nebo jiny startovni objekt tyto hodnoty prepis parametry
+na prikazove radce. Rucni override casoveho posunu:
+
+```powershell
+python .\experiment_tools\replay_compare.py --optitrack-delay-sec 75.35
 ```
 
 Vyhodnoceni proti OptiTracku:
 
 ```powershell
-python -m Four.experiment_tools.evaluate_optitrack `
-  --input-dir ".\Four\runs\experiment\20260425_150000_static_01" `
-  --xlsx ".\Four\data\optitrack\test_dronaren.xlsx" `
-  --tag-map "AA1122334455=Drone"
+python -m experiment_tools.evaluate_optitrack `
+  --input-dir ".\runs\experiment\20260425_150000_static_01" `
+  --xlsx ".\data\optitrack\Take 2026-05-05 11.47.22 AM.csv" `
+  --tag-map "20BA360ABBB8=Phantom4" `
+  --tag-map "AABBCCDDEEFF=Vysavac"
 ```
 
 Evaluator umi:
 
 - automaticky odhadnout casovy posun
-- porovnat fused vystup s ground truth
-- ulozit `evaluation.json` do slozky experimentu
+- vyhodnotit zdroje `fusion`, `ble` a `radar`
+- spocitat chyby proti ground truth celkove i po jednotlivych tagach
+- pracovat s vice rigid body najednou pres opakovane `--tag-map TAG_ID=RigidBodyName`
+- ulozit `evaluation.json` do slozky experimentu, nebo pres `--output` zvolit vlastni nazev, napr. `evaluation_multi.json`
+- vygenerovat PNG grafy do `evaluation_plots/`, pokud nepouzijes `--skip-plots`
 
-## Hlubsi Diagnostika Senzoru
+Pokud `tag_id` neodpovida nazvu rigid body, nespolehej na automaticke mapovani
+a zadej `--tag-map` explicitne. To plati typicky pro BLE tagy ve tvaru MAC
+adresy.
 
-Kdyz chces sbirat i nerozparserovana data ze seriovych portu, nech zapnute `FOUR_CAPTURE_RAW_SERIAL=1` a spust normalne `main.py`.
+## OptiTrack replay
 
-Diagnosticke soubory se ukladaji do:
+`experiment_tools.optitrack_replay` umi prehrat OptiTrack jako samostatnou
+dashboard referenci bez synthetic radar/BLE vrstvy.
 
-```text
-Four\runs\diagnostic\<RUN_ID>\
+Priklad:
+
+```powershell
+python -m experiment_tools.optitrack_replay `
+  --input ".\data\optitrack\Take 2026-05-05 11.47.22 AM.csv" `
+  --axis-x -x `
+  --axis-y z `
+  --axis-z y `
+  --yaw-deg -89.4461 `
+  --offset-x 2.6268 `
+  --offset-y 3.8304 `
+  --offset-z -0.1569 `
+  --start-on-body Phantom4
 ```
 
-Pri zmene `--label` v recorderu se dalsi diagnosticke zaznamy automaticky zacnou zapisovat do nove slozky bez restartu `main.py`, ale jen na nodu, ktery vidi stejny `ACTIVE_RUN_ID_FILE`.
+## Diagnostika senzoru
 
-Prakticky:
+Kdyz zustane zapnute `FOUR_CAPTURE_RAW_SERIAL=1`, ingestion uklada i
+neroztazene serial vystupy do:
 
-- single-node nebo vse v jednom adresari: diagnostika se prepne automaticky
-- `2x UP Board` s oddelenym filesystemem: recorder na centralu automaticky prepne central diagnostiku, ale ne edge diagnostiku
-- pokud chces mit na edge diagnostiku rozdelenou po behach stejne jako na centralu, musis `run_id` synchronizovat i na edge nebo edge diagnostiku vypnout
+```text
+runs/diagnostic/<RUN_ID>/
+```
 
-Vzniknou soubory:
+Typicke soubory:
 
 - `radar_1_serial.ndjson`
 - `radar_2_serial.ndjson`
@@ -386,29 +322,18 @@ Vzniknou soubory:
 - `ble_2_serial.ndjson`
 - `metadata.json`
 
-Obsah:
+To je uzitecne pro oddeleni problemu na vrstve portu, parseru a fusion logiky.
 
-- radar: `data_base64`, `bytes_len`, `parsed_ok`
-- BLE: `data_base64`, `decoded_text`, `matched_pattern`
+## Dulezite dokumenty
 
-Tohle je vhodne pro ladeni situaci, kdy neni jasne, jestli problem vznikl uz na seriove vrstve, v parseru, nebo az ve fusion.
+- `docs/ARENA_CHECKLIST.md`
+- `docs/UPBOARD_START.md`
+- `experiment_tools/evaluate_optitrack.py`
+- `experiment_tools/optitrack_replay.py`
+- `data/optitrack/Take 2026-05-05 11.47.22 AM.csv`
 
-## Dulezite Cesty
-
-- checklist do areny: `docs/ARENA_CHECKLIST.md`
-- start pro 2x UP Board: `docs/UPBOARD_START.md`
-- OptiTrack vstup: `data/optitrack/test_dronaren.xlsx`
-- experiment tools: `experiment_tools/`
-
-## Overeni Syntaxe
-
-Rychla kontrola Python souboru:
+## Rychla kontrola syntaxe
 
 ```powershell
 python -c "import ast, pathlib; [ast.parse(p.read_text(encoding='utf-8'), filename=str(p)) for p in pathlib.Path('.').rglob('*.py')]; print('OK')"
 ```
-
-## Zname Technicke Dluhy
-
-- `kalman_filter.py` existuje, ale hlavni fusion vrstva ho zatim nepouziva.
-- hlavni moduly jsou stale v rootu projektu; pripadny presun do `core/` by byl dalsi samostatny refaktor.
