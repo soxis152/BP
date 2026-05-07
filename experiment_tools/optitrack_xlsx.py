@@ -7,6 +7,7 @@ zavislost typu openpyxl. Proto parser pouziva jen standardni knihovnu.
 
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
 from pathlib import Path
 import re
@@ -214,10 +215,25 @@ def load_optitrack_take(
     offset_z: float = 0.0,
     selected_bodies: Iterable[str] | None = None,
 ) -> OptiTrackTake:
-    """Nacte OptiTrack export a vrati trajektorie uz prevedene do metru."""
+    """Nacte OptiTrack XLSX/CSV export a vrati trajektorie uz prevedene do metru."""
     take_path = Path(path).resolve()
     if not take_path.exists():
-        raise FileNotFoundError(f"OptiTrack XLSX nebyl nalezen: {take_path}")
+        raise FileNotFoundError(f"OptiTrack export nebyl nalezen: {take_path}")
+
+    suffix = take_path.suffix.lower()
+    if suffix == ".csv":
+        return load_optitrack_take_from_csv(
+            take_path,
+            axis_x=axis_x,
+            axis_y=axis_y,
+            axis_z=axis_z,
+            offset_x=offset_x,
+            offset_y=offset_y,
+            offset_z=offset_z,
+            selected_bodies=selected_bodies,
+        )
+    if suffix != ".xlsx":
+        raise ValueError(f"Nepodporovany format '{take_path.suffix}'. Pouzij .xlsx nebo .csv.")
 
     selected_set = {name.strip() for name in (selected_bodies or []) if name.strip()}
 
@@ -299,6 +315,160 @@ def load_optitrack_take(
         export_frame_rate=export_frame_rate,
         frame_period_seconds=frame_period_seconds,
     )
+
+
+def load_optitrack_take_from_csv(
+    take_path: Path,
+    *,
+    axis_x: str,
+    axis_y: str,
+    axis_z: str,
+    offset_x: float,
+    offset_y: float,
+    offset_z: float,
+    selected_bodies: Iterable[str] | None,
+) -> OptiTrackTake:
+    selected_set = {name.strip() for name in (selected_bodies or []) if name.strip()}
+
+    with take_path.open("r", encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.reader(handle))
+
+    if len(rows) < 7:
+        raise ValueError("OptiTrack CSV nema ocekavanou hlavicku.")
+
+    metadata = parse_csv_metadata(rows[0])
+    rigid_bodies = find_rigid_bodies_csv(rows)
+    if selected_set:
+        available_names = [body.name for body in rigid_bodies]
+        rigid_bodies = [body for body in rigid_bodies if body.name in selected_set]
+        if not rigid_bodies:
+            raise ValueError(
+                "Po filtrovani nezustal zadny rigid body. "
+                f"Dostupne nazvy: {', '.join(available_names)}"
+            )
+
+    frames = []
+    for row in rows[7:]:
+        if not row or len(row) < 2:
+            continue
+
+        frame_value = row[0].strip()
+        time_value = row[1].strip()
+        if not frame_value and not time_value:
+            continue
+
+        bodies = {}
+        for body in rigid_bodies:
+            x_mm = read_csv_cell(row, body.position_columns["x"]).strip()
+            y_mm = read_csv_cell(row, body.position_columns["y"]).strip()
+            z_mm = read_csv_cell(row, body.position_columns["z"]).strip()
+            if not x_mm or not y_mm or not z_mm:
+                continue
+
+            point_meters = (
+                float(x_mm) / 1000.0,
+                float(y_mm) / 1000.0,
+                float(z_mm) / 1000.0,
+            )
+            bodies[body.name] = transform_position(
+                point_meters,
+                axis_x=axis_x,
+                axis_y=axis_y,
+                axis_z=axis_z,
+                offset_x=offset_x,
+                offset_y=offset_y,
+                offset_z=offset_z,
+            )
+
+        frames.append(
+            OptiTrackFrame(
+                frame_number=int(float(frame_value)),
+                time_seconds=float(time_value),
+                bodies=bodies,
+            )
+        )
+
+    if not frames:
+        raise ValueError("V OptiTrack CSV nejsou zadne datove radky.")
+
+    capture_frame_rate = float(metadata.get("Capture Frame Rate", "0") or 0.0)
+    export_frame_rate = float(metadata.get("Export Frame Rate", "0") or 0.0)
+    if len(frames) >= 2:
+        frame_period_seconds = max(0.0001, frames[1].time_seconds - frames[0].time_seconds)
+    elif export_frame_rate > 0:
+        frame_period_seconds = 1.0 / export_frame_rate
+    elif capture_frame_rate > 0:
+        frame_period_seconds = 1.0 / capture_frame_rate
+    else:
+        frame_period_seconds = 0.1
+
+    return OptiTrackTake(
+        path=take_path,
+        sheet_name=take_path.name,
+        metadata=metadata,
+        rigid_bodies=rigid_bodies,
+        frames=frames,
+        capture_frame_rate=capture_frame_rate,
+        export_frame_rate=export_frame_rate,
+        frame_period_seconds=frame_period_seconds,
+    )
+
+
+def parse_csv_metadata(row: List[str]) -> Dict[str, str]:
+    metadata = {}
+    for index in range(0, len(row), 2):
+        key = row[index].strip()
+        value = row[index + 1].strip() if index + 1 < len(row) else ""
+        if key:
+            metadata[key] = value
+    return metadata
+
+
+def read_csv_cell(row: List[str], index: int) -> str:
+    return row[index] if index < len(row) else ""
+
+
+def find_rigid_bodies_csv(rows: List[List[str]]) -> List[OptiTrackRigidBody]:
+    type_row = rows[2]
+    name_row = rows[3]
+    id_row = rows[4]
+    kind_row = rows[5]
+    axis_row = rows[6]
+
+    ordered_names = []
+    rigid_bodies_by_name = {}
+
+    for column_index in range(2, len(axis_row)):
+        body_type = read_csv_cell(type_row, column_index).strip()
+        body_name = read_csv_cell(name_row, column_index).strip()
+        body_id = read_csv_cell(id_row, column_index).strip()
+        kind = read_csv_cell(kind_row, column_index).strip()
+        axis = read_csv_cell(axis_row, column_index).strip().lower()
+
+        if body_type != "Rigid Body" or not body_name:
+            continue
+        if kind != "Position" or axis not in {"x", "y", "z"}:
+            continue
+
+        if body_name not in rigid_bodies_by_name:
+            ordered_names.append(body_name)
+            rigid_bodies_by_name[body_name] = OptiTrackRigidBody(
+                name=body_name,
+                source_id=body_id,
+                position_columns={},
+            )
+
+        rigid_bodies_by_name[body_name].position_columns[axis] = column_index
+
+    rigid_bodies = []
+    for body_name in ordered_names:
+        body = rigid_bodies_by_name[body_name]
+        if {"x", "y", "z"} <= set(body.position_columns):
+            rigid_bodies.append(body)
+
+    if not rigid_bodies:
+        raise ValueError("V CSV exportu jsem nenasel zadne rigid body s Position X/Y/Z.")
+    return rigid_bodies
 
 
 def compute_bounds(frames: Iterable[OptiTrackFrame]) -> Dict[str, Tuple[float, float]]:

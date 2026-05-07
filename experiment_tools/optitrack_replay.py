@@ -12,13 +12,17 @@ import argparse
 import asyncio
 from pathlib import Path
 import re
+import threading
 import time
 
 import paho.mqtt.client as mqtt
+import uvicorn
 
 try:
     from Four.config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIGS, RUN_ID
     from Four.db_handler import db_handler
+    from Four import app as web_app
+    from Four import fusion
     from Four.test_soubory.optitrack_xlsx import (
         compute_auto_fit_offsets,
         compute_bounds,
@@ -36,6 +40,8 @@ except ImportError:
     try:
         from config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIGS, RUN_ID
         from db_handler import db_handler
+        import app as web_app
+        import fusion
         from test_soubory.optitrack_xlsx import compute_auto_fit_offsets, compute_bounds, load_optitrack_take, shift_take
         from test_soubory.scenario_common import (
             ObjectState,
@@ -55,6 +61,8 @@ except ImportError:
         )
         from ..config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIGS, RUN_ID
         from ..db_handler import db_handler
+        from .. import app as web_app
+        from .. import fusion
 
 
 DEFAULT_XLSX = Path(__file__).resolve().parents[1] / "data" / "optitrack" / "test_dronaren.xlsx"
@@ -70,9 +78,15 @@ def sanitize_tag_id(name: str) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Replay OptiTrack XLSX trajektorie pres testovaci MQTT pipeline projektu Four."
+        description="Replay OptiTrack XLSX/CSV trajektorie pres testovaci MQTT pipeline projektu Four."
     )
-    parser.add_argument("--xlsx", default=str(DEFAULT_XLSX), help="Cesta k OptiTrack XLSX exportu.")
+    parser.add_argument(
+        "--input",
+        "--xlsx",
+        dest="input_path",
+        default=str(DEFAULT_XLSX),
+        help="Cesta k OptiTrack exportu (.xlsx nebo .csv).",
+    )
     parser.add_argument("--sheet", default=None, help="Nazev sheetu. Vychozi je prvni sheet v souboru.")
     parser.add_argument(
         "--objects",
@@ -99,6 +113,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--frame-stride", type=int, default=1, help="Pouzit kazdy N-ty frame z XLSX.")
     parser.add_argument("--max-frames", type=int, default=0, help="Volitelne omezeni poctu prehranych framu.")
     parser.add_argument("--loop", action="store_true", help="Po dojeti znovu prehravat od zacatku.")
+    parser.add_argument(
+        "--start-local-stack",
+        action="store_true",
+        default=True,
+        help="Pred replayem rozjede lokalni fusion + API ve stejnem procesu. Vychozi je zapnuto.",
+    )
+    parser.add_argument(
+        "--no-local-stack",
+        action="store_false",
+        dest="start_local_stack",
+        help="Vypne automaticky start lokalni fusion + API vrstvy.",
+    )
+    parser.add_argument("--api-host", default="127.0.0.1", help="Host pro lokalni API server.")
+    parser.add_argument("--api-port", type=int, default=8000, help="Port pro lokalni API server.")
+    parser.add_argument(
+        "--startup-wait",
+        type=float,
+        default=3.0,
+        help="Kolik sekund pockat po startu lokalniho fusion/API pred replayem.",
+    )
     return parser.parse_args()
 
 
@@ -174,9 +208,52 @@ def apply_frame_to_objects(objects, body_names_by_object_id, take_frame):
     return previous_positions
 
 
+def start_fusion_thread() -> threading.Thread:
+    def runner():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(fusion.main_fusion())
+        finally:
+            loop.close()
+
+    thread = threading.Thread(target=runner, name="optitrack_replay_fusion_thread", daemon=True)
+    thread.start()
+    return thread
+
+
+def start_api_thread(host: str, port: int) -> threading.Thread:
+    def runner():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        config = uvicorn.Config(web_app.app, host=host, port=port, reload=False, loop="asyncio")
+        server = uvicorn.Server(config)
+        loop.run_until_complete(server.serve())
+
+    thread = threading.Thread(target=runner, name="optitrack_replay_api_thread", daemon=True)
+    thread.start()
+    return thread
+
+
+def maybe_start_local_stack(args: argparse.Namespace) -> None:
+    if not args.start_local_stack:
+        return
+
+    print("OptiTrack replay: startuji lokalni fusion vrstvu.")
+    start_fusion_thread()
+    print(f"OptiTrack replay: startuji lokalni API na http://{args.api_host}:{args.api_port}")
+    start_api_thread(args.api_host, args.api_port)
+
+    if args.startup_wait > 0:
+        print(f"OptiTrack replay: cekam {args.startup_wait:.1f}s na nabeh lokalniho stacku.")
+        time.sleep(args.startup_wait)
+
+
 async def run_replay(args: argparse.Namespace) -> None:
+    maybe_start_local_stack(args)
+
     manual_take = load_optitrack_take(
-        args.xlsx,
+        args.input_path,
         sheet_name=args.sheet,
         axis_x=args.axis_x,
         axis_y=args.axis_y,
