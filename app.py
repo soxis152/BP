@@ -1,14 +1,14 @@
 """Webova vrstva systemu.
 
-Modul slouzi jako tenky most mezi fusion vrstvou a prohlizecem:
+Modul slouzi jako tenky most mezi MQTT streamy a prohlizecem:
 
 - naserviruje `index.html`,
-- posloucha MQTT topic `sensors/fused`,
-- preposila prijate snapshoty otevrenym dashboardum pres WebSocket.
+- posloucha `sensors/fused` i pomocne referencni streamy,
+- sklada je do jednoho websocket payloadu pro dashboard.
 
 Matematika ani rozhodovani o identite objektu sem nepatri. Pokud se zmeni
 fusion algoritmus, tahle vrstva by mela zustat stejna, pokud zustane zachovany
-JSON format zpravy.
+JSON format zprav.
 """
 
 import asyncio
@@ -34,6 +34,9 @@ db_pool = None
 mqtt_listener_task = None
 active_websockets = []
 BASE_DIR = Path(__file__).resolve().parent
+OPTITRACK_REFERENCE_TOPIC = "sensors/reference/optitrack"
+latest_fused_payload = None
+latest_optitrack_payload = None
 
 
 @asynccontextmanager
@@ -81,27 +84,68 @@ def render_index_html(index_path: Path) -> str:
     )
 
 
+def build_empty_fused_payload() -> dict:
+    return {
+        "radar": [],
+        "radar_clusters": [],
+        "ble": [],
+        "ble_1_raw": [],
+        "ble_2_raw": [],
+        "objects": [],
+        "stats": None,
+    }
+
+
+def build_dashboard_payload() -> dict:
+    fused_payload = latest_fused_payload or build_empty_fused_payload()
+    payload = dict(fused_payload)
+
+    optitrack_payload = latest_optitrack_payload or {}
+    payload["optitrack_objects"] = list(optitrack_payload.get("objects", []))
+    payload["optitrack_stats"] = optitrack_payload.get("stats")
+    return payload
+
+
+async def broadcast_dashboard_payload() -> None:
+    if not active_websockets:
+        return
+
+    payload_text = json.dumps(build_dashboard_payload(), ensure_ascii=False)
+    for websocket in active_websockets.copy():
+        try:
+            await websocket.send_text(payload_text)
+        except Exception:
+            if websocket in active_websockets:
+                active_websockets.remove(websocket)
+
+
 async def mqtt_listener():
-    """Posloucha fused MQTT zpravy a rozesila je pripojenym dashboardum."""
+    """Posloucha fused a referencni MQTT zpravy a rozesila je dashboardum."""
+    global latest_fused_payload, latest_optitrack_payload
+
     while True:
         try:
             async with aiomqtt.Client(MQTT_HOST) as client:
                 await client.subscribe("sensors/fused")
-                print("App: Listening on MQTT topic 'sensors/fused'")
+                await client.subscribe(OPTITRACK_REFERENCE_TOPIC)
+                print(
+                    "App: Listening on MQTT topics "
+                    "'sensors/fused' and "
+                    f"'{OPTITRACK_REFERENCE_TOPIC}'"
+                )
 
                 async for message in client.messages:
-                    if not active_websockets:
+                    topic = str(message.topic)
+                    payload = json.loads(message.payload.decode())
+
+                    if topic == "sensors/fused":
+                        latest_fused_payload = payload
+                    elif topic == OPTITRACK_REFERENCE_TOPIC:
+                        latest_optitrack_payload = payload
+                    else:
                         continue
 
-                    payload = message.payload.decode()
-
-                    # Iteruji nad kopii, protoze se klient muze odpojit uprostred
-                    # rozesilani aktualni zpravy.
-                    for websocket in active_websockets.copy():
-                        try:
-                            await websocket.send_text(payload)
-                        except Exception:
-                            active_websockets.remove(websocket)
+                    await broadcast_dashboard_payload()
         except aiomqtt.MqttError:
             print("App: MQTT connection lost, retrying in 2s...")
             await asyncio.sleep(2)
@@ -125,6 +169,7 @@ async def websocket_endpoint(websocket: WebSocket):
     """Drzi websocket spojeni s jednim oknem dashboardu."""
     await websocket.accept()
     active_websockets.append(websocket)
+    await websocket.send_text(json.dumps(build_dashboard_payload(), ensure_ascii=False))
 
     try:
         while True:

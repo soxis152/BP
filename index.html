@@ -33,6 +33,7 @@
             --source-ble-only: #eab308;
             --source-ble-1: #14b8a6;
             --source-ble-2: #8b5cf6;
+            --source-optitrack: #16a34a;
             --source-diagnostics: #16a34a;
         }
 
@@ -83,7 +84,10 @@
 
         .legend-dot { width: 10px; height: 10px; border-radius: 999px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7); }
 
-        .controls-group { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+        .controls-group {
+            display: flex; flex-direction: column; gap: 12px; flex-wrap: nowrap;
+            justify-content: flex-start; align-items: flex-start; width: 100%;
+        }
         .control-block {
             display: flex; align-items: center; gap: 8px;
             background: var(--bg-card); border: 1px solid var(--border);
@@ -161,6 +165,7 @@
         .tile.source-ble-only { border-left-color: var(--source-ble-only); }
         .tile.source-ble-1-raw { border-left-color: var(--source-ble-1); }
         .tile.source-ble-2-raw { border-left-color: var(--source-ble-2); }
+        .tile.source-optitrack { border-left-color: var(--source-optitrack); }
         .tile.source-radar-cluster { border-left-color: var(--source-radar); }
         .tile.source-diagnostics { border-left-color: var(--source-diagnostics); }
 
@@ -177,6 +182,7 @@
         .badge-ble-only { color: #854d0e; background: #fef3c7; border-color: #fde68a; }
         .badge-ble-1-raw { color: #115e59; background: #ccfbf1; border-color: #99f6e4; }
         .badge-ble-2-raw { color: #5b21b6; background: #ede9fe; border-color: #ddd6fe; }
+        .badge-optitrack { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
         .badge-type { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }
 
         .tile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
@@ -243,6 +249,7 @@
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar-ble);"></span>Radar + BLE</span>
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-radar-ble-coasting);"></span>Radar + BLE coasting</span>
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-ble-only);"></span>BLE only</span>
+        <span class="legend-chip"><span class="legend-dot" style="background: var(--source-optitrack);"></span>OptiTrack reference</span>
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-ble-1);"></span>BLE 1 ray</span>
         <span class="legend-chip"><span class="legend-dot" style="background: var(--source-ble-2);"></span>BLE 2 ray</span>
     </div>
@@ -259,9 +266,12 @@
             <span class="control-label">Data</span>
             <div class="data-controls">
                 <button id="btnModeFused" class="active" onclick="switchDataMode('fused')">Fused</button>
+                <button id="btnModeRawOpti" onclick="switchDataMode('raw_opti')">Raw+Opti</button>
+                <button id="btnModeFusedOpti" onclick="switchDataMode('fused_opti')">Fused+Opti</button>
                 <button id="btnModeRaw" onclick="switchDataMode('raw_radar')">Raw Radar</button>
                 <button id="btnModeClusters" onclick="switchDataMode('radar_clusters')">Clustery</button>
                 <button id="btnModeBle" onclick="switchDataMode('ble')">BLE Triang</button>
+                <button id="btnModeOptitrack" onclick="switchDataMode('optitrack')">OptiTrack</button>
                 <button id="btnModeBle1" onclick="switchDataMode('ble_1')">BLE 1</button>
                 <button id="btnModeBle2" onclick="switchDataMode('ble_2')">BLE 2</button>
             </div>
@@ -289,7 +299,8 @@
             radar_cluster: '#0ea5e9',
             radar_ble: '#ef4444',
             radar_ble_coasting: '#f97316',
-            ble_only: '#eab308'
+            ble_only: '#eab308',
+            optitrack: '#16a34a'
         };
 
         // latest* je posledni surovy stav z backendu, displayState je vyhlazeny
@@ -297,8 +308,12 @@
         let currentMode = '2d';
         let currentDataMode = 'fused';
         let latestObjects = [];
+        let latestOptitrackObjects = [];
         let latestStats = null;
+        let latestFusedStats = null;
+        let latestOptitrackStats = null;
         let displayState = {};
+        let optitrackDisplayState = {};
         let latestRadarPoints = [];
         let latestRadarClusters = [];
         let latestBlePoints = [];
@@ -365,6 +380,11 @@
         const TEST_AREA_X_MAX = dashboardConfig.test_area_x_max ?? 4;
         const TEST_AREA_Y_MIN = dashboardConfig.test_area_y_min ?? 0;
         const TEST_AREA_Y_MAX = dashboardConfig.test_area_y_max ?? 6;
+        const DEFAULT_DATA_MODE = (() => {
+            const mode = String(dashboardConfig.default_data_mode ?? 'fused').trim().toLowerCase();
+            const allowedModes = new Set(['fused', 'raw_opti', 'fused_opti', 'raw_radar', 'radar_clusters', 'ble', 'optitrack', 'ble_1', 'ble_2']);
+            return allowedModes.has(mode) ? mode : 'fused';
+        })();
         const MAP_WIDTH_METERS = MAP_X_MAX - MAP_X_MIN;
         const MAP_HEIGHT_METERS = MAP_Y_MAX - MAP_Y_MIN;
         const TEST_AREA_WIDTH_METERS = TEST_AREA_X_MAX - TEST_AREA_X_MIN;
@@ -378,6 +398,8 @@
         if (dashboardTitle) {
             dashboardTitle.textContent = `Senzorová fúze ${TEST_AREA_WIDTH_METERS}x${TEST_AREA_HEIGHT_METERS}m`;
         }
+
+        currentDataMode = DEFAULT_DATA_MODE;
 
         function mapXToCanvas(x) {
             return OFFSET + ((x - MAP_X_MIN) * PIXELS_PER_METER);
@@ -398,12 +420,17 @@
         function switchDataMode(mode) {
             currentDataMode = mode;
             document.getElementById('btnModeFused').classList.toggle('active', mode === 'fused');
+            document.getElementById('btnModeRawOpti').classList.toggle('active', mode === 'raw_opti');
+            document.getElementById('btnModeFusedOpti').classList.toggle('active', mode === 'fused_opti');
             document.getElementById('btnModeRaw').classList.toggle('active', mode === 'raw_radar');
             document.getElementById('btnModeClusters').classList.toggle('active', mode === 'radar_clusters');
             document.getElementById('btnModeBle').classList.toggle('active', mode === 'ble');
+            document.getElementById('btnModeOptitrack').classList.toggle('active', mode === 'optitrack');
             document.getElementById('btnModeBle1').classList.toggle('active', mode === 'ble_1');
             document.getElementById('btnModeBle2').classList.toggle('active', mode === 'ble_2');
         }
+
+        switchDataMode(currentDataMode);
 
         function normalizeTagId(tagId) {
             if (tagId === null || tagId === undefined) return "";
@@ -439,6 +466,7 @@
 
             if (sourceRaw.includes('ble_1_raw')) return 'ble_1_raw';
             if (sourceRaw.includes('ble_2_raw')) return 'ble_2_raw';
+            if (sourceRaw.includes('optitrack')) return 'optitrack';
             if (sourceRaw.includes('ble_only') || sourceRaw.includes('ble only')) return 'ble_only';
             if (sourceRaw.includes('radar_cluster') || type === 'radar_cluster') return 'radar_cluster';
             if (sourceRaw.includes('radar_raw') || type === 'radar_raw') return 'radar_raw';
@@ -447,6 +475,7 @@
             if (sourceRaw.includes('ble') && !sourceRaw.includes('radar')) return 'ble_only';
             if (sourceRaw.includes('radar')) return 'radar';
 
+            if (type === 'optitrack') return 'optitrack';
             if (type === 'ble_only' || id.startsWith('BLE_')) return 'ble_only';
             if (type === 'tagged' || id.startsWith('TAG_')) return 'radar_ble';
             return 'radar';
@@ -456,6 +485,7 @@
             const source = getSourceCategory(obj);
             if (source === 'ble_1_raw') return 'BLE 1';
             if (source === 'ble_2_raw') return 'BLE 2';
+            if (source === 'optitrack') return 'OptiTrack';
             if (source === 'radar_cluster') return 'Radar cluster';
             if (source === 'radar_ble') return 'Radar + BLE';
             if (source === 'radar_ble_coasting') return 'Radar + BLE coasting';
@@ -470,6 +500,7 @@
             if (type === 'radar_cluster') return 'Cluster';
             if (type === 'radar_ble') return 'Fused';
             if (type === 'radar_ble_coasting') return 'Coasting';
+            if (type === 'optitrack') return 'Reference';
             if (type === 'tagged') return 'Tagged';
             if (type === 'ble_only') return 'BLE';
             return 'Track';
@@ -481,6 +512,7 @@
             const source = getSourceCategory(obj);
             if (source === 'ble_1_raw') return 'badge-ble-1-raw';
             if (source === 'ble_2_raw') return 'badge-ble-2-raw';
+            if (source === 'optitrack') return 'badge-optitrack';
             if (source === 'radar_cluster') return 'badge-radar-cluster';
             if (source === 'radar_ble') return 'badge-radar-ble';
             if (source === 'radar_ble_coasting') return 'badge-radar-ble-coasting';
@@ -492,6 +524,7 @@
             const source = getSourceCategory(obj);
             if (source === 'ble_1_raw') return 'source-ble-1-raw';
             if (source === 'ble_2_raw') return 'source-ble-2-raw';
+            if (source === 'optitrack') return 'source-optitrack';
             if (source === 'radar_cluster') return 'source-radar-cluster';
             if (source === 'radar_ble') return 'source-radar-ble';
             if (source === 'radar_ble_coasting') return 'source-radar-ble-coasting';
@@ -564,15 +597,34 @@
             return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
 
-        function updateDebugPanel(stats) {
-            if (!stats) return;
-            latestStats = stats;
+        function updateDebugPanel(stats, optitrackStats) {
+            if (stats) latestFusedStats = stats;
+            if (optitrackStats) latestOptitrackStats = optitrackStats;
+            latestStats = currentDataMode === 'optitrack'
+                ? (latestOptitrackStats || latestFusedStats)
+                : (latestFusedStats || latestOptitrackStats);
+        }
+
+        function getActiveStats() {
+            return currentDataMode === 'optitrack'
+                ? (latestOptitrackStats || latestFusedStats)
+                : (latestFusedStats || latestOptitrackStats);
         }
 
         function getCurrentDrawList() {
             if (currentDataMode === 'raw_radar') return latestRadarPoints;
             if (currentDataMode === 'radar_clusters') return latestRadarClusters;
             if (currentDataMode === 'ble') return latestBlePoints;
+            if (currentDataMode === 'raw_opti') return [
+                ...latestRadarPoints,
+                ...latestRadarClusters,
+                ...Object.values(optitrackDisplayState),
+            ];
+            if (currentDataMode === 'fused_opti') return [
+                ...Object.values(displayState),
+                ...Object.values(optitrackDisplayState),
+            ];
+            if (currentDataMode === 'optitrack') return Object.values(optitrackDisplayState);
             if (currentDataMode === 'ble_1') return latestBle1Rays;
             if (currentDataMode === 'ble_2') return latestBle2Rays;
             return Object.values(displayState);
@@ -582,6 +634,9 @@
             if (currentDataMode === 'raw_radar') return 'Raw radar rezim: body se zobrazuji jen ve vizualizaci.';
             if (currentDataMode === 'radar_clusters') return 'Zadne radar clustery v aktualnim okne.';
             if (currentDataMode === 'ble') return 'Zadne BLE pozice v aktualnim okne.';
+            if (currentDataMode === 'raw_opti') return 'Raw+Opti rezim: cekam na radar body, clustery a OptiTrack reference.';
+            if (currentDataMode === 'fused_opti') return 'Fused+Opti rezim: cekam na fused objekty a OptiTrack reference.';
+            if (currentDataMode === 'optitrack') return 'OptiTrack reference zatim neposila zadny objekt.';
             if (currentDataMode === 'ble_1') return 'BLE 1 zatim neposila zadny ray.';
             if (currentDataMode === 'ble_2') return 'BLE 2 zatim neposila zadny ray.';
             return 'Zadne sledovane cile.';
@@ -652,6 +707,59 @@
                 </div>`;
         }
 
+        function buildStatsPanelHtmlV2() {
+            const activeStats = getActiveStats();
+            const statsSubtitle = activeStats
+                ? (currentDataMode === 'optitrack'
+                    ? (activeStats.stream_label || 'OptiTrack reference stream')
+                    : 'zivy MQTT/WebSocket stream')
+                : 'cekam na prvni zpravu';
+            return `
+                <div class="tile source-diagnostics">
+                    <div class="tile-head">
+                        <div>
+                            <h3 class="tile-title">DIAGNOSTIKA SENZORU</h3>
+                            <div class="tile-sub">${statsSubtitle}</div>
+                        </div>
+                    </div>
+                    <div class="stats-section">
+                        <div class="stats-section-title">Vstupy senzoru</div>
+                        <div class="tile-grid">
+                            <div class="metric"><span class="metric-label">Radar novy</span><span class="metric-value">${activeStats?.new_radar_points ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Radar okno</span><span class="metric-value">${activeStats?.radar_history_points ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">BLE 1 tagy</span><span class="metric-value">${activeStats?.ble_1_tags ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">BLE 2 tagy</span><span class="metric-value">${activeStats?.ble_2_tags ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Spolecne BLE</span><span class="metric-value">${activeStats?.common_ble_tags ?? 0}</span></div>
+                        </div>
+                    </div>
+                    <div class="stats-section">
+                        <div class="stats-section-title">Vysledek zpracovani</div>
+                        <div class="tile-grid">
+                            <div class="metric"><span class="metric-label">Radar clustery</span><span class="metric-value">${activeStats?.radar_clusters ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Triangulace</span><span class="metric-value">${activeStats?.triangulated_ble ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Objekty</span><span class="metric-value">${activeStats?.objects ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">OptiTrack</span><span class="metric-value">${activeStats?.optitrack_objects ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Radar + BLE</span><span class="metric-value">${activeStats?.paired_radar_ble ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Pouze radar</span><span class="metric-value">${activeStats?.radar_cluster_objects ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">Pouze BLE</span><span class="metric-value">${activeStats?.ble_only_objects ?? 0}</span></div>
+                            <div class="metric"><span class="metric-label">BLE coast</span><span class="metric-value">${activeStats?.radar_ble_coasting_objects ?? 0}</span></div>
+                        </div>
+                    </div>
+                    <div class="stats-section">
+                        <div class="stats-section-title">Parametry fuze</div>
+                        <div class="tile-grid">
+                            <div class="metric"><span class="metric-label">Limit parovani</span><span class="metric-value">${formatMeters(activeStats?.pair_max_distance ?? 0)}</span></div>
+                            <div class="metric"><span class="metric-label">Podrzeni paru</span><span class="metric-value">${safeNum(activeStats?.pair_hold_seconds ?? 0).toFixed(0)} s</span></div>
+                            <div class="metric"><span class="metric-label">Reakvizice clusteru</span><span class="metric-value">${formatMeters(activeStats?.pair_reacquire_distance ?? 0)}</span></div>
+                        </div>
+                    </div>
+                    <div class="conf-wrap">
+                        <span class="conf-label">Posledni update</span>
+                        <span class="conf-value">${activeStats ? new Date(activeStats.timestamp * 1000).toLocaleTimeString() : '-'}</span>
+                    </div>
+                </div>`;
+        }
+
         function drawMap2D() {
             ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
             const axisXColor = '#2563eb';
@@ -711,7 +819,7 @@
 
         function drawObjects2D(objects) {
             drawMap2D();
-            const order = { radar_raw: 0, ble_1_raw: 1, ble_2_raw: 1, radar_cluster: 2, ble_only: 3, radar_ble_coasting: 4, radar_ble: 5, radar: 2 };
+            const order = { radar_raw: 0, ble_1_raw: 1, ble_2_raw: 1, radar_cluster: 2, ble_only: 3, radar_ble_coasting: 4, radar_ble: 5, optitrack: 6, radar: 2 };
             objects.sort((a, b) => (order[getSourceCategory(a)] ?? 0) - (order[getSourceCategory(b)] ?? 0));
 
             objects.forEach(obj => {
@@ -994,7 +1102,7 @@
 
             ws.onmessage = (e) => {
                 const data = JSON.parse(e.data);
-                updateDebugPanel(data.stats);
+                updateDebugPanel(data.stats, data.optitrack_stats);
                 let combined = [];
 
                 // --- Mapovani dat z fusion.py ---
@@ -1082,6 +1190,9 @@
                 }
 
                 latestObjects = combined;
+                latestOptitrackObjects = Array.isArray(data.optitrack_objects)
+                    ? data.optitrack_objects
+                    : [];
             };
 
             ws.onclose = () => {
@@ -1093,7 +1204,7 @@
         function renderStatsPanel() {
             // Diagnostika je prepisovana jako cele HTML. Je mala, takze je to
             // jednodussi a citelnejsi nez udrzovat mnoho jednotlivych uzlu.
-            statsContainer.innerHTML = buildStatsPanelHtml();
+            statsContainer.innerHTML = buildStatsPanelHtmlV2();
         }
 
         function renderTiles(drawList) {
@@ -1132,6 +1243,38 @@
             }).join('');
         }
 
+        function updateDisplayStateFromTargets(stateStore, latestList, nowSec, dtSec) {
+            const currentIds = new Set();
+            const latestUniqueObjects = dedupeByTagId(latestList);
+
+            latestUniqueObjects.forEach(target => {
+                const id = String(target.tag_id);
+                currentIds.add(id);
+
+                if (!stateStore[id]) {
+                    stateStore[id] = { ...target, last_seen: nowSec, last_reported_confidence: target.confidence ?? 1.0 };
+                } else {
+                    smoothObjectPosition(stateStore[id], target, dtSec);
+                    syncDisplayMetadata(stateStore[id], target);
+                    stateStore[id].last_seen = nowSec;
+                }
+            });
+
+            Object.keys(stateStore).forEach(id => {
+                if (currentIds.has(id)) return;
+                const obj = stateStore[id];
+                const age = nowSec - (obj.last_seen || nowSec);
+
+                if (age > VISUAL_HOLD_SECONDS) {
+                    delete stateStore[id];
+                    return;
+                }
+                const baseConf = obj.last_reported_confidence ?? obj.confidence ?? 1.0;
+                const minHoldConfidence = getSourceCategory(obj) === 'radar_ble' ? 0.55 : 0.15;
+                obj.confidence = Math.max(minHoldConfidence, baseConf * (1 - (age / VISUAL_HOLD_SECONDS)));
+            });
+        }
+
         function animationLoop() {
             // Render loop bezi nezavisle na WebSocket frekvenci. Kdyz nova data
             // chvili neprijdou, posledni objekty se jeste kratce drzi a pomalu
@@ -1141,35 +1284,8 @@
             const dtSec = Math.min(0.08, Math.max(0.001, nowSec - lastAnimationTimeSec));
             lastAnimationTimeSec = nowSec;
 
-            const currentIds = new Set();
-            const latestUniqueObjects = dedupeByTagId(latestObjects);
-
-            latestUniqueObjects.forEach(target => {
-                const id = String(target.tag_id);
-                currentIds.add(id);
-
-                if (!displayState[id]) {
-                    displayState[id] = { ...target, last_seen: nowSec, last_reported_confidence: target.confidence ?? 1.0 };
-                } else {
-                    smoothObjectPosition(displayState[id], target, dtSec);
-                    syncDisplayMetadata(displayState[id], target);
-                    displayState[id].last_seen = nowSec;
-                }
-            });
-
-            Object.keys(displayState).forEach(id => {
-                if (currentIds.has(id)) return;
-                const obj = displayState[id];
-                const age = nowSec - (obj.last_seen || nowSec);
-
-                if (age > VISUAL_HOLD_SECONDS) {
-                    delete displayState[id];
-                    return;
-                }
-                const baseConf = obj.last_reported_confidence ?? obj.confidence ?? 1.0;
-                const minHoldConfidence = getSourceCategory(obj) === 'radar_ble' ? 0.55 : 0.15;
-                obj.confidence = Math.max(minHoldConfidence, baseConf * (1 - (age / VISUAL_HOLD_SECONDS)));
-            });
+            updateDisplayStateFromTargets(displayState, latestObjects, nowSec, dtSec);
+            updateDisplayStateFromTargets(optitrackDisplayState, latestOptitrackObjects, nowSec, dtSec);
 
             const drawList = getCurrentDrawList();
             if (currentMode === '2d') { drawObjects2D(drawList); } else { controls.update(); updateObjects3D(drawList); renderer.render(scene, camera); }

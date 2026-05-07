@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass
+import math
 from pathlib import Path
 import re
 from typing import Dict, Iterable, List, Tuple
@@ -20,6 +21,7 @@ XML_NS = {"a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 WORKBOOK_REL_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
 CELL_REF_PATTERN = re.compile(r"([A-Z]+)(\d+)")
 AXIS_TO_INDEX = {"x": 0, "y": 1, "z": 2}
+ZERO_POSITION_EPSILON = 1e-9
 
 
 @dataclass(frozen=True)
@@ -184,6 +186,7 @@ def transform_position(
     axis_x: str,
     axis_y: str,
     axis_z: str,
+    yaw_degrees: float,
     offset_x: float,
     offset_y: float,
     offset_z: float,
@@ -196,11 +199,21 @@ def transform_position(
     for axis_index, sign in (mapping_x, mapping_y, mapping_z):
         values.append(point_meters[axis_index] * sign)
 
+    yaw_radians = math.radians(yaw_degrees)
+    cos_yaw = math.cos(yaw_radians)
+    sin_yaw = math.sin(yaw_radians)
+    rotated_x = (values[0] * cos_yaw) - (values[1] * sin_yaw)
+    rotated_y = (values[0] * sin_yaw) + (values[1] * cos_yaw)
+
     return (
-        values[0] + offset_x,
-        values[1] + offset_y,
+        rotated_x + offset_x,
+        rotated_y + offset_y,
         values[2] + offset_z,
     )
+
+
+def is_zero_position(point_meters: Tuple[float, float, float]) -> bool:
+    return all(abs(value) <= ZERO_POSITION_EPSILON for value in point_meters)
 
 
 def load_optitrack_take(
@@ -210,6 +223,7 @@ def load_optitrack_take(
     axis_x: str = "x",
     axis_y: str = "-z",
     axis_z: str = "y",
+    yaw_degrees: float = 0.0,
     offset_x: float = 0.0,
     offset_y: float = 0.0,
     offset_z: float = 0.0,
@@ -227,6 +241,7 @@ def load_optitrack_take(
             axis_x=axis_x,
             axis_y=axis_y,
             axis_z=axis_z,
+            yaw_degrees=yaw_degrees,
             offset_x=offset_x,
             offset_y=offset_y,
             offset_z=offset_z,
@@ -273,11 +288,14 @@ def load_optitrack_take(
                 float(y_mm) / 1000.0,
                 float(z_mm) / 1000.0,
             )
+            if is_zero_position(point_meters):
+                continue
             bodies[body.name] = transform_position(
                 point_meters,
                 axis_x=axis_x,
                 axis_y=axis_y,
                 axis_z=axis_z,
+                yaw_degrees=yaw_degrees,
                 offset_x=offset_x,
                 offset_y=offset_y,
                 offset_z=offset_z,
@@ -323,6 +341,7 @@ def load_optitrack_take_from_csv(
     axis_x: str,
     axis_y: str,
     axis_z: str,
+    yaw_degrees: float,
     offset_x: float,
     offset_y: float,
     offset_z: float,
@@ -370,11 +389,14 @@ def load_optitrack_take_from_csv(
                 float(y_mm) / 1000.0,
                 float(z_mm) / 1000.0,
             )
+            if is_zero_position(point_meters):
+                continue
             bodies[body.name] = transform_position(
                 point_meters,
                 axis_x=axis_x,
                 axis_y=axis_y,
                 axis_z=axis_z,
+                yaw_degrees=yaw_degrees,
                 offset_x=offset_x,
                 offset_y=offset_y,
                 offset_z=offset_z,
