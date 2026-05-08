@@ -19,13 +19,22 @@
             sparovane radar+BLE detekce.
         */
         :root {
-            --bg-page: #edf2f7;
+            --bg-page: #eaf0f6;
             --bg-card: #ffffff;
-            --bg-soft: #f8fafc;
+            --bg-soft: #f7f9fc;
+            --bg-panel: rgba(255, 255, 255, 0.94);
             --text-main: #0f172a;
             --text-muted: #64748b;
-            --border: #d8e1eb;
-            --accent: #334155;
+            --border: #d6deea;
+            --border-strong: #c4cfde;
+            --accent: #1e3a5f;
+            --accent-soft: #eef4fb;
+            --panel-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+            --panel-shadow-soft: 0 8px 18px rgba(15, 23, 42, 0.06);
+            --panel-radius: 14px;
+            --panel-gap: 16px;
+            --page-max-width: min(1560px, calc(100vw - 32px));
+            --dashboard-height: calc(100vh - 196px);
 
             --source-radar: #0ea5e9;
             --source-radar-ble: #ef4444;
@@ -41,124 +50,437 @@
 
         body {
             background:
-                radial-gradient(circle at 8% 10%, rgba(14, 165, 233, 0.10), transparent 28%),
-                radial-gradient(circle at 92% 92%, rgba(234, 179, 8, 0.12), transparent 28%),
+                radial-gradient(circle at 8% 10%, rgba(14, 165, 233, 0.08), transparent 26%),
+                radial-gradient(circle at 92% 92%, rgba(234, 179, 8, 0.10), transparent 24%),
                 var(--bg-page);
             color: var(--text-main);
             font-family: "Segoe UI", "Inter", system-ui, sans-serif;
-            display: flex; flex-direction: column; align-items: center;
-            margin: 0; padding: 20px;
+            min-height: 100vh;
+            margin: 0;
+            padding: 16px;
+        }
+
+        .header-panel,
+        .toolbar,
+        .dashboard,
+        .stats-container,
+        .diagnostics-panel {
+            width: var(--page-max-width);
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .header-panel {
-            width: 100%; max-width: 1000px;
-            background: var(--bg-card); border: 1px solid var(--border);
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
             border-top: 4px solid var(--accent);
-            padding: 14px 20px; margin-bottom: 14px;
-            display: flex; justify-content: space-between; align-items: center;
-            border-radius: 12px; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
-            gap: 12px; flex-wrap: wrap;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: var(--panel-radius);
+            box-shadow: var(--panel-shadow);
+            gap: 16px;
+            flex-wrap: wrap;
+            backdrop-filter: blur(10px);
         }
 
-        .title-wrap h1 { margin: 0; font-size: 20px; letter-spacing: 0.2px; }
-        .title-wrap p { margin: 4px 0 0 0; color: var(--text-muted); font-size: 13px; }
+        .title-wrap h1 {
+            margin: 0;
+            font-size: 22px;
+            letter-spacing: 0;
+            line-height: 1.15;
+        }
+
+        .title-wrap p {
+            margin: 4px 0 0 0;
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.35;
+        }
 
         .status-wrap {
-            display: flex; align-items: center; gap: 8px; font-size: 12px;
-            color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-left: auto;
+        }
+
+        .status-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 2px;
+            min-width: 108px;
+        }
+
+        .status-meta-label,
+        .toolbar-label,
+        .control-label {
+            font-size: 10px;
+            font-weight: 800;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .status-meta-value {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-main);
         }
 
         .toolbar {
-            width: 100%; max-width: 1000px; display: flex; justify-content: space-between;
-            align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding: 14px 16px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: var(--panel-radius);
+            box-shadow: var(--panel-shadow-soft);
+            backdrop-filter: blur(10px);
         }
 
-        .legend-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .toolbar-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .legend-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
 
         .legend-chip {
-            display: inline-flex; align-items: center; gap: 8px;
-            background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: 999px; padding: 6px 12px; font-size: 12px;
-            font-weight: 700; color: #334155;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            min-height: 28px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #334155;
+            white-space: nowrap;
         }
 
-        .legend-dot { width: 10px; height: 10px; border-radius: 999px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7); }
+        .legend-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 999px;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.75);
+        }
 
         .controls-group {
-            display: flex; flex-direction: column; gap: 12px; flex-wrap: nowrap;
-            justify-content: flex-start; align-items: flex-start; width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: stretch;
+            width: 100%;
         }
+
         .control-block {
-            display: flex; align-items: center; gap: 8px;
-            background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: 12px; padding: 8px; box-shadow: 0 5px 14px rgba(15, 23, 42, 0.06);
-        }
-        .control-label {
-            font-size: 11px; font-weight: 800; color: var(--text-muted);
-            text-transform: uppercase; letter-spacing: 0.05em; padding: 0 4px;
-        }
-        .view-controls, .data-controls {
-            display: flex; gap: 6px; flex-wrap: wrap;
-            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 4px;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 10px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            min-height: 58px;
+            flex: 0 1 auto;
         }
 
-        .view-controls button, .data-controls button {
-            background-color: transparent; border: 0;
-            padding: 9px 12px; font-weight: 800; color: #475569;
-            border-radius: 8px; cursor: pointer; transition: all 0.18s; letter-spacing: 0.02em;
+        .controls-group .control-block:nth-child(2) { flex: 1 1 560px; }
+        .controls-group .control-block:nth-child(3) { flex: 1 1 420px; }
+
+        .control-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 0;
         }
 
-        .view-controls button.active, .data-controls button.active {
-            background-color: var(--accent); color: white;
-            box-shadow: 0 8px 22px rgba(51, 65, 85, 0.18);
+        .view-controls,
+        .data-controls {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            background: #ffffff;
+            border: 1px solid #dbe4ee;
+            border-radius: 10px;
+            padding: 4px;
         }
 
-        .dashboard { display: flex; flex-direction: row; gap: 20px; justify-content: center; width: 100%; max-width: 1000px; margin-bottom: 14px; }
-
-        .view-container {
-            position: relative; width: 600px; height: 600px;
-            background-color: var(--bg-soft); border: 2px solid var(--border);
-            border-radius: 12px; overflow: hidden; box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+        .replay-controls {
+            display: grid;
+            grid-template-columns: minmax(0, auto) minmax(220px, 1fr);
+            gap: 8px 10px;
+            align-items: center;
+            min-width: min(100%, 560px);
         }
 
-        #radarCanvas { position: absolute; top: 0; left: 0; }
-        #view3d { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; }
+        .replay-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            background: #ffffff;
+            border: 1px solid #dbe4ee;
+            border-radius: 10px;
+            padding: 4px;
+        }
 
-        .tiles-container { display: flex; flex-direction: column; gap: 10px; width: 380px; max-height: 600px; overflow-y: auto; padding-right: 4px; }
-        .tiles-container::-webkit-scrollbar { width: 8px; }
-        .tiles-container::-webkit-scrollbar-thumb { background: #c7d2de; border-radius: 999px; }
-        .stats-container { width: 100%; max-width: 1000px; margin-bottom: 12px; }
-        .stats-container .tile { margin: 0; }
-        .stats-container .tile-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-        .diagnostics-panel {
-            width: 100%; max-width: 1000px; margin-bottom: 12px;
-            background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: 8px; box-shadow: 0 5px 14px rgba(15, 23, 42, 0.06);
+        .replay-buttons button,
+        .view-controls button,
+        .data-controls button {
+            background-color: transparent;
+            border: 0;
+            min-height: 36px;
+            padding: 0 12px;
+            font-weight: 800;
+            color: #475569;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.18s;
+            letter-spacing: 0;
+            white-space: nowrap;
         }
-        .diagnostics-panel summary {
-            cursor: pointer; padding: 12px 14px; font-weight: 800; color: #0f172a;
-            display: flex; justify-content: space-between; gap: 12px; list-style: none;
+
+        .replay-buttons button.active,
+        .view-controls button.active,
+        .data-controls button.active {
+            background-color: var(--accent);
+            color: white;
+            box-shadow: 0 10px 20px rgba(30, 58, 95, 0.18);
         }
-        .diagnostics-panel summary::-webkit-details-marker { display: none; }
-        .diagnostics-panel summary::after {
-            content: "Rozbalit"; color: #64748b; font-size: 12px; text-transform: uppercase;
+
+        .replay-buttons button:disabled {
+            opacity: 0.45;
+            cursor: default;
+            box-shadow: none;
+        }
+
+        .replay-scrubber {
+            width: 100%;
+            accent-color: var(--accent);
+        }
+
+        .replay-meta {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            font-size: 11px;
+            font-weight: 800;
+            color: #475569;
+            text-transform: uppercase;
             letter-spacing: 0.04em;
         }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) clamp(340px, 28vw, 380px);
+            gap: var(--panel-gap);
+            align-items: stretch;
+            min-height: max(620px, var(--dashboard-height));
+            margin-bottom: 16px;
+        }
+
+        .view-panel,
+        .inspector-panel {
+            min-height: 0;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: var(--panel-radius);
+            box-shadow: var(--panel-shadow);
+            backdrop-filter: blur(10px);
+        }
+
+        .view-panel {
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .view-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            background-color: var(--bg-soft);
+            border: 1px solid var(--border-strong);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+        }
+
+        #radarCanvas,
+        #view3d,
+        #view3d canvas {
+            position: absolute;
+            inset: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #view3d { display: none; }
+
+        .inspector-panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .inspector-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px 16px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .inspector-title {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .inspector-subtitle {
+            margin: 3px 0 0 0;
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .inspector-count {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 34px;
+            min-height: 28px;
+            padding: 0 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            border: 1px solid #cfe0f4;
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .tiles-container {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 14px 14px 16px;
+        }
+
+        .tiles-container::-webkit-scrollbar { width: 8px; }
+        .tiles-container::-webkit-scrollbar-thumb { background: #c7d2de; border-radius: 999px; }
+
+        .stats-container { margin-bottom: 12px; }
+        .stats-container .tile { margin: 0; }
+        .stats-container .tile-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+        .diagnostics-panel {
+            margin-bottom: 12px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: var(--panel-radius);
+            box-shadow: var(--panel-shadow-soft);
+        }
+
+        .diagnostics-panel summary {
+            cursor: pointer;
+            padding: 12px 14px;
+            font-weight: 800;
+            color: #0f172a;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            list-style: none;
+        }
+
+        .diagnostics-panel summary::-webkit-details-marker { display: none; }
+
+        .diagnostics-panel summary::after {
+            content: "Rozbalit";
+            color: #64748b;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
         .diagnostics-panel[open] summary::after { content: "Sbalit"; }
         .diagnostics-panel .stats-container { padding: 0 12px 12px; margin-bottom: 0; box-sizing: border-box; }
         .stats-section { margin-top: 12px; }
         .stats-section:first-of-type { margin-top: 0; }
+
         .stats-section-title {
-            font-size: 11px; font-weight: 800; color: #334155;
-            text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 6px;
+            font-size: 11px;
+            font-weight: 800;
+            color: #334155;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 0 0 6px;
         }
 
-        .empty-state { background: var(--bg-card); border: 1px dashed var(--border); border-radius: 12px; color: var(--text-muted); padding: 16px; font-style: italic; }
+        .inspector-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .inspector-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .inspector-section-title {
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .empty-state {
+            background: var(--bg-card);
+            border: 1px dashed var(--border);
+            border-radius: 12px;
+            color: var(--text-muted);
+            padding: 16px;
+            font-style: italic;
+        }
+
+        .empty-state.compact {
+            padding: 12px;
+            font-size: 13px;
+        }
 
         .tile {
-            background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
-            box-shadow: 0 5px 14px rgba(15, 23, 42, 0.06); padding: 12px; border-left: 6px solid var(--source-radar);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            box-shadow: var(--panel-shadow-soft);
+            padding: 14px;
+            border-left: 5px solid var(--source-radar);
         }
+
+        .tile-primary { padding: 16px; }
+        .tile-compact { padding: 11px 12px; }
         .tile.source-radar { border-left-color: var(--source-radar); }
         .tile.source-radar-ble { border-left-color: var(--source-radar-ble); }
         .tile.source-radar-ble-coasting { border-left-color: var(--source-radar-ble-coasting); }
@@ -169,12 +491,46 @@
         .tile.source-radar-cluster { border-left-color: var(--source-radar); }
         .tile.source-diagnostics { border-left-color: var(--source-diagnostics); }
 
-        .tile-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
-        .tile-title { font-size: 14px; font-weight: 800; margin: 0; line-height: 1.25; word-break: break-word; }
-        .tile-sub { margin-top: 2px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+        .tile-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .tile-title {
+            font-size: 14px;
+            font-weight: 800;
+            margin: 0;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+
+        .tile-primary .tile-title { font-size: 18px; }
+
+        .tile-sub {
+            margin-top: 2px;
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
 
         .badge-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-        .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; border: 1px solid transparent; white-space: nowrap; }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+
         .badge-radar { color: #0369a1; background: #e0f2fe; border-color: #bae6fd; }
         .badge-radar-cluster { color: #0369a1; background: #e0f2fe; border-color: #bae6fd; }
         .badge-radar-ble { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
@@ -185,25 +541,109 @@
         .badge-optitrack { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
         .badge-type { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }
 
-        .tile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
-        .metric { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 8px; }
-        .metric-label { display: block; font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
-        .metric-value { font-size: 13px; font-weight: 700; color: #0f172a; }
+        .tile-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .tile-compact .tile-grid {
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .metric {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 7px 8px;
+        }
+
+        .tile-compact .metric { padding: 6px 7px; }
+
+        .metric-label {
+            display: block;
+            font-size: 10px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 2px;
+        }
+
+        .metric-value {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+        }
 
         .conf-wrap { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         .conf-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
         .conf-value { font-size: 12px; font-weight: 800; color: #0f172a; }
         .conf-bar { width: 100%; height: 8px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+        .tile-compact .conf-bar { height: 7px; }
         .conf-fill { height: 100%; border-radius: 999px; width: 0; transition: width 120ms linear; background: linear-gradient(90deg, #ef4444 0%, #eab308 55%, #0ea5e9 100%); }
 
-        .status { color: #075985; font-weight: 800; background: #e0f2fe; padding: 4px 10px; border-radius: 999px; border: 1px solid #bae6fd; font-size: 12px; }
+        .status {
+            color: #075985;
+            font-weight: 800;
+            background: #e0f2fe;
+            min-height: 28px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid #bae6fd;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+        }
+
         .status.disconnected { color: #b91c1c; background: #fee2e2; border-color: #fecaca; }
 
-        @media (max-width: 1100px) {
-            .dashboard { flex-direction: column; align-items: center; }
-            .view-container, .tiles-container { width: min(95vw, 700px); }
-            .tiles-container { max-height: none; }
+        @media (max-width: 1180px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+
+            .view-panel { min-height: 520px; }
+
+            .tiles-container { overflow: visible; }
             .stats-container .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .replay-controls { grid-template-columns: 1fr; min-width: 0; width: 100%; }
+        }
+
+        @media (max-width: 860px) {
+            :root { --page-max-width: calc(100vw - 24px); }
+
+            body { padding: 12px; }
+
+            .header-panel,
+            .toolbar {
+                padding-left: 14px;
+                padding-right: 14px;
+            }
+
+            .status-wrap,
+            .status-meta {
+                align-items: flex-start;
+                justify-content: flex-start;
+            }
+
+            .view-panel { min-height: 420px; }
+            .tile-grid { grid-template-columns: 1fr; }
+            .control-block { width: 100%; }
+        }
+
+        @media (max-width: 640px) {
+            .title-wrap h1 { font-size: 20px; }
+            .toolbar { gap: 10px; }
+
+            .replay-buttons button,
+            .view-controls button,
+            .data-controls button {
+                min-height: 36px;
+                padding: 0 10px;
+            }
         }
     </style>
 </head>
@@ -212,10 +652,16 @@
     <!-- Horni panel drzi stav spojeni a kratky popis aktualniho pohledu. -->
     <div class="header-panel">
         <div class="title-wrap">
-            <h1>Senzorová fúze 4x6m</h1>
+            <h1>Senzorová fúze 6x7.5m</h1>
             <p>Přehled tras a zdrojů: radar vs. radar+BLE vs. BLE-only</p>
         </div>
-        <div class="status-wrap">STATUS: <span id="status" class="status disconnected">OFFLINE</span></div>
+        <div class="status-wrap">
+            <span id="status" class="status disconnected">OFFLINE</span>
+            <div class="status-meta">
+                <span class="status-meta-label">Last update</span>
+                <span id="headerLastUpdate" class="status-meta-value">-</span>
+            </div>
+        </div>
     </div>
 
     <!-- Diagnostika je oddelena od seznamu objektu, protoze odpovida stavu cele pipeline. -->
@@ -256,35 +702,72 @@
 
     <div class="controls-group">
         <div class="control-block">
-            <span class="control-label">Pohled</span>
-            <div class="view-controls">
-                <button id="btn2d" class="active" onclick="switchView('2d')">2D</button>
-                <button id="btn3d" onclick="switchView('3d')">3D</button>
+            <div class="control-stack">
+                <span class="control-label">View</span>
+                <div class="view-controls">
+                    <button id="btn2d" class="active" onclick="switchView('2d')">2D</button>
+                    <button id="btn3d" onclick="switchView('3d')">3D</button>
+                </div>
             </div>
         </div>
         <div class="control-block">
-            <span class="control-label">Data</span>
-            <div class="data-controls">
-                <button id="btnModeFused" class="active" onclick="switchDataMode('fused')">Fused</button>
-                <button id="btnModeRawOpti" onclick="switchDataMode('raw_opti')">Raw+Opti</button>
-                <button id="btnModeFusedOpti" onclick="switchDataMode('fused_opti')">Fused+Opti</button>
-                <button id="btnModeRaw" onclick="switchDataMode('raw_radar')">Raw Radar</button>
-                <button id="btnModeClusters" onclick="switchDataMode('radar_clusters')">Clustery</button>
-                <button id="btnModeBle" onclick="switchDataMode('ble')">BLE Triang</button>
-                <button id="btnModeOptitrack" onclick="switchDataMode('optitrack')">OptiTrack</button>
-                <button id="btnModeBle1" onclick="switchDataMode('ble_1')">BLE 1</button>
-                <button id="btnModeBle2" onclick="switchDataMode('ble_2')">BLE 2</button>
+            <div class="control-stack">
+                <span class="control-label">Replay</span>
+                <div class="replay-controls">
+                    <div class="replay-buttons">
+                        <button id="btnReplayFirst" onclick="jumpReplayBoundary('first')">|&lt;</button>
+                        <button id="btnReplayLive" class="active" onclick="goLiveReplay()">Live</button>
+                        <button id="btnReplayPause" onclick="pauseReplayView()">Pause</button>
+                        <button id="btnReplayPlay" onclick="playReplayView()">Play</button>
+                        <button id="btnReplayPrev" onclick="stepReplayFrame(-1)">-1</button>
+                        <button id="btnReplayNext" onclick="stepReplayFrame(1)">+1</button>
+                        <button id="btnReplayLast" onclick="jumpReplayBoundary('last')">&gt;|</button>
+                    </div>
+                    <input id="replayScrubber" class="replay-scrubber" type="range" min="0" max="0" value="0" step="1" oninput="seekReplayFrame(Number(this.value))">
+                    <div class="replay-meta">
+                        <span id="replayFrameLabel">Frame 0 / 0</span>
+                        <span id="replayModeLabel">Live</span>
+                        <span id="replayTimeLabel">Cas -</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="control-block">
+            <div class="control-stack">
+                <span class="control-label">Data view</span>
+                <div class="data-controls">
+                    <button id="btnModeFused" class="active" onclick="switchDataMode('fused')">Fused</button>
+                    <button id="btnModeRawOpti" onclick="switchDataMode('raw_opti')">Raw+Opti</button>
+                    <button id="btnModeFusedOpti" onclick="switchDataMode('fused_opti')">Fused+Opti</button>
+                    <button id="btnModeRaw" onclick="switchDataMode('raw_radar')">Raw Radar</button>
+                    <button id="btnModeClusters" onclick="switchDataMode('radar_clusters')">Clustery</button>
+                    <button id="btnModeBle" onclick="switchDataMode('ble')">BLE Triang</button>
+                    <button id="btnModeOptitrack" onclick="switchDataMode('optitrack')">OptiTrack</button>
+                    <button id="btnModeBle1" onclick="switchDataMode('ble_1')">BLE 1</button>
+                    <button id="btnModeBle2" onclick="switchDataMode('ble_2')">BLE 2</button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Hlavni plocha: vlevo mapa/scena, vpravo textovy seznam aktualnich objektu. -->
     <div class="dashboard">
-        <div class="view-container">
-            <canvas id="radarCanvas" width="600" height="600"></canvas>
-            <div id="view3d"></div>
+        <div class="view-panel">
+            <div class="view-container">
+                <canvas id="radarCanvas" width="600" height="600"></canvas>
+                <div id="view3d"></div>
+            </div>
         </div>
-        <div id="tiles-container" class="tiles-container"></div>
+        <aside class="inspector-panel">
+            <div class="inspector-head">
+                <div>
+                    <h2 class="inspector-title">Inspector</h2>
+                    <p class="inspector-subtitle">Hlavní objekt a navazující detekce v aktuálním snímku.</p>
+                </div>
+                <span id="inspectorCount" class="inspector-count">0</span>
+            </div>
+            <div id="tiles-container" class="tiles-container"></div>
+        </aside>
     </div>
 
     <script id="four-dashboard-config" type="application/json">__FOUR_DASHBOARD_VIEW_CONFIG__</script>
@@ -320,6 +803,13 @@
         let latestBle1Rays = [];
         let latestBle2Rays = [];
         let lastAnimationTimeSec = performance.now() / 1000;
+        let frameBuffer = [];
+        let frameCursor = -1;
+        let playbackMode = 'live';
+        let playbackAccumulatorMs = 0;
+        let lastPlaybackTickMs = performance.now();
+
+        const MAX_BUFFERED_FRAMES = 0;
 
         // Vyhlazeni je ciste vizualni. Backendova data se tim nemeni.
         const TRACK_SMOOTH_SECONDS = 0.22;
@@ -332,6 +822,13 @@
         const ctx = canvas.getContext('2d');
         const tilesContainer = document.getElementById('tiles-container');
         const statsContainer = document.getElementById('stats-container');
+        const headerLastUpdate = document.getElementById('headerLastUpdate');
+        const inspectorCount = document.getElementById('inspectorCount');
+        const viewContainer = document.querySelector('.view-container');
+        const replayScrubber = document.getElementById('replayScrubber');
+        const replayFrameLabel = document.getElementById('replayFrameLabel');
+        const replayModeLabel = document.getElementById('replayModeLabel');
+        const replayTimeLabel = document.getElementById('replayTimeLabel');
 
         function mountToolbar() {
             const legend = document.querySelector('.legend-row');
@@ -341,8 +838,21 @@
             const toolbar = document.createElement('div');
             toolbar.className = 'toolbar';
             legend.before(toolbar);
-            toolbar.appendChild(legend);
-            toolbar.appendChild(controls);
+
+            const sourcesSection = document.createElement('div');
+            sourcesSection.className = 'toolbar-section';
+            const sourcesLabel = document.createElement('span');
+            sourcesLabel.className = 'toolbar-label';
+            sourcesLabel.textContent = 'Layers / Sources';
+            sourcesSection.appendChild(sourcesLabel);
+            sourcesSection.appendChild(legend);
+
+            const controlsSection = document.createElement('div');
+            controlsSection.className = 'toolbar-section';
+            controlsSection.appendChild(controls);
+
+            toolbar.appendChild(sourcesSection);
+            toolbar.appendChild(controlsSection);
         }
 
         function mountDiagnosticsPanel() {
@@ -362,6 +872,16 @@
 
         mountToolbar();
         mountDiagnosticsPanel();
+
+        function syncLayoutMetrics() {
+            const header = document.querySelector('.header-panel');
+            const toolbar = document.querySelector('.toolbar');
+            const headerHeight = header?.offsetHeight ?? 0;
+            const toolbarHeight = toolbar?.offsetHeight ?? 0;
+            const chromeHeight = headerHeight + toolbarHeight + 72;
+            const availableHeight = Math.max(540, window.innerHeight - chromeHeight);
+            document.documentElement.style.setProperty('--dashboard-height', `${availableHeight}px`);
+        }
 
         const dashboardConfig = JSON.parse(
             document.getElementById('four-dashboard-config')?.textContent ?? '{}'
@@ -431,6 +951,264 @@
         }
 
         switchDataMode(currentDataMode);
+
+        function clampReplayIndex(index) {
+            if (frameBuffer.length === 0) return 0;
+            return Math.max(0, Math.min(frameBuffer.length - 1, index));
+        }
+
+        function formatReplayTimestamp(snapshot) {
+            if (!snapshot) return '-';
+            const sourceTimestamp =
+                safeNum(snapshot.fusedStats?.timestamp, null)
+                ?? safeNum(snapshot.optitrackStats?.timestamp, null);
+            if (sourceTimestamp === null) return '-';
+            return `${sourceTimestamp.toFixed(3)} s`;
+        }
+
+        function updateReplayControls() {
+            const hasFrames = frameBuffer.length > 0;
+            const currentIndex = hasFrames
+                ? (playbackMode === 'live' ? frameBuffer.length - 1 : clampReplayIndex(frameCursor))
+                : 0;
+            const currentSnapshot = hasFrames ? frameBuffer[currentIndex] : null;
+
+            replayScrubber.max = String(Math.max(0, frameBuffer.length - 1));
+            replayScrubber.value = String(currentIndex);
+            replayScrubber.disabled = !hasFrames;
+
+            replayFrameLabel.textContent = `Frame ${hasFrames ? currentIndex + 1 : 0} / ${frameBuffer.length}`;
+            replayModeLabel.textContent = playbackMode === 'live'
+                ? 'Live'
+                : (playbackMode === 'playback' ? 'Prehravani' : 'Pauza');
+            replayTimeLabel.textContent = `Cas ${formatReplayTimestamp(currentSnapshot)}`;
+
+            document.getElementById('btnReplayLive').classList.toggle('active', playbackMode === 'live');
+            document.getElementById('btnReplayPause').classList.toggle('active', playbackMode === 'paused');
+            document.getElementById('btnReplayPlay').classList.toggle('active', playbackMode === 'playback');
+
+            document.getElementById('btnReplayLive').disabled = !hasFrames;
+            document.getElementById('btnReplayPause').disabled = !hasFrames;
+            document.getElementById('btnReplayPlay').disabled = !hasFrames;
+            document.getElementById('btnReplayFirst').disabled = !hasFrames;
+            document.getElementById('btnReplayPrev').disabled = !hasFrames;
+            document.getElementById('btnReplayNext').disabled = !hasFrames;
+            document.getElementById('btnReplayLast').disabled = !hasFrames;
+        }
+
+        function applySnapshot(snapshot) {
+            if (!snapshot) return;
+            latestRadarPoints = snapshot.radarPoints;
+            latestRadarClusters = snapshot.radarClusters;
+            latestBlePoints = snapshot.blePoints;
+            latestBle1Rays = snapshot.ble1Rays;
+            latestBle2Rays = snapshot.ble2Rays;
+            latestObjects = snapshot.objects;
+            latestOptitrackObjects = snapshot.optitrackObjects;
+            latestFusedStats = snapshot.fusedStats;
+            latestOptitrackStats = snapshot.optitrackStats;
+            latestStats = snapshot.fusedStats;
+            updateDebugPanel(snapshot.fusedStats, snapshot.optitrackStats);
+        }
+
+        function pushSnapshot(snapshot) {
+            frameBuffer.push(snapshot);
+            if (MAX_BUFFERED_FRAMES > 0 && frameBuffer.length > MAX_BUFFERED_FRAMES) {
+                frameBuffer.shift();
+                if (playbackMode !== 'live') {
+                    frameCursor = Math.max(0, frameCursor - 1);
+                }
+            }
+
+            if (playbackMode === 'live') {
+                frameCursor = frameBuffer.length - 1;
+                applySnapshot(snapshot);
+            }
+
+            updateReplayControls();
+        }
+
+        function goLiveReplay() {
+            playbackMode = 'live';
+            playbackAccumulatorMs = 0;
+            if (frameBuffer.length > 0) {
+                frameCursor = frameBuffer.length - 1;
+                applySnapshot(frameBuffer[frameCursor]);
+            }
+            updateReplayControls();
+        }
+
+        function pauseReplayView() {
+            if (frameBuffer.length === 0) return;
+            if (playbackMode === 'live') {
+                frameCursor = frameBuffer.length - 1;
+            }
+            playbackMode = 'paused';
+            playbackAccumulatorMs = 0;
+            updateReplayControls();
+        }
+
+        function playReplayView() {
+            if (frameBuffer.length === 0) return;
+            frameCursor = playbackMode === 'live' ? frameBuffer.length - 1 : clampReplayIndex(frameCursor);
+            playbackMode = 'playback';
+            playbackAccumulatorMs = 0;
+            lastPlaybackTickMs = performance.now();
+            applySnapshot(frameBuffer[frameCursor]);
+            updateReplayControls();
+        }
+
+        function seekReplayFrame(index) {
+            if (frameBuffer.length === 0) return;
+            frameCursor = clampReplayIndex(index);
+            playbackMode = 'paused';
+            playbackAccumulatorMs = 0;
+            applySnapshot(frameBuffer[frameCursor]);
+            updateReplayControls();
+        }
+
+        function stepReplayFrame(delta) {
+            if (frameBuffer.length === 0) return;
+            if (playbackMode === 'live') {
+                frameCursor = frameBuffer.length - 1;
+            }
+            const baseIndex = frameCursor < 0 ? frameBuffer.length - 1 : frameCursor;
+            frameCursor = clampReplayIndex(baseIndex + delta);
+            playbackMode = 'paused';
+            playbackAccumulatorMs = 0;
+            applySnapshot(frameBuffer[frameCursor]);
+            updateReplayControls();
+        }
+
+        function jumpReplayBoundary(which) {
+            if (frameBuffer.length === 0) return;
+            frameCursor = which === 'first' ? 0 : frameBuffer.length - 1;
+            playbackMode = which === 'last' ? 'paused' : 'paused';
+            playbackAccumulatorMs = 0;
+            applySnapshot(frameBuffer[frameCursor]);
+            updateReplayControls();
+        }
+
+        function updateReplayPlayback(nowMs) {
+            if (playbackMode !== 'playback' || frameBuffer.length === 0) {
+                lastPlaybackTickMs = nowMs;
+                return;
+            }
+
+            frameCursor = clampReplayIndex(frameCursor < 0 ? 0 : frameCursor);
+            playbackAccumulatorMs += Math.max(0, nowMs - lastPlaybackTickMs);
+            lastPlaybackTickMs = nowMs;
+
+            while (frameCursor < frameBuffer.length - 1) {
+                const currentSnapshot = frameBuffer[frameCursor];
+                const nextSnapshot = frameBuffer[frameCursor + 1];
+                const frameDelayMs = Math.max(
+                    16,
+                    Math.min(750, (nextSnapshot.receivedAtMs || 0) - (currentSnapshot.receivedAtMs || 0) || 33)
+                );
+                if (playbackAccumulatorMs < frameDelayMs) {
+                    break;
+                }
+
+                playbackAccumulatorMs -= frameDelayMs;
+                frameCursor += 1;
+                applySnapshot(frameBuffer[frameCursor]);
+            }
+
+            updateReplayControls();
+        }
+
+        function buildSnapshotFromPayload(data, receivedAtMs) {
+            const radarPoints = Array.isArray(data.radar)
+                ? data.radar.map((r, index) => ({
+                    tag_id: `RAW_R_${index}`,
+                    object_type: 'radar_raw',
+                    source: 'radar_raw',
+                    x: r.x,
+                    y: r.y,
+                    z: r.z,
+                    confidence: 0.95
+                }))
+                : [];
+
+            const radarClusters = Array.isArray(data.radar_clusters)
+                ? data.radar_clusters.map(cluster => ({
+                    tag_id: cluster.id,
+                    object_type: 'radar_cluster',
+                    source: 'radar_cluster',
+                    x: cluster.x,
+                    y: cluster.y,
+                    z: cluster.z,
+                    points: cluster.points,
+                    confidence: Math.min(0.85, 0.45 + (cluster.points * 0.06))
+                }))
+                : [];
+
+            const blePoints = Array.isArray(data.ble)
+                ? data.ble.map(point => ({
+                    tag_id: point.tag_id,
+                    object_type: 'ble_only',
+                    source: 'ble_only',
+                    x: point.x,
+                    y: point.y,
+                    z: point.z,
+                    confidence: 0.6
+                }))
+                : [];
+
+            const ble1Rays = Array.isArray(data.ble_1_raw)
+                ? data.ble_1_raw.map(point => ({
+                    tag_id: point.tag_id,
+                    object_type: 'ble_anchor_ray',
+                    source: 'ble_1_raw',
+                    sensor_id: point.sensor_id,
+                    sensor_x: point.sensor_x,
+                    sensor_y: point.sensor_y,
+                    sensor_z: point.sensor_z,
+                    x: point.x,
+                    y: point.y,
+                    z: point.z,
+                    azimuth: point.azimuth,
+                    elevation: point.elevation,
+                    confidence: 0.82
+                }))
+                : [];
+
+            const ble2Rays = Array.isArray(data.ble_2_raw)
+                ? data.ble_2_raw.map(point => ({
+                    tag_id: point.tag_id,
+                    object_type: 'ble_anchor_ray',
+                    source: 'ble_2_raw',
+                    sensor_id: point.sensor_id,
+                    sensor_x: point.sensor_x,
+                    sensor_y: point.sensor_y,
+                    sensor_z: point.sensor_z,
+                    x: point.x,
+                    y: point.y,
+                    z: point.z,
+                    azimuth: point.azimuth,
+                    elevation: point.elevation,
+                    confidence: 0.82
+                }))
+                : [];
+
+            const objects = Array.isArray(data.objects)
+                ? data.objects
+                : [...radarClusters, ...blePoints];
+
+            return {
+                receivedAtMs,
+                radarPoints,
+                radarClusters,
+                blePoints,
+                ble1Rays,
+                ble2Rays,
+                objects,
+                optitrackObjects: Array.isArray(data.optitrack_objects) ? data.optitrack_objects : [],
+                fusedStats: data.stats ?? null,
+                optitrackStats: data.optitrack_stats ?? null
+            };
+        }
 
         function normalizeTagId(tagId) {
             if (tagId === null || tagId === undefined) return "";
@@ -762,8 +1540,10 @@
 
         function drawMap2D() {
             ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-            const axisXColor = '#2563eb';
-            const axisYColor = '#dc2626';
+            const gridColor = '#d3dde8';
+            const axisColor = '#64748b';
+            const axisStrong = '#475569';
+            const labelColor = '#526277';
 
             const mapLeft = mapXToCanvas(MAP_X_MIN);
             const mapRight = mapXToCanvas(MAP_X_MAX);
@@ -774,33 +1554,47 @@
             const testBottom = mapYToCanvas(TEST_AREA_Y_MIN);
             const testTop = mapYToCanvas(TEST_AREA_Y_MAX);
 
-            ctx.fillStyle = 'rgba(148, 163, 184, 0.22)';
+            ctx.fillStyle = 'rgba(148, 163, 184, 0.16)';
             ctx.fillRect(testLeft, testTop, testRight - testLeft, testBottom - testTop);
 
             ctx.lineWidth = 1;
-            ctx.strokeStyle = '#cbd5e1';
+            ctx.strokeStyle = gridColor;
             for (let x = MAP_X_MIN; x <= MAP_X_MAX; x++) {
                 const p = mapXToCanvas(x);
                 ctx.beginPath(); ctx.moveTo(p, mapBottom); ctx.lineTo(p, mapTop); ctx.stroke();
-                ctx.font = 'bold 12px Arial';
-                ctx.fillStyle = axisXColor; ctx.fillText(`${x}`, p - 8, CANVAS_SIZE - 10);
+                ctx.font = '600 12px Segoe UI';
+                ctx.fillStyle = labelColor;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(`${x}`, p, mapBottom + 10);
             }
             for (let y = MAP_Y_MIN; y <= MAP_Y_MAX; y++) {
                 const p = mapYToCanvas(y);
                 ctx.beginPath(); ctx.moveTo(mapLeft, p); ctx.lineTo(mapRight, p); ctx.stroke();
-                ctx.font = 'bold 12px Arial';
-                ctx.fillStyle = axisYColor; ctx.fillText(`${y}`, 8, p + 4);
+                ctx.font = '600 12px Segoe UI';
+                ctx.fillStyle = labelColor;
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${y}`, mapLeft - 10, p);
             }
 
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = axisXColor;
-            ctx.beginPath(); ctx.moveTo(mapLeft, mapYToCanvas(0)); ctx.lineTo(mapRight + 8, mapYToCanvas(0)); ctx.stroke();
-            ctx.strokeStyle = axisYColor;
-            ctx.beginPath(); ctx.moveTo(mapXToCanvas(0), mapBottom); ctx.lineTo(mapXToCanvas(0), mapTop - 8); ctx.stroke();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = axisStrong;
+            ctx.beginPath(); ctx.moveTo(mapLeft, mapYToCanvas(0)); ctx.lineTo(mapRight, mapYToCanvas(0)); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(mapXToCanvas(0), mapBottom); ctx.lineTo(mapXToCanvas(0), mapTop); ctx.stroke();
 
-            ctx.font = 'bold 15px Arial';
-            ctx.fillStyle = axisXColor; ctx.fillText('X', mapRight + 12, mapYToCanvas(0) + 5);
-            ctx.fillStyle = axisYColor; ctx.fillText('Y', mapXToCanvas(0) - 5, mapTop - 14);
+            ctx.font = '700 14px Segoe UI';
+            ctx.fillStyle = axisColor;
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('X [m]', mapRight - 6, mapBottom - 8);
+            ctx.save();
+            ctx.translate(mapLeft + 16, mapTop + 18);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText('Y [m]', 0, 0);
+            ctx.restore();
 
             ctx.strokeStyle = '#94a3b8';
             ctx.lineWidth = 2;
@@ -813,7 +1607,11 @@
                 const px = mapXToCanvas(s.x);
                 const py = mapYToCanvas(s.y);
                 ctx.fillStyle = '#1e293b'; ctx.fillRect(px - 10, py - 10, 20, 20);
-                ctx.fillStyle = 'white'; ctx.font = 'bold 10px Arial'; ctx.fillText(s.id, px - 6, py + 4);
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 10px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(s.id, px, py + 1);
             });
         }
 
@@ -879,10 +1677,24 @@
         // prevedene do Three.js souradnic pres helper `toScenePosition`.
         const scene = new THREE.Scene(); scene.background = new THREE.Color(0xf8fafc);
         const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100); camera.position.set(6.8, 7.1, 5.6);
-        const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(CANVAS_SIZE, CANVAS_SIZE);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio || 1); renderer.outputEncoding = THREE.sRGBEncoding;
         renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
         document.getElementById('view3d').appendChild(renderer.domElement);
+
+        function syncViewSize() {
+            if (!viewContainer) return;
+            const panel = document.querySelector('.view-panel');
+            const panelRect = panel?.getBoundingClientRect();
+            const availableWidth = Math.max(240, Math.floor((panelRect?.width ?? CANVAS_SIZE) - 24));
+            const availableHeight = Math.max(240, Math.floor((panelRect?.height ?? availableWidth) - 24));
+            const side = Math.max(240, Math.min(availableWidth, availableHeight));
+            viewContainer.style.width = `${side}px`;
+            viewContainer.style.height = `${side}px`;
+            renderer.setSize(side, side, false);
+            camera.aspect = 1;
+            camera.updateProjectionMatrix();
+        }
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.target.set(2.0, 1.0, -3.0); controls.enableDamping = true; controls.dampingFactor = 0.08;
@@ -944,8 +1756,8 @@
         }
 
         function addReference3D() {
-            const xColor = 0x2563eb;
-            const yColor = 0xdc2626;
+            const xColor = 0x64748b;
+            const yColor = 0x64748b;
             const zColor = 0x16a34a;
             const boxColor = 0x94a3b8;
 
@@ -967,15 +1779,15 @@
             addLine(toScenePosition(0, MAP_Y_MIN, 0.025), toScenePosition(0, MAP_Y_MAX + 0.25, 0.025), yColor, 1);
             addLine(toScenePosition(0, 0, 0), toScenePosition(0, 0, 3.25), zColor, 1);
 
-            addTextLabel('X', toScenePosition(MAP_X_MAX + 0.38, 0, 0.12), '#2563eb', 0.22);
-            addTextLabel('Y', toScenePosition(0, MAP_Y_MAX + 0.38, 0.12), '#dc2626', 0.22);
+            addTextLabel('X', toScenePosition(MAP_X_MAX + 0.38, 0, 0.12), '#64748b', 0.22);
+            addTextLabel('Y', toScenePosition(0, MAP_Y_MAX + 0.38, 0.12), '#64748b', 0.22);
             addTextLabel('Z', toScenePosition(0, 0, 3.38), '#16a34a', 0.22);
 
             for (let x = MAP_X_MIN; x <= MAP_X_MAX; x++) {
-                addTextLabel(`${x}`, toScenePosition(x, -0.18, 0.04), '#1e3a8a', 0.13);
+                addTextLabel(`${x}`, toScenePosition(x, -0.18, 0.04), '#526277', 0.13);
             }
             for (let y = MAP_Y_MIN; y <= MAP_Y_MAX; y++) {
-                addTextLabel(`${y}`, toScenePosition(-0.18, y, 0.04), '#7f1d1d', 0.13);
+                addTextLabel(`${y}`, toScenePosition(-0.18, y, 0.04), '#526277', 0.13);
             }
             for (let z = 0; z <= 3; z++) {
                 addTextLabel(`${z}`, toScenePosition(-0.18, 0, z), '#14532d', 0.13);
@@ -1102,97 +1914,7 @@
 
             ws.onmessage = (e) => {
                 const data = JSON.parse(e.data);
-                updateDebugPanel(data.stats, data.optitrack_stats);
-                let combined = [];
-
-                // --- Mapovani dat z fusion.py ---
-
-                // Surove radarove body drzim oddelene. Pri beznem zobrazeni je
-                // nevypisuju do karet, protoze by DOM zahltily stovky bodu.
-                if (data.radar && Array.isArray(data.radar)) {
-                    latestRadarPoints = data.radar.map((r, index) => ({
-                            tag_id: `RAW_R_${index}`,
-                            object_type: 'radar_raw',
-                            source: 'radar_raw',
-                            x: r.x, y: r.y, z: r.z,
-                            confidence: 0.95
-                    }));
-                }
-
-                latestRadarClusters = Array.isArray(data.radar_clusters)
-                    ? data.radar_clusters.map(cluster => ({
-                        tag_id: cluster.id,
-                        object_type: 'radar_cluster',
-                        source: 'radar_cluster',
-                        x: cluster.x,
-                        y: cluster.y,
-                        z: cluster.z,
-                        points: cluster.points,
-                        confidence: Math.min(0.85, 0.45 + (cluster.points * 0.06))
-                    }))
-                    : [];
-
-                latestBlePoints = Array.isArray(data.ble)
-                    ? data.ble.map(point => ({
-                        tag_id: point.tag_id,
-                        object_type: 'ble_only',
-                        source: 'ble_only',
-                        x: point.x,
-                        y: point.y,
-                        z: point.z,
-                        confidence: 0.6
-                    }))
-                    : [];
-
-                latestBle1Rays = Array.isArray(data.ble_1_raw)
-                    ? data.ble_1_raw.map(point => ({
-                        tag_id: point.tag_id,
-                        object_type: 'ble_anchor_ray',
-                        source: 'ble_1_raw',
-                        sensor_id: point.sensor_id,
-                        sensor_x: point.sensor_x,
-                        sensor_y: point.sensor_y,
-                        sensor_z: point.sensor_z,
-                        x: point.x,
-                        y: point.y,
-                        z: point.z,
-                        azimuth: point.azimuth,
-                        elevation: point.elevation,
-                        confidence: 0.82
-                    }))
-                    : [];
-
-                latestBle2Rays = Array.isArray(data.ble_2_raw)
-                    ? data.ble_2_raw.map(point => ({
-                        tag_id: point.tag_id,
-                        object_type: 'ble_anchor_ray',
-                        source: 'ble_2_raw',
-                        sensor_id: point.sensor_id,
-                        sensor_x: point.sensor_x,
-                        sensor_y: point.sensor_y,
-                        sensor_z: point.sensor_z,
-                        x: point.x,
-                        y: point.y,
-                        z: point.z,
-                        azimuth: point.azimuth,
-                        elevation: point.elevation,
-                        confidence: 0.82
-                    }))
-                    : [];
-
-                if (Array.isArray(data.objects)) {
-                    combined = data.objects;
-                } else {
-                    combined = [...latestRadarClusters];
-
-                    // Fallback pro starsi payload bez `objects`.
-                    combined.push(...latestBlePoints);
-                }
-
-                latestObjects = combined;
-                latestOptitrackObjects = Array.isArray(data.optitrack_objects)
-                    ? data.optitrack_objects
-                    : [];
+                pushSnapshot(buildSnapshotFromPayload(data, performance.now()));
             };
 
             ws.onclose = () => {
@@ -1205,42 +1927,93 @@
             // Diagnostika je prepisovana jako cele HTML. Je mala, takze je to
             // jednodussi a citelnejsi nez udrzovat mnoho jednotlivych uzlu.
             statsContainer.innerHTML = buildStatsPanelHtmlV2();
+            const activeStats = getActiveStats();
+            if (headerLastUpdate) {
+                headerLastUpdate.textContent = activeStats?.timestamp
+                    ? new Date(activeStats.timestamp * 1000).toLocaleTimeString()
+                    : '-';
+            }
+        }
+
+        function buildMetricHtml(label, value) {
+            return `<div class="metric"><span class="metric-label">${label}</span><span class="metric-value">${value}</span></div>`;
+        }
+
+        function buildObjectCard(obj, options = {}) {
+            const primary = Boolean(options.primary);
+            const sourceLabel = getSourceLabel(obj);
+            const sourceBadgeClass = getSourceBadgeClass(obj);
+            const sourceClass = getTileClass(obj);
+            const conf = safeNum(obj.confidence, 0);
+            const confPct = Math.max(0, Math.min(100, conf * 100));
+            const tagId = escapeHtml(obj.tag_id || 'UNKNOWN');
+
+            const metrics = [
+                buildMetricHtml('X', formatMeters(obj.x)),
+                buildMetricHtml('Y', formatMeters(obj.y)),
+                buildMetricHtml('Z', formatMeters(obj.z)),
+                buildMetricHtml('Confidence', formatConf(conf))
+            ];
+
+            if (obj.points !== undefined) metrics.push(buildMetricHtml('Body clusteru', escapeHtml(obj.points)));
+            if (obj.pair_distance !== undefined) metrics.push(buildMetricHtml('BLE-Radar', formatMeters(obj.pair_distance)));
+            if (primary && obj.pair_mode) metrics.push(buildMetricHtml('Párování', escapeHtml(obj.pair_mode)));
+            if (primary && obj.sensor_id) metrics.push(buildMetricHtml('Kotva', escapeHtml(obj.sensor_id)));
+            if (primary && obj.azimuth !== undefined) metrics.push(buildMetricHtml('Azimut', formatDegrees(obj.azimuth)));
+            if (primary && obj.elevation !== undefined) metrics.push(buildMetricHtml('Elevace', formatDegrees(obj.elevation)));
+
+            return `
+                <article class="tile ${sourceClass} ${primary ? 'tile-primary' : 'tile-compact'}">
+                    <div class="tile-head">
+                        <div>
+                            <h3 class="tile-title">${tagId}</h3>
+                            <div class="tile-sub">${escapeHtml(String(obj.source || 'fused-stream'))}</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge ${sourceBadgeClass}">${sourceLabel}</span>
+                            <span class="badge badge-type">${getTypeLabel(obj)}</span>
+                        </div>
+                    </div>
+                    <div class="tile-grid">
+                        ${metrics.join('')}
+                    </div>
+                    <div class="conf-wrap">
+                        <span class="conf-label">${primary ? 'Spolehlivost detekce' : 'Reliability'}</span>
+                        <span class="conf-value">${confPct.toFixed(0)}%</span>
+                    </div>
+                    <div class="conf-bar"><div class="conf-fill" style="width:${confPct}%"></div></div>
+                </article>`;
         }
 
         function renderTiles(drawList) {
             renderStatsPanel();
-            // Surove radarove body nevypisuju do karet, aby zbytecne nerostl DOM.
             const filteredForTiles = drawList.filter(obj => !isRadarRaw(obj));
+            if (inspectorCount) {
+                inspectorCount.textContent = String(filteredForTiles.length);
+            }
+
             if (filteredForTiles.length === 0) {
                 tilesContainer.innerHTML = `<div class="empty-state">${escapeHtml(getEmptyStateMessage())}</div>`;
                 return;
             }
 
             const sorted = [...filteredForTiles].sort((a, b) => safeNum(b.confidence) - safeNum(a.confidence));
-            tilesContainer.innerHTML = sorted.map(obj => {
-                const sourceLabel = getSourceLabel(obj); const sourceBadgeClass = getSourceBadgeClass(obj);
-                const sourceClass = getTileClass(obj); const conf = safeNum(obj.confidence, 0);
-                const confPct = Math.max(0, Math.min(100, conf * 100)); const tagId = escapeHtml(obj.tag_id || 'UNKNOWN');
-                return `
-                    <div class="tile ${sourceClass}">
-                        <div class="tile-head"><div><h3 class="tile-title">${tagId}</h3><div class="tile-sub">${escapeHtml(String(obj.source || 'fused-stream'))}</div></div>
-                        <div class="badge-row"><span class="badge ${sourceBadgeClass}">${sourceLabel}</span><span class="badge badge-type">${getTypeLabel(obj)}</span></div></div>
-                        <div class="tile-grid">
-                            <div class="metric"><span class="metric-label">X</span><span class="metric-value">${formatMeters(obj.x)}</span></div>
-                            <div class="metric"><span class="metric-label">Y</span><span class="metric-value">${formatMeters(obj.y)}</span></div>
-                            <div class="metric"><span class="metric-label">Z</span><span class="metric-value">${formatMeters(obj.z)}</span></div>
-                            <div class="metric"><span class="metric-label">Confidence</span><span class="metric-value">${formatConf(conf)}</span></div>
-                            ${obj.points !== undefined ? `<div class="metric"><span class="metric-label">Body clusteru</span><span class="metric-value">${escapeHtml(obj.points)}</span></div>` : ''}
-                            ${obj.pair_distance !== undefined ? `<div class="metric"><span class="metric-label">BLE-Radar</span><span class="metric-value">${formatMeters(obj.pair_distance)}</span></div>` : ''}
-                            ${obj.sensor_id ? `<div class="metric"><span class="metric-label">Kotva</span><span class="metric-value">${escapeHtml(obj.sensor_id)}</span></div>` : ''}
-                            ${obj.azimuth !== undefined ? `<div class="metric"><span class="metric-label">Azimut</span><span class="metric-value">${formatDegrees(obj.azimuth)}</span></div>` : ''}
-                            ${obj.elevation !== undefined ? `<div class="metric"><span class="metric-label">Elevace</span><span class="metric-value">${formatDegrees(obj.elevation)}</span></div>` : ''}
-                            ${obj.pair_mode ? `<div class="metric"><span class="metric-label">Párování</span><span class="metric-value">${escapeHtml(obj.pair_mode)}</span></div>` : ''}
-                        </div>
-                        <div class="conf-wrap"><span class="conf-label">Spolehlivost detekce</span><span class="conf-value">${confPct.toFixed(0)}%</span></div>
-                        <div class="conf-bar"><div class="conf-fill" style="width:${confPct}%"></div></div>
-                    </div>`;
-            }).join('');
+            const primary = sorted[0];
+            const secondary = sorted.slice(1);
+
+            tilesContainer.innerHTML = `
+                <div class="inspector-layout">
+                    <section class="inspector-section">
+                        <div class="inspector-section-title">Hlavní objekt</div>
+                        ${buildObjectCard(primary, { primary: true })}
+                    </section>
+                    <section class="inspector-section">
+                        <div class="inspector-section-title">Ostatní objekty</div>
+                        ${secondary.length
+                            ? secondary.map(obj => buildObjectCard(obj)).join('')
+                            : '<div class="empty-state compact">Žádný další objekt v aktuálním snímku.</div>'}
+                    </section>
+                </div>`;
         }
 
         function updateDisplayStateFromTargets(stateStore, latestList, nowSec, dtSec) {
@@ -1280,6 +2053,7 @@
             // chvili neprijdou, posledni objekty se jeste kratce drzi a pomalu
             // slabnou podle confidence.
             requestAnimationFrame(animationLoop);
+            updateReplayPlayback(performance.now());
             const nowSec = performance.now() / 1000;
             const dtSec = Math.min(0.08, Math.max(0.001, nowSec - lastAnimationTimeSec));
             lastAnimationTimeSec = nowSec;
@@ -1293,6 +2067,13 @@
         }
 
         connect();
+        updateReplayControls();
+        syncLayoutMetrics();
+        syncViewSize();
+        window.addEventListener('resize', () => {
+            syncLayoutMetrics();
+            syncViewSize();
+        });
         animationLoop();
     </script>
 </body>

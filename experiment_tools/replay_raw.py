@@ -6,11 +6,23 @@ import argparse
 import asyncio
 import json
 from pathlib import Path
+import sys
 import threading
 import time
 
 import paho.mqtt.client as mqtt
 import uvicorn
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = SCRIPT_DIR.parent
+PROJECT_ROOT = PROJECT_DIR.parent
+RUNS_BASE_DIR = PROJECT_DIR
+
+for candidate in (PROJECT_ROOT, PROJECT_DIR, SCRIPT_DIR):
+    candidate_str = str(candidate)
+    if candidate_str not in sys.path:
+        sys.path.insert(0, candidate_str)
 
 try:
     from Four.config import BASE_DIR, MQTT_HOST, MQTT_PORT
@@ -98,7 +110,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def resolve_latest_run_dir() -> Path:
-    experiment_root = BASE_DIR / "runs" / "experiment"
+    experiment_root = RUNS_BASE_DIR / "runs" / "experiment"
     if not experiment_root.exists():
         raise FileNotFoundError(f"Adresar s experimenty neexistuje: {experiment_root}")
 
@@ -110,7 +122,7 @@ def resolve_latest_run_dir() -> Path:
 
 
 def resolve_preferred_run_dir() -> Path:
-    experiment_root = BASE_DIR / "runs" / "experiment"
+    experiment_root = RUNS_BASE_DIR / "runs" / "experiment"
     candidates = [path for path in experiment_root.iterdir() if path.is_dir()]
     dronarena_candidates = [path for path in candidates if "dronarena" in path.name.lower()]
     if dronarena_candidates:

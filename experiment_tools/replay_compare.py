@@ -10,30 +10,42 @@ import sys
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
 PROJECT_ROOT = PROJECT_DIR.parent
-PREFERRED_OPTITRACK_INPUT = PROJECT_DIR / "data" / "optitrack" / "Take 2026-05-05 11.47.22 AM.csv"
+PREFERRED_OPTITRACK_INPUT = PROJECT_DIR / "data" / "optitrack" / "Take 2026-05-07 12.43.55 PM.csv"
+PREFERRED_EXPERIMENT_INPUT_DIR = PROJECT_DIR / "runs" / "experiment" / "20260507_104346_Dronarena_04"
 
 
 def build_default_args() -> list[str]:
     args = [
+
+        "--input-dir",
+        str(PREFERRED_EXPERIMENT_INPUT_DIR),
+
+        # Pro mereni Dronarena_04           # pro mereni Dronarena_02
+
         "--with-optitrack-reference",
+
+        # Casovy offset
         "--optitrack-delay-sec",
-        "97.5",
+        "7.376",                              # "97.5",
+
+        # Souradnice
         "--optitrack-axis-x",
         "z",
         "--optitrack-axis-y",
         "x",
         "--optitrack-axis-z",
         "y",
+
+        # Prostorove offsety
         "--optitrack-yaw-deg",
         "0",
         "--optitrack-offset-x",
-        "2.635",
+        "2.371",                              # "2.635",
         "--optitrack-offset-y",
-        "3.847",
+        "3.808",                              # "3.847",
         "--optitrack-offset-z",
-        "-0.088",
-        "--optitrack-start-on-body",
-        "Phantom4",
+        "0.068",
+
     ]
 
     if PREFERRED_OPTITRACK_INPUT.exists():

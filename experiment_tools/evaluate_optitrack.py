@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from bisect import bisect_left
+import csv
 import json
 import math
 from pathlib import Path
@@ -42,7 +43,57 @@ DEFAULT_YAW_DEG = -89.4461
 DEFAULT_OFFSET_X = 2.6268
 DEFAULT_OFFSET_Y = 3.8304
 DEFAULT_OFFSET_Z = -0.1569
-SUPPORTED_SOURCES = ("fusion", "ble", "radar")
+SUPPORTED_SOURCES = (
+    "fusion",
+    "ble",
+    "radar",
+    "radar1",
+    "radar2",
+    "ble1",
+    "ble2",
+    "radar12",
+    "ble12",
+    "radar1_ble1",
+    "radar2_ble2",
+    "radar1_ble12",
+    "radar2_ble12",
+    "radar12_ble12",
+)
+SOURCE_ALIASES = {
+    "ble": "ble12",
+    "radar": "radar12",
+    "radary": "radar12",
+    "ble kotvy": "ble12",
+    "ble_kotvy": "ble12",
+    "ble1 + radar1": "radar1_ble1",
+    "ble1+radar1": "radar1_ble1",
+    "radar1 + ble1": "radar1_ble1",
+    "radar1+ble1": "radar1_ble1",
+    "ble2 + radar2": "radar2_ble2",
+    "ble2+radar2": "radar2_ble2",
+    "radar2 + ble2": "radar2_ble2",
+    "radar2+ble2": "radar2_ble2",
+    "ble kotvy + radar1": "radar1_ble12",
+    "ble kotvy+radar1": "radar1_ble12",
+    "ble_kotvy+radar1": "radar1_ble12",
+    "radar1 + ble kotvy": "radar1_ble12",
+    "radar1+ble kotvy": "radar1_ble12",
+    "radar1+ble_kotvy": "radar1_ble12",
+    "ble kotvy + radar2": "radar2_ble12",
+    "ble kotvy+radar2": "radar2_ble12",
+    "ble_kotvy+radar2": "radar2_ble12",
+    "radar2 + ble kotvy": "radar2_ble12",
+    "radar2+ble kotvy": "radar2_ble12",
+    "radar2+ble_kotvy": "radar2_ble12",
+    "radary + ble kotvy": "radar12_ble12",
+    "radary+ble kotvy": "radar12_ble12",
+    "radary+ble_kotvy": "radar12_ble12",
+    "ble kotvy + radary": "radar12_ble12",
+    "ble kotvy+radary": "radar12_ble12",
+    "ble_kotvy+radary": "radar12_ble12",
+}
+DEFAULT_SOURCES = "radar1,radar2,ble1,ble2,radar12,ble12,radar1_ble1,radar2_ble2,radar1_ble12,radar2_ble12,radar12_ble12"
+RAW_RADAR_HISTORY_WINDOW_SECONDS = 0.4
 
 
 def parse_args() -> argparse.Namespace:
@@ -65,13 +116,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--search-samples", type=int, default=2000, help="Max pocet vzorku pro automaticke hledani offsetu.")
     parser.add_argument(
         "--sources",
-        default="fusion,ble,radar",
-        help="Carkou oddeleny seznam zdroju k vyhodnoceni. Podporovano: fusion,ble,radar.",
+        default=DEFAULT_SOURCES,
+        help=(
+            "Carkou oddeleny seznam zdroju k vyhodnoceni. "
+            "Podporovano: fusion, ble/ble12, ble1, ble2, radar/radar12, radar1, radar2, "
+            "radar1_ble1, radar2_ble2, radar1_ble12, radar2_ble12, radar12_ble12."
+        ),
     )
     parser.add_argument(
         "--offset-source",
         default="fusion",
-        choices=("fusion", "ble"),
         help="Ktery tagovany zdroj pouzit pro automaticky odhad casoveho posunu.",
     )
     parser.add_argument(
@@ -79,6 +133,12 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=2.0,
         help="Max vzdalenost [m] pro sparovani radar clusteru s OptiTrack telosem.",
+    )
+    parser.add_argument(
+        "--raw-radar-history-window",
+        type=float,
+        default=RAW_RADAR_HISTORY_WINDOW_SECONDS,
+        help="Kolik sekund historie radarovych raw bodu pouzit pro radar1/radar2/radar12 evaluaci.",
     )
     parser.add_argument(
         "--plot-dir",
@@ -103,7 +163,7 @@ def sanitize_name(name: str) -> str:
 def parse_sources(raw_sources: str) -> list[str]:
     sources = []
     for item in raw_sources.split(","):
-        source = item.strip().lower()
+        source = SOURCE_ALIASES.get(item.strip().lower(), item.strip().lower())
         if not source:
             continue
         if source not in SUPPORTED_SOURCES:
@@ -115,6 +175,15 @@ def parse_sources(raw_sources: str) -> list[str]:
     if not sources:
         raise ValueError("Musis zadat alespon jeden zdroj v --sources.")
     return sources
+
+
+def normalize_source_name(raw_source: str) -> str:
+    source = SOURCE_ALIASES.get(raw_source.strip().lower(), raw_source.strip().lower())
+    if source not in SUPPORTED_SOURCES:
+        raise ValueError(
+            f"Neznamy zdroj '{raw_source}'. Podporovane zdroje: {', '.join(SUPPORTED_SOURCES)}"
+        )
+    return source
 
 
 def parse_tag_map(raw_items):
@@ -144,11 +213,33 @@ def load_fused_records(fused_path: Path):
                     "snapshot_timestamp": stats.get("timestamp", item["recorded_at"]),
                     "objects": payload.get("objects", []),
                     "ble": payload.get("ble", []),
+                    "ble_1_raw": payload.get("ble_1_raw", []),
+                    "ble_2_raw": payload.get("ble_2_raw", []),
                     "radar_clusters": payload.get("radar_clusters", []),
                 }
             )
     if not records:
         raise ValueError(f"Soubor {fused_path} neobsahuje zadne fused zpravy.")
+    return records
+
+
+def load_raw_records(raw_path: Path):
+    records = []
+    with raw_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            item = json.loads(line)
+            payload = json.loads(item["payload_text"])
+            records.append(
+                {
+                    "recorded_at": float(item["recorded_at"]),
+                    "payload_timestamp": float(item.get("payload_timestamp") or payload.get("timestamp") or item["recorded_at"]),
+                    "topic": str(item["topic"]),
+                    "payload": payload,
+                }
+            )
     return records
 
 
@@ -158,7 +249,7 @@ def infer_tag_mapping(records, body_names, explicit_mapping):
     body_by_sanitized = {sanitize_name(name): name for name in body_names}
 
     for record in records:
-        for collection_name in ("objects", "ble"):
+        for collection_name in ("objects", "ble", "ble_1_raw", "ble_2_raw"):
             for obj in record[collection_name]:
                 tag_id = str(obj.get("tag_id", "")).strip()
                 if not tag_id or tag_id in mapping:
@@ -186,14 +277,13 @@ def build_ground_truth(take):
     return trajectories
 
 
-def build_tagged_samples(records, tag_mapping, record_key):
-    first_timestamp = records[0]["snapshot_timestamp"]
+def build_tagged_samples(records, tag_mapping, record_key, base_timestamp):
     total_snapshots = len(records)
     samples = []
     snapshots_by_tag = {tag_id: 0 for tag_id in tag_mapping}
 
     for record in records:
-        relative_time = record["snapshot_timestamp"] - first_timestamp
+        relative_time = record["snapshot_timestamp"] - base_timestamp
         present_tags = set()
         for obj in record[record_key]:
             tag_id = str(obj.get("tag_id", "")).strip()
@@ -224,11 +314,47 @@ def build_tagged_samples(records, tag_mapping, record_key):
     }
 
 
-def build_radar_snapshots(records):
-    first_timestamp = records[0]["snapshot_timestamp"]
+def build_tagged_snapshot_series(records, tag_mapping, record_key, base_timestamp):
+    snapshots = []
+    snapshots_by_tag = {tag_id: 0 for tag_id in tag_mapping}
+
+    for snapshot_index, record in enumerate(records):
+        relative_time = record["snapshot_timestamp"] - base_timestamp
+        candidates = []
+        present_tags = set()
+        for candidate_index, obj in enumerate(record[record_key]):
+            tag_id = str(obj.get("tag_id", "")).strip()
+            if tag_id not in tag_mapping:
+                continue
+            present_tags.add(tag_id)
+            candidates.append(
+                {
+                    "candidate_id": f"{record_key}_{snapshot_index}_{candidate_index}",
+                    "source_kind": record_key,
+                    "tag_id": tag_id,
+                    "body_name": tag_mapping[tag_id],
+                    "x": float(obj.get("x", 0.0)),
+                    "y": float(obj.get("y", 0.0)),
+                    "z": float(obj.get("z", 0.0)),
+                    "confidence": float(obj.get("confidence", 0.0)),
+                }
+            )
+        for tag_id in present_tags:
+            snapshots_by_tag[tag_id] += 1
+        snapshots.append({"relative_time": relative_time, "candidates": candidates})
+
+    return {
+        "kind": "mixed",
+        "snapshots": snapshots,
+        "total_snapshots": len(snapshots),
+        "snapshots_by_tag": snapshots_by_tag,
+    }
+
+
+def build_radar_snapshots(records, base_timestamp):
     snapshots = []
     for record in records:
-        relative_time = record["snapshot_timestamp"] - first_timestamp
+        relative_time = record["snapshot_timestamp"] - base_timestamp
         clusters = []
         for index, cluster in enumerate(record["radar_clusters"]):
             clusters.append(
@@ -244,6 +370,76 @@ def build_radar_snapshots(records):
             )
         snapshots.append({"relative_time": relative_time, "clusters": clusters})
     return {"kind": "radar", "snapshots": snapshots, "total_snapshots": len(snapshots)}
+
+
+def build_raw_radar_snapshots_from_topics(fused_records, raw_records, topic_names, base_timestamp, history_window_seconds):
+    radar_records = [
+        record
+        for record in raw_records
+        if record["topic"] in topic_names
+    ]
+    radar_records.sort(key=lambda item: item["payload_timestamp"])
+
+    snapshots = []
+    left_index = 0
+    right_index = 0
+    total_records = len(radar_records)
+
+    for snapshot_index, record in enumerate(fused_records):
+        snapshot_timestamp = float(record["snapshot_timestamp"])
+        window_start = snapshot_timestamp - history_window_seconds
+
+        while left_index < total_records and radar_records[left_index]["payload_timestamp"] < window_start:
+            left_index += 1
+        while right_index < total_records and radar_records[right_index]["payload_timestamp"] <= snapshot_timestamp:
+            right_index += 1
+
+        clusters = []
+        for candidate_index, raw_record in enumerate(radar_records[left_index:right_index]):
+            payload = raw_record["payload"]
+            clusters.append(
+                {
+                    "cluster_index": candidate_index,
+                    "cluster_id": f"{raw_record['topic'].replace('/', '_')}_{snapshot_index}_{candidate_index}",
+                    "x": float(payload.get("x", 0.0)),
+                    "y": float(payload.get("y", 0.0)),
+                    "z": float(payload.get("z", 0.0)),
+                    "points": 1,
+                    "confidence": float(payload.get("snr", 0.0)),
+                    "source_topic": raw_record["topic"],
+                }
+            )
+
+        snapshots.append(
+            {
+                "relative_time": snapshot_timestamp - base_timestamp,
+                "clusters": clusters,
+            }
+        )
+
+    return {"kind": "radar", "snapshots": snapshots, "total_snapshots": len(snapshots)}
+
+
+def build_mixed_snapshots(*, total_snapshots, primary_snapshots, secondary_snapshots):
+    snapshots = []
+    for index in range(total_snapshots):
+        candidates = []
+        if index < len(primary_snapshots):
+            candidates.extend(primary_snapshots[index].get("clusters", []))
+            candidates.extend(primary_snapshots[index].get("candidates", []))
+        if index < len(secondary_snapshots):
+            candidates.extend(secondary_snapshots[index].get("clusters", []))
+            candidates.extend(secondary_snapshots[index].get("candidates", []))
+
+        relative_time = 0.0
+        if index < len(primary_snapshots):
+            relative_time = primary_snapshots[index]["relative_time"]
+        elif index < len(secondary_snapshots):
+            relative_time = secondary_snapshots[index]["relative_time"]
+
+        snapshots.append({"relative_time": relative_time, "candidates": candidates})
+
+    return {"kind": "mixed", "snapshots": snapshots, "total_snapshots": total_snapshots}
 
 
 def interpolate_body_position(points, target_time):
@@ -434,6 +630,72 @@ def evaluate_radar_snapshots(radar_snapshots, trajectories, time_offset, tag_map
     return errors, per_tag_errors, identity_mismatch_counts, matched_snapshots_by_tag
 
 
+def evaluate_mixed_snapshots(mixed_snapshots, trajectories, time_offset, tag_mapping, max_distance):
+    errors = []
+    per_tag_errors = {tag_id: [] for tag_id in tag_mapping}
+    matched_snapshots_by_tag = {tag_id: 0 for tag_id in tag_mapping}
+    identity_mismatch_counts = {tag_id: 0 for tag_id in tag_mapping}
+
+    for snapshot in mixed_snapshots:
+        gt_time = snapshot["relative_time"] + time_offset
+        candidate_bodies = []
+        for tag_id, body_name in tag_mapping.items():
+            gt_position = interpolate_body_position(trajectories.get(body_name, []), gt_time)
+            if gt_position is None:
+                continue
+            candidate_bodies.append((tag_id, body_name, gt_position))
+        if not candidate_bodies or not snapshot["candidates"]:
+            continue
+
+        pair_candidates = []
+        for candidate_index, candidate in enumerate(snapshot["candidates"]):
+            sensor_position = (candidate["x"], candidate["y"], candidate["z"])
+            tagged_candidate = candidate.get("tag_id") in tag_mapping and candidate.get("body_name")
+
+            if tagged_candidate:
+                tag_id = candidate["tag_id"]
+                body_name = candidate["body_name"]
+                gt_position = interpolate_body_position(trajectories.get(body_name, []), gt_time)
+                if gt_position is None:
+                    continue
+                distance = distance_3d(sensor_position, gt_position)
+                pair_candidates.append((distance, candidate_index, candidate, tag_id, body_name, gt_position))
+                continue
+
+            for tag_id, body_name, gt_position in candidate_bodies:
+                distance = distance_3d(sensor_position, gt_position)
+                if distance <= max_distance:
+                    pair_candidates.append((distance, candidate_index, candidate, tag_id, body_name, gt_position))
+
+        pair_candidates.sort(key=lambda item: item[0])
+        used_candidates = set()
+        used_tags = set()
+
+        for _, candidate_index, candidate, tag_id, body_name, gt_position in pair_candidates:
+            if candidate_index in used_candidates or tag_id in used_tags:
+                continue
+            used_candidates.add(candidate_index)
+            used_tags.add(tag_id)
+
+            sample = {
+                "tag_id": tag_id,
+                "body_name": body_name,
+                "relative_time": snapshot["relative_time"],
+                "x": candidate["x"],
+                "y": candidate["y"],
+                "z": candidate["z"],
+                "confidence": float(candidate.get("confidence", 0.0)),
+            }
+            error_item = build_error_item(sample, gt_position, gt_time)
+            error_item["source_kind"] = candidate.get("source_kind", "mixed")
+            error_item["candidate_id"] = candidate.get("candidate_id") or candidate.get("cluster_id")
+            errors.append(error_item)
+            per_tag_errors[tag_id].append(error_item)
+            matched_snapshots_by_tag[tag_id] += 1
+
+    return errors, per_tag_errors, identity_mismatch_counts, matched_snapshots_by_tag
+
+
 def estimate_time_offset(samples, trajectories, tag_mapping, start, end, step, max_samples):
     if not samples:
         return 0.0
@@ -550,13 +812,403 @@ def print_source_summary(source_result):
         print(f"Evaluation {label}: nenasel jsem zadne porovnatelne vzorky.")
 
 
+def build_source_label(source_name: str) -> str:
+    labels = {
+        "fusion": "Fuze",
+        "ble12": "2x BLE",
+        "ble1": "BLE 1",
+        "ble2": "BLE 2",
+        "radar12": "2x Radar",
+        "radar1": "Radar 1",
+        "radar2": "Radar 2",
+        "radar1_ble1": "BLE 1 + Radar 1",
+        "radar2_ble2": "BLE 2 + Radar 2",
+        "radar1_ble12": "2x BLE + Radar 1",
+        "radar2_ble12": "2x BLE + Radar 2",
+        "radar12_ble12": "2x Radar + 2x BLE",
+    }
+    return labels.get(source_name, source_name.upper())
+
+
+def write_summary_csv(summary_csv_path: Path, requested_sources, source_results) -> None:
+    summary_csv_path.parent.mkdir(parents=True, exist_ok=True)
+    with summary_csv_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "source_key",
+                "label",
+                "count",
+                "mean_error_3d_m",
+                "median_error_3d_m",
+                "p95_error_3d_m",
+                "max_error_3d_m",
+                "rmse_3d_m",
+                "mean_error_xy_m",
+                "median_error_xy_m",
+                "mean_abs_error_z_m",
+                "median_abs_error_z_m",
+                "mean_presence_ratio",
+                "identity_mismatches_total",
+            ],
+        )
+        writer.writeheader()
+
+        for source_name in requested_sources:
+            source_result = source_results[source_name]
+            overall = source_result["overall"]
+            per_tag = source_result["per_tag"]
+            presence_values = [item.get("presence_ratio", 0.0) for item in per_tag.values() if item.get("count", 0) > 0]
+            mismatch_total = sum(item.get("suspected_identity_mismatches", 0) for item in per_tag.values())
+            writer.writerow(
+                {
+                    "source_key": source_name,
+                    "label": source_result["label"],
+                    "count": overall.get("count", 0),
+                    "mean_error_3d_m": overall.get("mean_error_3d_m"),
+                    "median_error_3d_m": overall.get("median_error_3d_m"),
+                    "p95_error_3d_m": overall.get("p95_error_3d_m"),
+                    "max_error_3d_m": overall.get("max_error_3d_m"),
+                    "rmse_3d_m": overall.get("rmse_3d_m"),
+                    "mean_error_xy_m": overall.get("mean_error_xy_m"),
+                    "median_error_xy_m": overall.get("median_error_xy_m"),
+                    "mean_abs_error_z_m": overall.get("mean_abs_error_z_m"),
+                    "median_abs_error_z_m": overall.get("median_abs_error_z_m"),
+                    "mean_presence_ratio": mean(presence_values) if presence_values else 0.0,
+                    "identity_mismatches_total": mismatch_total,
+                }
+            )
+
+
+def write_summary_json(summary_json_path: Path, requested_sources, source_results) -> None:
+    summary_json_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_payload = {
+        "sources": [
+            {
+                "source_key": source_name,
+                "label": source_results[source_name]["label"],
+                "overall": source_results[source_name]["overall"],
+                "per_tag": source_results[source_name]["per_tag"],
+            }
+            for source_name in requested_sources
+        ]
+    }
+    summary_json_path.write_text(json.dumps(summary_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def escape_latex(text: str) -> str:
+    replacements = {
+        "\\": r"\textbackslash{}",
+        "&": r"\&",
+        "%": r"\%",
+        "$": r"\$",
+        "#": r"\#",
+        "_": r"\_",
+        "{": r"\{",
+        "}": r"\}",
+    }
+    escaped = str(text)
+    for old, new in replacements.items():
+        escaped = escaped.replace(old, new)
+    return escaped
+
+
+def format_metric(value) -> str:
+    if value is None:
+        return "--"
+    if isinstance(value, int):
+        return str(value)
+    return f"{float(value):.3f}"
+
+
+def latex_relative_path(path: Path) -> str:
+    try:
+        relative = path.resolve().relative_to(PROJECT_DIR.resolve())
+        return relative.as_posix()
+    except ValueError:
+        return path.name
+
+
+def source_sort_key(source_name: str, source_results) -> tuple[float, float]:
+    overall = source_results[source_name]["overall"]
+    median_3d = overall.get("median_error_3d_m")
+    p95_3d = overall.get("p95_error_3d_m")
+    return (
+        float(median_3d) if median_3d is not None else float("inf"),
+        float(p95_3d) if p95_3d is not None else float("inf"),
+    )
+
+
+def write_summary_latex(summary_tex_path: Path, requested_sources, source_results, *, ranked: bool = False) -> None:
+    summary_tex_path.parent.mkdir(parents=True, exist_ok=True)
+    source_order = list(requested_sources)
+    if ranked:
+        source_order = sorted(source_order, key=lambda item: source_sort_key(item, source_results))
+    lines = [
+        r"\begin{table}[htbp]",
+        r"\centering",
+        r"\small",
+        r"\begin{tabular}{lrrrrrr}",
+        r"\hline",
+        r"Zdroj & N & Median 3D [m] & P95 3D [m] & RMSE 3D [m] & Median XY [m] & Median $|Z|$ [m] \\",
+        r"\hline",
+    ]
+
+    for source_name in source_order:
+        source_result = source_results[source_name]
+        overall = source_result["overall"]
+        lines.append(
+            " & ".join(
+                [
+                    escape_latex(source_result["label"]),
+                    format_metric(overall.get("count", 0)),
+                    format_metric(overall.get("median_error_3d_m")),
+                    format_metric(overall.get("p95_error_3d_m")),
+                    format_metric(overall.get("rmse_3d_m")),
+                    format_metric(overall.get("median_error_xy_m")),
+                    format_metric(overall.get("median_abs_error_z_m")),
+                ]
+            )
+            + r" \\"
+        )
+
+    lines.extend(
+        [
+            r"\hline",
+            r"\end{tabular}",
+            (
+                r"\caption{Serazeny souhrn presnosti jednotlivych variant lokalizace vuci referencnimu systemu OptiTrack.}"
+                if ranked else
+                r"\caption{Souhrn presnosti jednotlivych variant lokalizace vuci referencnimu systemu OptiTrack.}"
+            ),
+            (
+                r"\label{tab:optitrack_accuracy_ranked}"
+                if ranked else
+                r"\label{tab:optitrack_accuracy_summary}"
+            ),
+            r"\end{table}",
+            "",
+        ]
+    )
+    summary_tex_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_figure_snippets(figures_tex_path: Path, comparison_plot_paths: dict[str, str]) -> None:
+    figures_tex_path.parent.mkdir(parents=True, exist_ok=True)
+    boxplot_path = comparison_plot_paths.get("error_3d_boxplot")
+    cdf_path = comparison_plot_paths.get("error_3d_cdf")
+    if not boxplot_path or not cdf_path:
+        figures_tex_path.write_text("% Comparison plots were not generated.\n", encoding="utf-8")
+        return
+
+    boxplot_include = latex_relative_path(Path(boxplot_path))
+    cdf_include = latex_relative_path(Path(cdf_path))
+    lines = [
+        r"\begin{figure}[htbp]",
+        r"    \centering",
+        rf"    \includegraphics[width=0.92\linewidth]{{{boxplot_include}}}",
+        r"    \caption{Krabicovy graf prostorove chyby jednotlivych variant lokalizace vzhledem k referencnimu systemu OptiTrack.}",
+        r"    \label{fig:optitrack_error_3d_boxplot}",
+        r"\end{figure}",
+        "",
+        r"\begin{figure}[htbp]",
+        r"    \centering",
+        rf"    \includegraphics[width=0.92\linewidth]{{{cdf_include}}}",
+        r"    \caption{Kumulativni distribucni funkce prostorove chyby pro jednotlive varianty lokalizace.}",
+        r"    \label{fig:optitrack_error_3d_cdf}",
+        r"\end{figure}",
+        "",
+    ]
+    figures_tex_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def join_labels_for_text(labels: list[str]) -> str:
+    if not labels:
+        return ""
+    if len(labels) == 1:
+        return labels[0]
+    return ", ".join(labels[:-1]) + " a " + labels[-1]
+
+
+def build_offset_text(time_offset: float, offset_source_label: str, source_results) -> str:
+    if offset_source_label == "manual":
+        return f"Casova synchronizace byla nastavena manualne s vyslednym posunem ${time_offset:.3f}\\,\\mathrm{{s}}$."
+    if offset_source_label.startswith("estimated:"):
+        offset_source = offset_source_label.split(":", 1)[1]
+        source_label = source_results.get(offset_source, {}).get("label", build_source_label(offset_source))
+        return (
+            f"Casova synchronizace byla odhadnuta automaticky ze zdroje "
+            f"\\texttt{{{escape_latex(source_label)}}} s vyslednym posunem "
+            f"${time_offset:.3f}\\,\\mathrm{{s}}$."
+        )
+    return f"Pro vyhodnoceni byl pouzit casovy posun ${time_offset:.3f}\\,\\mathrm{{s}}$."
+
+
+def write_accuracy_chapter_template(
+    chapter_tex_path: Path,
+    run_dir: Path,
+    requested_sources,
+    source_results,
+    time_offset: float,
+    offset_source_label: str,
+    comparison_plot_paths: dict[str, str],
+) -> None:
+    chapter_tex_path.parent.mkdir(parents=True, exist_ok=True)
+    ranked_sources = sorted(requested_sources, key=lambda item: source_sort_key(item, source_results))
+    best_source = ranked_sources[0]
+    second_source = ranked_sources[1] if len(ranked_sources) > 1 else best_source
+    worst_source = ranked_sources[-1]
+    best_summary = source_results[best_source]["overall"]
+    second_summary = source_results[second_source]["overall"]
+    worst_summary = source_results[worst_source]["overall"]
+    summary_include = latex_relative_path(run_dir / "summary_metrics_table.tex")
+    summary_ranked_include = latex_relative_path(run_dir / "summary_metrics_ranked_table.tex")
+    figures_include = latex_relative_path(run_dir / "accuracy_figures.tex")
+    detail_plot_dir = latex_relative_path(run_dir / "evaluation_plots")
+    offset_text = build_offset_text(time_offset, offset_source_label, source_results)
+    evaluated_labels = [escape_latex(source_results[source]["label"]) for source in requested_sources]
+
+    lines = [
+        r"\section{Vyhodnoceni presnosti vuci referencnimu systemu}",
+        "",
+        r"Cilem teto kapitoly je porovnat presnost jednotlivych variant lokalizace vuci referencnimu systemu OptiTrack. "
+        rf"Vyhodnoceni bylo provedeno nad experimentem \texttt{{{escape_latex(run_dir.name)}}}. "
+        + offset_text,
+        "",
+        r"\subsection{Vyhodnocovane varianty}",
+        "",
+        r"Porovnavane byly nasledujici varianty lokalizace: " + join_labels_for_text(evaluated_labels) + ".",
+        "",
+        r"\subsection{Pouzite metriky}",
+        "",
+        r"Jako hlavni metriky byly zvoleny median prostorove chyby, 95. percentil prostorove chyby a hodnota RMSE. "
+        r"Doplnkove byly sledovany median horizontalni chyby v rovine XY a median absolutni chyby ve smeru osy Z. "
+        r"Tyto metriky umoznuji hodnotit jak typickou presnost metody, tak i jeji chovani v horsich stavech.",
+        "",
+        r"\subsection{Souhrnne vysledky}",
+        "",
+        r"Tabulka~\ref{tab:optitrack_accuracy_summary} uvadi souhrn vyslednych metrik v puvodnim poradi variant. "
+        r"Tabulka~\ref{tab:optitrack_accuracy_ranked} potom stejne vysledky radi podle medianu prostorove chyby.",
+        "",
+        rf"\input{{{summary_include}}}",
+        "",
+        rf"\input{{{summary_ranked_include}}}",
+        "",
+        r"Z hlediska medianu prostorove chyby dosahla nejlepsiho vysledku varianta "
+        + escape_latex(source_results[best_source]["label"])
+        + r" s hodnotou "
+        + format_metric(best_summary.get("median_error_3d_m"))
+        + r"\,\mathrm{m}. "
+        r"Druhy nejlepsi vysledek poskytla varianta "
+        + escape_latex(source_results[second_source]["label"])
+        + r" s medianem "
+        + format_metric(second_summary.get("median_error_3d_m"))
+        + r"\,\mathrm{m}. "
+        r"Naopak nejhorsi vysledek vykazala varianta "
+        + escape_latex(source_results[worst_source]["label"])
+        + r" s medianem "
+        + format_metric(worst_summary.get("median_error_3d_m"))
+        + r"\,\mathrm{m}.",
+        "",
+    ]
+    if comparison_plot_paths:
+        lines.extend(
+            [
+                r"\subsection{Distribuce chyby}",
+                "",
+                r"Pro lepsi interpretaci vysledku jsou na obr.~\ref{fig:optitrack_error_3d_boxplot} a "
+                r"obr.~\ref{fig:optitrack_error_3d_cdf} uvedeny grafy rozdeleni prostorove chyby.",
+                "",
+                rf"\input{{{figures_include}}}",
+                "",
+                r"Krabicovy graf umoznuje rychle porovnat typickou chybu i rozsah hodnot jednotlivych variant, "
+                r"zatimco kumulativni distribucni funkce ukazuje, jaka cast odhadu lezi pod zvolenou hranici chyby. "
+                r"Z kombinace obou grafu je patrne, zda zlepseni vyplyva z posunu cele distribuce, nebo z omezeni odlehlych stavu.",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            r"\subsection{Interpretace}",
+            "",
+            r"Z vysledku je patrne, ze samotne BLE kotvy vykazuji oproti radarovym variantam vyrazne vyssi chybu. "
+            r"Pridani druhe BLE kotvy vsak vede k citelnemu zlepseni oproti jednotlivym BLE vetvim. "
+            r"Soucasne je videt, ze druhy radar poskytuje lepsi vysledky nez prvni radar, a to jak v medianu, tak v 95. percentilu chyby. "
+            r"Nejpresnejsi vysledky nasledne poskytuje kombinace obou radarovych vetvi s obema BLE kotvami, "
+            r"coz potvrzuje prinos multi-senzorove fuzni strategie.",
+            "",
+            r"\subsection{Doplnkova diagnostika}",
+            "",
+            r"Detailni casove prubehy po jednotlivych osach X, Y a Z jsou ulozeny v adresari "
+            rf"\texttt{{{escape_latex(detail_plot_dir)}}}. "
+            r"Tyto grafy slouzi zejmena pro diagnostiku systematickych odchylek v jednotlivych osach a nejsou proto pouzity jako hlavni srovnavaci vystup kapitoly.",
+            "",
+        ]
+    )
+    chapter_tex_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_comparison_plots(plot_dir: Path, requested_sources, source_results, error_distributions) -> dict[str, str]:
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    valid_sources = [
+        source_name
+        for source_name in requested_sources
+        if error_distributions.get(source_name)
+    ]
+    if not valid_sources:
+        return {}
+
+    labels = [source_results[source_name]["label"] for source_name in valid_sources]
+    distributions = [
+        [item["error_3d_m"] for item in error_distributions[source_name]]
+        for source_name in valid_sources
+    ]
+
+    boxplot_path = plot_dir / "error_3d_boxplot.png"
+    figure, axis = plt.subplots(figsize=(max(11, len(valid_sources) * 1.1), 6.5))
+    axis.boxplot(distributions, tick_labels=labels, showfliers=False)
+    axis.set_ylabel("3D error [m]")
+    axis.set_title("Srovnani 3D chyby proti OptiTracku")
+    axis.grid(True, axis="y", alpha=0.25)
+    plt.setp(axis.get_xticklabels(), rotation=25, ha="right")
+    figure.tight_layout()
+    figure.savefig(boxplot_path, dpi=150, bbox_inches="tight")
+    plt.close(figure)
+
+    cdf_path = plot_dir / "error_3d_cdf.png"
+    figure, axis = plt.subplots(figsize=(11, 6.5))
+    for label, values in zip(labels, distributions):
+        ordered = sorted(values)
+        cdf = [(index + 1) / len(ordered) for index in range(len(ordered))]
+        axis.plot(ordered, cdf, linewidth=1.5, label=label)
+    axis.set_xlabel("3D error [m]")
+    axis.set_ylabel("CDF")
+    axis.set_title("Kumulativni rozdeleni 3D chyby")
+    axis.grid(True, alpha=0.25)
+    axis.legend(loc="lower right", fontsize=9)
+    figure.tight_layout()
+    figure.savefig(cdf_path, dpi=150, bbox_inches="tight")
+    plt.close(figure)
+
+    return {
+        "error_3d_boxplot": str(boxplot_path),
+        "error_3d_cdf": str(cdf_path),
+    }
+
+
 def main() -> None:
     args = parse_args()
     requested_sources = parse_sources(args.sources)
+    offset_source = normalize_source_name(args.offset_source)
 
     run_dir = Path(args.input_dir).resolve()
     fused_path = run_dir / "fused.ndjson"
+    raw_path = run_dir / "raw.ndjson"
     records = load_fused_records(fused_path)
+    raw_records = load_raw_records(raw_path) if raw_path.exists() else []
+    fused_base_timestamp = min(record["snapshot_timestamp"] for record in records)
+    raw_base_timestamp = min((record["payload_timestamp"] for record in raw_records), default=fused_base_timestamp)
+    base_timestamp = min(fused_base_timestamp, raw_base_timestamp)
 
     take = load_optitrack_take(
         args.xlsx,
@@ -579,15 +1231,59 @@ def main() -> None:
         )
 
     source_inputs = {
-        "fusion": build_tagged_samples(records, tag_mapping, "objects"),
-        "ble": build_tagged_samples(records, tag_mapping, "ble"),
-        "radar": build_radar_snapshots(records),
+        "fusion": build_tagged_samples(records, tag_mapping, "objects", base_timestamp),
+        "ble12": build_tagged_samples(records, tag_mapping, "ble", base_timestamp),
+        "ble1": build_tagged_samples(records, tag_mapping, "ble_1_raw", base_timestamp),
+        "ble2": build_tagged_samples(records, tag_mapping, "ble_2_raw", base_timestamp),
+        "radar12": build_raw_radar_snapshots_from_topics(
+            records, raw_records, {"sensors/raw/radar_1", "sensors/raw/radar_2"}, base_timestamp, args.raw_radar_history_window
+        ),
+        "radar1": build_raw_radar_snapshots_from_topics(
+            records, raw_records, {"sensors/raw/radar_1"}, base_timestamp, args.raw_radar_history_window
+        ),
+        "radar2": build_raw_radar_snapshots_from_topics(
+            records, raw_records, {"sensors/raw/radar_2"}, base_timestamp, args.raw_radar_history_window
+        ),
     }
+    source_inputs["ble"] = source_inputs["ble12"]
+    source_inputs["radar"] = source_inputs["radar12"]
 
-    offset_source = args.offset_source
+    ble12_snapshots = build_tagged_snapshot_series(records, tag_mapping, "ble", base_timestamp)
+    ble1_snapshots = build_tagged_snapshot_series(records, tag_mapping, "ble_1_raw", base_timestamp)
+    ble2_snapshots = build_tagged_snapshot_series(records, tag_mapping, "ble_2_raw", base_timestamp)
+    radar12_snapshots = source_inputs["radar12"]
+    radar1_snapshots = source_inputs["radar1"]
+    radar2_snapshots = source_inputs["radar2"]
+
+    source_inputs["radar1_ble1"] = build_mixed_snapshots(
+        total_snapshots=len(records),
+        primary_snapshots=radar1_snapshots["snapshots"],
+        secondary_snapshots=ble1_snapshots["snapshots"],
+    )
+    source_inputs["radar2_ble2"] = build_mixed_snapshots(
+        total_snapshots=len(records),
+        primary_snapshots=radar2_snapshots["snapshots"],
+        secondary_snapshots=ble2_snapshots["snapshots"],
+    )
+    source_inputs["radar1_ble12"] = build_mixed_snapshots(
+        total_snapshots=len(records),
+        primary_snapshots=radar1_snapshots["snapshots"],
+        secondary_snapshots=ble12_snapshots["snapshots"],
+    )
+    source_inputs["radar2_ble12"] = build_mixed_snapshots(
+        total_snapshots=len(records),
+        primary_snapshots=radar2_snapshots["snapshots"],
+        secondary_snapshots=ble12_snapshots["snapshots"],
+    )
+    source_inputs["radar12_ble12"] = build_mixed_snapshots(
+        total_snapshots=len(records),
+        primary_snapshots=radar12_snapshots["snapshots"],
+        secondary_snapshots=ble12_snapshots["snapshots"],
+    )
+
     offset_samples = source_inputs[offset_source]["samples"]
     if not offset_samples and offset_source == "fusion":
-        offset_source = "ble"
+        offset_source = "ble12"
         offset_samples = source_inputs[offset_source]["samples"]
     if not offset_samples:
         raise ValueError(
@@ -611,10 +1307,11 @@ def main() -> None:
 
     plot_dir = Path(args.plot_dir).resolve() if args.plot_dir else (run_dir / "evaluation_plots")
     source_results = {}
+    error_distributions = {}
 
     for source_name in requested_sources:
         source_input = source_inputs[source_name]
-        if source_name in {"fusion", "ble"}:
+        if source_input["kind"] == "tagged":
             errors, per_tag_errors, identity_mismatch_counts = evaluate_tagged_samples(
                 source_input["samples"],
                 trajectories,
@@ -623,7 +1320,7 @@ def main() -> None:
             )
             source_result = build_source_result(
                 source_name=source_name,
-                label=source_name.upper(),
+                label=build_source_label(source_name),
                 errors=errors,
                 per_tag_errors=per_tag_errors,
                 tag_mapping=tag_mapping,
@@ -631,7 +1328,7 @@ def main() -> None:
                 snapshots_by_tag=source_input["snapshots_by_tag"],
                 identity_mismatch_counts=identity_mismatch_counts,
             )
-        else:
+        elif source_input["kind"] == "radar":
             errors, per_tag_errors, identity_mismatch_counts, matched_snapshots_by_tag = evaluate_radar_snapshots(
                 source_input["snapshots"],
                 trajectories,
@@ -641,7 +1338,26 @@ def main() -> None:
             )
             source_result = build_source_result(
                 source_name=source_name,
-                label="RADAR",
+                label=build_source_label(source_name),
+                errors=errors,
+                per_tag_errors=per_tag_errors,
+                tag_mapping=tag_mapping,
+                total_snapshots=source_input["total_snapshots"],
+                snapshots_by_tag=matched_snapshots_by_tag,
+                identity_mismatch_counts=identity_mismatch_counts,
+            )
+            source_result["match_max_distance_m"] = args.radar_match_max_distance
+        else:
+            errors, per_tag_errors, identity_mismatch_counts, matched_snapshots_by_tag = evaluate_mixed_snapshots(
+                source_input["snapshots"],
+                trajectories,
+                time_offset,
+                tag_mapping,
+                args.radar_match_max_distance,
+            )
+            source_result = build_source_result(
+                source_name=source_name,
+                label=build_source_label(source_name),
                 errors=errors,
                 per_tag_errors=per_tag_errors,
                 tag_mapping=tag_mapping,
@@ -667,8 +1383,30 @@ def main() -> None:
                 summary["plot_path"] = plot_paths[tag_id]
         source_result["plot_files"] = plot_paths
         source_results[source_name] = source_result
+        error_distributions[source_name] = errors
 
     fusion_result = source_results.get("fusion", {"overall": {"count": 0}, "per_tag": {}})
+    summary_csv_path = run_dir / "summary_metrics.csv"
+    summary_json_path = run_dir / "summary_metrics.json"
+    summary_tex_path = run_dir / "summary_metrics_table.tex"
+    summary_ranked_tex_path = run_dir / "summary_metrics_ranked_table.tex"
+    figures_tex_path = run_dir / "accuracy_figures.tex"
+    chapter_template_path = run_dir / "accuracy_chapter_template.tex"
+    write_summary_csv(summary_csv_path, requested_sources, source_results)
+    write_summary_json(summary_json_path, requested_sources, source_results)
+    comparison_plot_paths = write_comparison_plots(plot_dir, requested_sources, source_results, error_distributions) if not args.skip_plots else {}
+    write_summary_latex(summary_tex_path, requested_sources, source_results)
+    write_summary_latex(summary_ranked_tex_path, requested_sources, source_results, ranked=True)
+    write_figure_snippets(figures_tex_path, comparison_plot_paths)
+    write_accuracy_chapter_template(
+        chapter_template_path,
+        run_dir,
+        requested_sources,
+        source_results,
+        time_offset,
+        offset_source_label,
+        comparison_plot_paths,
+    )
     output = {
         "input_dir": str(run_dir),
         "xlsx": str(Path(args.xlsx).resolve()),
@@ -680,6 +1418,13 @@ def main() -> None:
         "mapped_tags": tag_mapping,
         "sources_requested": requested_sources,
         "plot_dir": None if args.skip_plots else str(plot_dir),
+        "summary_csv": str(summary_csv_path),
+        "summary_json": str(summary_json_path),
+        "summary_tex": str(summary_tex_path),
+        "summary_ranked_tex": str(summary_ranked_tex_path),
+        "figures_tex": str(figures_tex_path),
+        "chapter_template_tex": str(chapter_template_path),
+        "comparison_plots": comparison_plot_paths,
         "sources": source_results,
         # Zachovani zpetne kompatibility se starym vyhodnocenim fused vystupu.
         "fused_snapshots": source_inputs["fusion"]["total_snapshots"],
@@ -692,8 +1437,16 @@ def main() -> None:
 
     print(f"Evaluation: ulozeno do {output_path}")
     print(f"Evaluation: time_offset={time_offset:.3f}s ({offset_source_label})")
+    print(f"Evaluation: souhrn CSV ulozen do {summary_csv_path}")
+    print(f"Evaluation: souhrn JSON ulozen do {summary_json_path}")
+    print(f"Evaluation: souhrn LaTeX tabulka ulozena do {summary_tex_path}")
+    print(f"Evaluation: serazena LaTeX tabulka ulozena do {summary_ranked_tex_path}")
+    print(f"Evaluation: LaTeX figure snippet ulozen do {figures_tex_path}")
+    print(f"Evaluation: sablona kapitoly ulozena do {chapter_template_path}")
     if not args.skip_plots:
         print(f"Evaluation: grafy ulozeny do {plot_dir}")
+        for plot_name, plot_path in comparison_plot_paths.items():
+            print(f"Evaluation: {plot_name} -> {plot_path}")
     for source_name in requested_sources:
         print_source_summary(source_results[source_name])
 

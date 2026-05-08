@@ -125,7 +125,6 @@ DASHBOARD_VIEW_CONFIG = {
     "test_area_x_max": TEST_AREA_X_MAX,
     "test_area_y_min": TEST_AREA_Y_MIN,
     "test_area_y_max": TEST_AREA_Y_MAX,
-    "default_data_mode": os.getenv("FOUR_DASHBOARD_DEFAULT_DATA_MODE", "fused").strip().lower() or "fused",
 }
 
 BLE_CONFIGS = [
@@ -133,7 +132,7 @@ BLE_CONFIGS = [
         "id": "ble_1",
         "port": os.getenv("FOUR_BLE_1_PORT", platform_default("COM38", "/dev/ttyUSB2")),
         "baud": env_int("FOUR_BLE_1_BAUD", 115200),
-        "pos_x": env_float("FOUR_BLE_1_POS_X", 3.15),
+        "pos_x": env_float("FOUR_BLE_1_POS_X", 3.05),
         "pos_y": env_float("FOUR_BLE_1_POS_Y", 0.0),
         "pos_z": env_float("FOUR_BLE_1_POS_Z", 1.0),
         "rotation": env_float("FOUR_BLE_1_ROTATION", 90),
@@ -154,7 +153,7 @@ RADAR_CONFIGS = [
         "id": "radar_1",
         "cfg_port": os.getenv("FOUR_RADAR_1_CFG_PORT", platform_default("COM13", "/dev/ttyACM0")),
         "dat_port": os.getenv("FOUR_RADAR_1_DAT_PORT", platform_default("COM14", "/dev/ttyACM1")),
-        "pos_x": env_float("FOUR_RADAR_1_POS_X", 3.05),
+        "pos_x": env_float("FOUR_RADAR_1_POS_X", 2.95),
         "pos_y": env_float("FOUR_RADAR_1_POS_Y", 0.0),
         "pos_z": env_float("FOUR_RADAR_1_POS_Z", 1.0),
         "rotation": env_float("FOUR_RADAR_1_ROTATION", 0),

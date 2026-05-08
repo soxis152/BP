@@ -13,11 +13,22 @@ import asyncio
 import json
 from pathlib import Path
 import re
+import sys
 import threading
 import time
 
 import paho.mqtt.client as mqtt
 import uvicorn
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = SCRIPT_DIR.parent
+PROJECT_ROOT = PROJECT_DIR.parent
+
+for candidate in (PROJECT_ROOT, PROJECT_DIR, SCRIPT_DIR):
+    candidate_str = str(candidate)
+    if candidate_str not in sys.path:
+        sys.path.insert(0, candidate_str)
 
 try:
     from Four.config import BLE_CONFIGS, MQTT_HOST, MQTT_PORT, RADAR_CONFIGS, RUN_ID
@@ -30,7 +41,7 @@ try:
         load_optitrack_take,
         shift_take,
     )
-    from Four.test_soubory.scenario_common import (
+    from Four.experiment_tools.synthetic_measurements import (
         ObjectState,
         build_ble_records,
         build_radar_records,
@@ -49,7 +60,7 @@ except ImportError:
             load_optitrack_take,
             shift_take,
         )
-        from test_soubory.scenario_common import (
+        from experiment_tools.synthetic_measurements import (
             ObjectState,
             build_ble_records,
             build_radar_records,
@@ -58,7 +69,7 @@ except ImportError:
         )
     except ImportError:
         from Four.experiment_tools.optitrack_xlsx import compute_auto_fit_offsets, compute_bounds, load_optitrack_take, shift_take
-        from Four.test_soubory.scenario_common import (
+        from Four.experiment_tools.synthetic_measurements import (
             ObjectState,
             build_ble_records,
             build_radar_records,
