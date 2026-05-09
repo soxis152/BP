@@ -20,7 +20,7 @@ from pathlib import Path
 import aiomqtt
 import asyncpg
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 
 try:
     from config import DASHBOARD_VIEW_CONFIG, DB_CONFIG, MQTT_HOST
@@ -37,6 +37,8 @@ BASE_DIR = Path(__file__).resolve().parent
 OPTITRACK_REFERENCE_TOPIC = "sensors/reference/optitrack"
 latest_fused_payload = None
 latest_optitrack_payload = None
+replay_frame_cache_path = None
+replay_timeline_cache_path = None
 
 
 @asynccontextmanager
@@ -73,6 +75,50 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+def configure_replay_frame_cache(path: str | Path | None) -> None:
+    """Nastavi volitelnou NDJSON cache pro preload replay frame bufferu."""
+    global replay_frame_cache_path
+
+    if not path:
+        replay_frame_cache_path = None
+        return
+
+    replay_frame_cache_path = Path(path).resolve()
+
+
+def configure_replay_timeline_cache(path: str | Path | None) -> None:
+    """Nastavi volitelnou NDJSON timeline cache pro frame-based replay."""
+    global replay_timeline_cache_path
+
+    if not path:
+        replay_timeline_cache_path = None
+        return
+
+    replay_timeline_cache_path = Path(path).resolve()
+
+
+def iter_replay_frame_payload_lines(cache_path: Path):
+    """Vrati textove payload radky pro preload dashboardu z NDJSON datasetu."""
+    with cache_path.open("r", encoding="utf-8") as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                yield line
+                continue
+
+            payload_text = record.get("payload_text")
+            if isinstance(payload_text, str) and payload_text.strip():
+                yield payload_text.strip()
+                continue
+
+            yield json.dumps(record, ensure_ascii=False)
 
 
 def render_index_html(index_path: Path) -> str:
@@ -160,6 +206,32 @@ async def get():
 
     return HTMLResponse(
         render_index_html(index_path),
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+
+@app.get("/api/replay/frames")
+async def get_replay_frames():
+    """Vrati predpocitanou NDJSON cache replay snimku, kdyz je dostupna."""
+    if not replay_frame_cache_path or not replay_frame_cache_path.exists():
+        return Response(status_code=404)
+
+    return PlainTextResponse(
+        "\n".join(iter_replay_frame_payload_lines(replay_frame_cache_path)),
+        media_type="application/x-ndjson; charset=utf-8",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+
+@app.get("/api/replay/timeline")
+async def get_replay_timeline():
+    """Vrati predpocitanou timeline cache nad presnou frame osou replaye."""
+    if not replay_timeline_cache_path or not replay_timeline_cache_path.exists():
+        return Response(status_code=404)
+
+    return PlainTextResponse(
+        replay_timeline_cache_path.read_text(encoding="utf-8"),
+        media_type="application/x-ndjson; charset=utf-8",
         headers={"Cache-Control": "no-store, max-age=0"},
     )
 

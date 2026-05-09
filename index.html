@@ -19,22 +19,28 @@
             sparovane radar+BLE detekce.
         */
         :root {
-            --bg-page: #eaf0f6;
+            --bg-page: #edf2f8;
             --bg-card: #ffffff;
-            --bg-soft: #f7f9fc;
+            --bg-soft: #f5f8fc;
             --bg-panel: rgba(255, 255, 255, 0.94);
             --text-main: #0f172a;
             --text-muted: #64748b;
-            --border: #d6deea;
-            --border-strong: #c4cfde;
+            --border: #d7e0eb;
+            --border-strong: #c6d3e1;
             --accent: #1e3a5f;
             --accent-soft: #eef4fb;
-            --panel-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
-            --panel-shadow-soft: 0 8px 18px rgba(15, 23, 42, 0.06);
+            --panel-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+            --panel-shadow-soft: 0 6px 16px rgba(15, 23, 42, 0.06);
             --panel-radius: 14px;
             --panel-gap: 16px;
-            --page-max-width: min(1560px, calc(100vw - 32px));
-            --dashboard-height: calc(100vh - 196px);
+            --panel-padding: 16px;
+            --page-max-width: min(1680px, calc(100vw - 24px));
+            --dashboard-height: calc(100vh - 172px);
+            --toolbar-button-height: 38px;
+            --chip-height: 26px;
+            --inspector-width: clamp(340px, 26vw, 380px);
+            --view-overlay-width: 196px;
+            --view-overlay-gap: 24px;
 
             --source-radar: #0ea5e9;
             --source-radar-ble: #ef4444;
@@ -49,15 +55,12 @@
         * { box-sizing: border-box; }
 
         body {
-            background:
-                radial-gradient(circle at 8% 10%, rgba(14, 165, 233, 0.08), transparent 26%),
-                radial-gradient(circle at 92% 92%, rgba(234, 179, 8, 0.10), transparent 24%),
-                var(--bg-page);
+            background: linear-gradient(180deg, #f1f5fa 0%, #eaf0f6 100%);
             color: var(--text-main);
             font-family: "Segoe UI", "Inter", system-ui, sans-serif;
             min-height: 100vh;
             margin: 0;
-            padding: 16px;
+            padding: 12px;
         }
 
         .header-panel,
@@ -73,38 +76,38 @@
         .header-panel {
             background: var(--bg-panel);
             border: 1px solid var(--border);
-            border-top: 4px solid var(--accent);
-            padding: 12px 16px;
-            margin-bottom: 12px;
+            border-top: 3px solid var(--accent);
+            padding: 10px 16px;
+            margin-bottom: 10px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             border-radius: var(--panel-radius);
             box-shadow: var(--panel-shadow);
-            gap: 16px;
+            gap: 12px;
             flex-wrap: wrap;
             backdrop-filter: blur(10px);
         }
 
         .title-wrap h1 {
             margin: 0;
-            font-size: 22px;
+            font-size: 20px;
             letter-spacing: 0;
-            line-height: 1.15;
+            line-height: 1.1;
         }
 
         .title-wrap p {
-            margin: 4px 0 0 0;
+            margin: 3px 0 0 0;
             color: var(--text-muted);
-            font-size: 13px;
-            line-height: 1.35;
+            font-size: 12px;
+            line-height: 1.3;
         }
 
         .status-wrap {
             display: flex;
             align-items: center;
             justify-content: flex-end;
-            gap: 10px;
+            gap: 8px;
             flex-wrap: wrap;
             margin-left: auto;
         }
@@ -113,8 +116,8 @@
             display: flex;
             flex-direction: column;
             align-items: flex-end;
-            gap: 2px;
-            min-width: 108px;
+            gap: 1px;
+            min-width: 96px;
         }
 
         .status-meta-label,
@@ -128,7 +131,7 @@
         }
 
         .status-meta-value {
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             color: var(--text-main);
         }
@@ -136,9 +139,9 @@
         .toolbar {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 6px;
             margin-bottom: 16px;
-            padding: 14px 16px;
+            padding: 8px 14px;
             background: var(--bg-panel);
             border: 1px solid var(--border);
             border-radius: var(--panel-radius);
@@ -149,25 +152,33 @@
         .toolbar-section {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .toolbar-main {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
         }
 
         .legend-row {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
         }
 
         .legend-chip {
             display: inline-flex;
             align-items: center;
-            gap: 7px;
-            min-height: 28px;
+            gap: 6px;
+            min-height: var(--chip-height);
             background: #f8fafc;
             border: 1px solid var(--border);
             border-radius: 999px;
-            padding: 4px 10px;
-            font-size: 11px;
+            padding: 3px 9px;
+            font-size: 10px;
             font-weight: 700;
             color: #334155;
             white-space: nowrap;
@@ -181,62 +192,90 @@
         }
 
         .controls-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            align-items: stretch;
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            gap: 14px;
+            align-items: center;
             width: 100%;
         }
 
         .control-block {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             gap: 8px;
-            padding: 10px;
-            background: #f8fafc;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            min-height: 58px;
+            padding: 0;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
+            min-height: 0;
             flex: 0 1 auto;
         }
 
-        .controls-group .control-block:nth-child(2) { flex: 1 1 560px; }
-        .controls-group .control-block:nth-child(3) { flex: 1 1 420px; }
+        .controls-group .control-block:nth-child(1) { min-width: max-content; }
+        .controls-group .control-block:nth-child(2) { min-width: 0; }
+        .controls-group .control-block:nth-child(3) { min-width: 0; }
 
         .control-stack {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
             min-width: 0;
+        }
+
+        .control-stack > .control-label {
+            display: block;
+            min-height: 12px;
+            line-height: 12px;
+        }
+
+        .control-view .control-stack {
+            min-width: 118px;
+        }
+
+        .control-view .control-label {
+            transform: translateY(-7px);
+        }
+
+        .control-replay .control-stack {
+            width: 100%;
         }
 
         .view-controls,
         .data-controls {
             display: flex;
-            gap: 6px;
+            gap: 4px;
             flex-wrap: wrap;
             background: #ffffff;
             border: 1px solid #dbe4ee;
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 4px;
         }
 
         .replay-controls {
             display: grid;
-            grid-template-columns: minmax(0, auto) minmax(220px, 1fr);
-            gap: 8px 10px;
+            grid-template-columns: minmax(0, auto) minmax(320px, 1fr);
+            gap: 8px 12px;
             align-items: center;
-            min-width: min(100%, 560px);
+            min-width: min(100%, 640px);
         }
 
         .replay-buttons {
             display: flex;
-            gap: 6px;
+            gap: 4px;
             flex-wrap: wrap;
             background: #ffffff;
             border: 1px solid #dbe4ee;
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 4px;
+        }
+
+        .replay-rail {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 0;
+            padding-top: 1px;
         }
 
         .replay-buttons button,
@@ -244,8 +283,8 @@
         .data-controls button {
             background-color: transparent;
             border: 0;
-            min-height: 36px;
-            padding: 0 12px;
+            min-height: var(--toolbar-button-height);
+            padding: 0 11px;
             font-weight: 800;
             color: #475569;
             border-radius: 8px;
@@ -272,26 +311,51 @@
         .replay-scrubber {
             width: 100%;
             accent-color: var(--accent);
+            margin: 0;
         }
 
         .replay-meta {
-            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+        .replay-meta-item {
             display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            font-size: 11px;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+            padding: 6px 8px;
+            border: 1px solid #dbe4ee;
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+
+        .replay-meta-label {
+            font-size: 10px;
             font-weight: 800;
-            color: #475569;
+            color: #64748b;
             text-transform: uppercase;
-            letter-spacing: 0.04em;
+            letter-spacing: 0.05em;
+        }
+
+        .replay-meta-value {
+            font-size: 12px;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .dashboard {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) clamp(340px, 28vw, 380px);
+            grid-template-columns: minmax(0, 1fr) var(--inspector-width);
             gap: var(--panel-gap);
             align-items: stretch;
             min-height: max(620px, var(--dashboard-height));
+            height: max(620px, var(--dashboard-height));
             margin-bottom: 16px;
         }
 
@@ -306,16 +370,196 @@
         }
 
         .view-panel {
-            padding: 12px;
+            padding: 0;
+            display: flex;
+            align-items: stretch;
+            justify-content: stretch;
+            overflow: hidden;
+        }
+
+        .view-panel-shell {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+        }
+
+        .view-panel-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px 12px;
+            background: linear-gradient(180deg, #fbfdff 0%, #f5f8fc 100%);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .view-panel-title {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .view-panel-subtitle {
+            margin: 3px 0 0 0;
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .view-panel-chip {
+            display: inline-flex;
+            align-items: center;
+            min-height: 26px;
+            padding: 0 10px;
+            border-radius: 999px;
+            background: #ffffff;
+            border: 1px solid #dbe4ee;
+            color: #334155;
+            font-size: 11px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .view-layout {
+            position: relative;
+            width: 100%;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .view-map-slot {
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+            min-width: 0;
+            min-height: 0;
+            padding: 6px calc(var(--view-overlay-width) + var(--view-overlay-gap)) 6px 6px;
+            height: 100%;
+            background: linear-gradient(180deg, #f7fafe 0%, #f1f5fa 100%);
+        }
+
+        .view-map-card {
             display: flex;
             align-items: center;
-            justify-content: flex-start;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+        }
+
+        .view-side-panel {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            bottom: 12px;
+            width: var(--view-overlay-width);
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            min-width: 0;
+            min-height: 0;
+            padding: 12px;
+            background: rgba(251, 253, 255, 0.94);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: var(--panel-shadow-soft);
+            backdrop-filter: blur(10px);
+            overflow-y: auto;
+        }
+
+        .view-side-section,
+        .view-side-panel .control-block {
+            min-width: 0;
+            padding: 0;
+            margin: 0;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        .view-side-panel > * + * {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .view-side-panel .control-data {
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .view-side-panel .control-stack {
+            gap: 5px;
+        }
+
+        .view-side-section > .toolbar-label,
+        .view-side-panel .control-label {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .view-side-panel .legend-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            align-content: flex-start;
+            gap: 5px;
+        }
+
+        .view-side-panel .data-controls {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 4px;
+            padding: 0;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+        }
+
+        .view-side-panel .legend-chip,
+        .view-side-panel .data-controls button {
+            width: 100%;
+        }
+
+        .view-side-panel .legend-chip {
+            min-height: 32px;
+            padding: 5px 9px;
+            font-size: 11px;
+            background: #ffffff;
+        }
+
+        .view-side-panel .data-controls button {
+            justify-content: center;
+            text-align: center;
+            padding: 0 6px;
+            min-height: 34px;
+            border: 1px solid var(--border);
+            background: #ffffff;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .view-side-panel .data-controls button.active {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: #ffffff;
+            box-shadow: none;
         }
 
         .view-container {
             position: relative;
             width: 100%;
             max-width: 100%;
+            max-height: 100%;
             background-color: var(--bg-soft);
             border: 1px solid var(--border-strong);
             border-radius: 12px;
@@ -346,20 +590,20 @@
             justify-content: space-between;
             align-items: flex-start;
             gap: 12px;
-            padding: 16px 16px 12px;
+            padding: 14px 16px 12px;
             border-bottom: 1px solid var(--border);
         }
 
         .inspector-title {
             margin: 0;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 800;
             line-height: 1.2;
         }
 
         .inspector-subtitle {
             margin: 3px 0 0 0;
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-muted);
             line-height: 1.4;
         }
@@ -369,7 +613,7 @@
             align-items: center;
             justify-content: center;
             min-width: 34px;
-            min-height: 28px;
+            min-height: 26px;
             padding: 0 10px;
             border-radius: 999px;
             background: var(--accent-soft);
@@ -383,7 +627,7 @@
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            padding: 14px 14px 16px;
+            padding: 12px;
         }
 
         .tiles-container::-webkit-scrollbar { width: 8px; }
@@ -439,13 +683,20 @@
         .inspector-layout {
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 12px;
         }
 
         .inspector-section {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
+        }
+
+        .inspector-section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
         }
 
         .inspector-section-title {
@@ -454,6 +705,27 @@
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.08em;
+        }
+
+        .section-count {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 26px;
+            min-height: 24px;
+            padding: 0 8px;
+            border-radius: 999px;
+            background: #f1f5f9;
+            border: 1px solid #dbe4ee;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .secondary-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         .empty-state {
@@ -473,14 +745,14 @@
         .tile {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 14px;
+            border-radius: 12px;
             box-shadow: var(--panel-shadow-soft);
-            padding: 14px;
-            border-left: 5px solid var(--source-radar);
+            padding: 12px;
+            border-left: 4px solid var(--source-radar);
         }
 
         .tile-primary { padding: 16px; }
-        .tile-compact { padding: 11px 12px; }
+        .tile-compact { padding: 10px 11px; }
         .tile.source-radar { border-left-color: var(--source-radar); }
         .tile.source-radar-ble { border-left-color: var(--source-radar-ble); }
         .tile.source-radar-ble-coasting { border-left-color: var(--source-radar-ble-coasting); }
@@ -496,7 +768,7 @@
             justify-content: space-between;
             align-items: flex-start;
             gap: 8px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .tile-title {
@@ -525,7 +797,7 @@
             min-height: 24px;
             border-radius: 999px;
             padding: 2px 8px;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             border: 1px solid transparent;
             white-space: nowrap;
@@ -568,11 +840,11 @@
             color: #64748b;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            margin-bottom: 2px;
+            margin-bottom: 3px;
         }
 
         .metric-value {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 700;
             color: #0f172a;
         }
@@ -588,11 +860,11 @@
             color: #075985;
             font-weight: 800;
             background: #e0f2fe;
-            min-height: 28px;
+            min-height: 26px;
             padding: 4px 10px;
             border-radius: 999px;
             border: 1px solid #bae6fd;
-            font-size: 12px;
+            font-size: 11px;
             display: inline-flex;
             align-items: center;
         }
@@ -603,13 +875,41 @@
             .dashboard {
                 grid-template-columns: 1fr;
                 min-height: auto;
+                height: auto;
+            }
+
+            .controls-group {
+                grid-template-columns: 1fr;
+            }
+
+            .view-layout {
+                display: grid;
+                grid-template-columns: 1fr;
             }
 
             .view-panel { min-height: 520px; }
 
+            .view-map-slot {
+                padding: 6px;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .view-side-panel {
+                position: static;
+                width: auto;
+                border-radius: 0;
+                border-left: 0;
+                border-right: 0;
+                border-bottom: 0;
+                box-shadow: none;
+                background: #fbfdff;
+                backdrop-filter: none;
+            }
+
             .tiles-container { overflow: visible; }
             .stats-container .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .replay-controls { grid-template-columns: 1fr; min-width: 0; width: 100%; }
+            .replay-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
 
         @media (max-width: 860px) {
@@ -619,8 +919,8 @@
 
             .header-panel,
             .toolbar {
-                padding-left: 14px;
-                padding-right: 14px;
+                padding-left: 12px;
+                padding-right: 12px;
             }
 
             .status-wrap,
@@ -629,14 +929,23 @@
                 justify-content: flex-start;
             }
 
+            .view-side-panel .data-controls {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
             .view-panel { min-height: 420px; }
             .tile-grid { grid-template-columns: 1fr; }
             .control-block { width: 100%; }
+            .replay-meta { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 640px) {
-            .title-wrap h1 { font-size: 20px; }
-            .toolbar { gap: 10px; }
+            .title-wrap h1 { font-size: 18px; }
+            .toolbar { gap: 8px; }
+
+            .view-side-panel .data-controls {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
 
             .replay-buttons button,
             .view-controls button,
@@ -715,19 +1024,31 @@
                 <span class="control-label">Replay</span>
                 <div class="replay-controls">
                     <div class="replay-buttons">
-                        <button id="btnReplayFirst" onclick="jumpReplayBoundary('first')">|&lt;</button>
-                        <button id="btnReplayLive" class="active" onclick="goLiveReplay()">Live</button>
-                        <button id="btnReplayPause" onclick="pauseReplayView()">Pause</button>
                         <button id="btnReplayPlay" onclick="playReplayView()">Play</button>
+                        <button id="btnReplayPause" onclick="pauseReplayView()">Pause</button>
                         <button id="btnReplayPrev" onclick="stepReplayFrame(-1)">-1</button>
                         <button id="btnReplayNext" onclick="stepReplayFrame(1)">+1</button>
-                        <button id="btnReplayLast" onclick="jumpReplayBoundary('last')">&gt;|</button>
                     </div>
-                    <input id="replayScrubber" class="replay-scrubber" type="range" min="0" max="0" value="0" step="1" oninput="seekReplayFrame(Number(this.value))">
-                    <div class="replay-meta">
-                        <span id="replayFrameLabel">Frame 0 / 0</span>
-                        <span id="replayModeLabel">Live</span>
-                        <span id="replayTimeLabel">Cas -</span>
+                    <div class="replay-rail">
+                        <input id="replayScrubber" class="replay-scrubber" type="range" min="0" max="0" value="0" step="1" oninput="seekReplayFrame(Number(this.value))">
+                        <div class="replay-meta">
+                            <span class="replay-meta-item">
+                                <span class="replay-meta-label">Frame</span>
+                                <span id="replayFrameLabel" class="replay-meta-value">0 / 0</span>
+                            </span>
+                            <span class="replay-meta-item">
+                                <span class="replay-meta-label">Source</span>
+                                <span id="replaySourceLabel" class="replay-meta-value">Fused -</span>
+                            </span>
+                            <span class="replay-meta-item">
+                                <span class="replay-meta-label">Mode</span>
+                                <span id="replayModeLabel" class="replay-meta-value">Pause</span>
+                            </span>
+                            <span class="replay-meta-item">
+                                <span class="replay-meta-label">Time</span>
+                                <span id="replayTimeLabel" class="replay-meta-value">-</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -804,6 +1125,8 @@
         let latestBle2Rays = [];
         let lastAnimationTimeSec = performance.now() / 1000;
         let frameBuffer = [];
+        let replayTimeline = null;
+        let replayFusedFrames = null;
         let frameCursor = -1;
         let playbackMode = 'live';
         let playbackAccumulatorMs = 0;
@@ -827,32 +1150,144 @@
         const viewContainer = document.querySelector('.view-container');
         const replayScrubber = document.getElementById('replayScrubber');
         const replayFrameLabel = document.getElementById('replayFrameLabel');
+        const replaySourceLabel = document.getElementById('replaySourceLabel');
         const replayModeLabel = document.getElementById('replayModeLabel');
         const replayTimeLabel = document.getElementById('replayTimeLabel');
+
+        function getFrameEntry(index) {
+            if (frameBuffer.length === 0) return null;
+            const clampedIndex = clampReplayIndex(index);
+            return frameBuffer[clampedIndex] ?? null;
+        }
+
+        function buildSnapshotFromTimelineEntry(entry) {
+            if (!entry) return null;
+            const fusedSnapshot = replayFusedFrames?.[entry.fused_frame_index];
+            if (!fusedSnapshot) return null;
+
+            return {
+                ...fusedSnapshot,
+                receivedAtMs: entry.timestamp ?? fusedSnapshot.receivedAtMs,
+                sourceTimestampMs: (entry.timestamp ?? 0) * 1000,
+                optitrackObjects: Array.isArray(entry.optitrack_objects) ? entry.optitrack_objects : [],
+                optitrackStats: entry.optitrack_stats ?? null,
+            };
+        }
+
+        function getSnapshotForFrameIndex(index) {
+            const entry = getFrameEntry(index);
+            if (!entry) return null;
+            return replayTimeline ? buildSnapshotFromTimelineEntry(entry) : entry;
+        }
+
+        function applyFrameAtIndex(index) {
+            const snapshot = getSnapshotForFrameIndex(index);
+            if (!snapshot) return;
+            applySnapshot(snapshot);
+        }
+
+        function getFrameTimestampMs(entry) {
+            if (!entry) return 0;
+            if (replayTimeline) {
+                return (entry.timestamp ?? 0) * 1000;
+            }
+            return entry.sourceTimestampMs ?? entry.receivedAtMs ?? 0;
+        }
+
+        function formatReplayFrameLabel(currentIndex) {
+            if (!replayTimeline) {
+                return `${currentIndex + 1} / ${frameBuffer.length}`;
+            }
+
+            const entry = getFrameEntry(currentIndex);
+            const frameNumber = entry?.frame_number;
+            const frameSuffix = Number.isFinite(frameNumber) ? `  |  CSV ${frameNumber}` : '';
+            return `${currentIndex + 1} / ${frameBuffer.length}${frameSuffix}`;
+        }
+
+        function formatReplaySourceLabel(currentIndex) {
+            if (!replayTimeline) {
+                return `Fused ${currentIndex + 1}`;
+            }
+
+            const entry = getFrameEntry(currentIndex);
+            const fusedIndex = Number.isFinite(entry?.fused_frame_index) ? entry.fused_frame_index + 1 : null;
+            return fusedIndex !== null ? `Fused ${fusedIndex}` : 'Fused -';
+        }
 
         function mountToolbar() {
             const legend = document.querySelector('.legend-row');
             const controls = document.querySelector('.controls-group');
-            if (!legend || !controls) return;
+            const viewPanel = document.querySelector('.view-panel');
+            const viewRoot = document.querySelector('.view-container');
+            if (!legend || !controls || !viewPanel || !viewRoot) return;
+
+            const controlBlocks = Array.from(controls.children).filter(el => el.classList.contains('control-block'));
+            const viewBlock = controlBlocks[0];
+            const replayBlock = controlBlocks[1];
+            const dataBlock = controlBlocks[2];
 
             const toolbar = document.createElement('div');
             toolbar.className = 'toolbar';
             legend.before(toolbar);
 
-            const sourcesSection = document.createElement('div');
-            sourcesSection.className = 'toolbar-section';
+            const toolbarMain = document.createElement('div');
+            toolbarMain.className = 'toolbar-main';
+            toolbar.appendChild(toolbarMain);
+            toolbarMain.appendChild(controls);
+
+            if (dataBlock) {
+                dataBlock.classList.add('control-data');
+                dataBlock.remove();
+            }
+
+            if (viewBlock) viewBlock.classList.add('control-view');
+            if (replayBlock) replayBlock.classList.add('control-replay');
+
+            const viewShell = document.createElement('div');
+            viewShell.className = 'view-panel-shell';
+
+            const viewHead = document.createElement('div');
+            viewHead.className = 'view-panel-head';
+            viewHead.innerHTML = `
+                <div>
+                    <h2 class="view-panel-title">Mapa prostoru</h2>
+                    <p class="view-panel-subtitle">Aktivni vrstvy a datove rezimy pro aktualni snimek.</p>
+                </div>
+                <span class="view-panel-chip">6 x 7.5 m</span>
+            `;
+            viewShell.appendChild(viewHead);
+
+            const viewLayout = document.createElement('div');
+            viewLayout.className = 'view-layout';
+
+            const mapSlot = document.createElement('div');
+            mapSlot.className = 'view-map-slot';
+            const mapCard = document.createElement('div');
+            mapCard.className = 'view-map-card';
+            mapCard.appendChild(viewRoot);
+            mapSlot.appendChild(mapCard);
+            viewLayout.appendChild(mapSlot);
+
+            const viewSidePanel = document.createElement('aside');
+            viewSidePanel.className = 'view-side-panel';
+
+            const sourcesSection = document.createElement('section');
+            sourcesSection.className = 'view-side-section';
             const sourcesLabel = document.createElement('span');
             sourcesLabel.className = 'toolbar-label';
             sourcesLabel.textContent = 'Layers / Sources';
             sourcesSection.appendChild(sourcesLabel);
             sourcesSection.appendChild(legend);
+            viewSidePanel.appendChild(sourcesSection);
 
-            const controlsSection = document.createElement('div');
-            controlsSection.className = 'toolbar-section';
-            controlsSection.appendChild(controls);
+            if (dataBlock) {
+                viewSidePanel.appendChild(dataBlock);
+            }
 
-            toolbar.appendChild(sourcesSection);
-            toolbar.appendChild(controlsSection);
+            viewLayout.appendChild(viewSidePanel);
+            viewShell.appendChild(viewLayout);
+            viewPanel.appendChild(viewShell);
         }
 
         function mountDiagnosticsPanel() {
@@ -878,8 +1313,8 @@
             const toolbar = document.querySelector('.toolbar');
             const headerHeight = header?.offsetHeight ?? 0;
             const toolbarHeight = toolbar?.offsetHeight ?? 0;
-            const chromeHeight = headerHeight + toolbarHeight + 72;
-            const availableHeight = Math.max(540, window.innerHeight - chromeHeight);
+            const chromeHeight = headerHeight + toolbarHeight + 52;
+            const availableHeight = Math.max(560, window.innerHeight - chromeHeight);
             document.documentElement.style.setProperty('--dashboard-height', `${availableHeight}px`);
         }
 
@@ -890,8 +1325,9 @@
             { id: "S1", x: 2.0, y: 0.0, z: 1.0 },
             { id: "S2", x: 0.0, y: 3.0, z: 1.0 }
         ];
-        const CANVAS_SIZE = dashboardConfig.canvas_size ?? 600;
-        const OFFSET = dashboardConfig.offset ?? 30;
+        const CANVAS_BASE_WIDTH = dashboardConfig.canvas_size ?? 600;
+        const CANVAS_RENDER_SCALE = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+        const OFFSET = dashboardConfig.offset ?? 18;
         const MAP_X_MIN = dashboardConfig.map_x_min ?? -1;
         const MAP_X_MAX = dashboardConfig.map_x_max ?? 5;
         const MAP_Y_MIN = dashboardConfig.map_y_min ?? 0;
@@ -909,10 +1345,33 @@
         const MAP_HEIGHT_METERS = MAP_Y_MAX - MAP_Y_MIN;
         const TEST_AREA_WIDTH_METERS = TEST_AREA_X_MAX - TEST_AREA_X_MIN;
         const TEST_AREA_HEIGHT_METERS = TEST_AREA_Y_MAX - TEST_AREA_Y_MIN;
-        const PIXELS_PER_METER = Math.min(
-            (CANVAS_SIZE - (2 * OFFSET)) / MAP_WIDTH_METERS,
-            (CANVAS_SIZE - (2 * OFFSET)) / MAP_HEIGHT_METERS
+        const MAP_CENTER_X = (MAP_X_MIN + MAP_X_MAX) / 2;
+        const MAP_CENTER_Y = (MAP_Y_MIN + MAP_Y_MAX) / 2;
+        const DISPLAY_WIDTH_METERS = MAP_HEIGHT_METERS;
+        const DISPLAY_HEIGHT_METERS = MAP_WIDTH_METERS;
+        const CANVAS_WIDTH = CANVAS_BASE_WIDTH;
+        const CANVAS_HEIGHT = Math.round(CANVAS_BASE_WIDTH * (DISPLAY_HEIGHT_METERS / Math.max(DISPLAY_WIDTH_METERS, 0.001)));
+        let canvasDisplayWidth = CANVAS_WIDTH;
+        let canvasDisplayHeight = CANVAS_HEIGHT;
+        let pixelsPerMeter = Math.min(
+            (CANVAS_WIDTH - (2 * OFFSET)) / DISPLAY_WIDTH_METERS,
+            (CANVAS_HEIGHT - (2 * OFFSET)) / DISPLAY_HEIGHT_METERS
         );
+
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        function syncCanvasResolution(width = CANVAS_WIDTH, height = CANVAS_HEIGHT) {
+            canvasDisplayWidth = Math.max(1, Math.floor(width));
+            canvasDisplayHeight = Math.max(1, Math.floor(height));
+            pixelsPerMeter = Math.min(
+                (canvasDisplayWidth - (2 * OFFSET)) / DISPLAY_WIDTH_METERS,
+                (canvasDisplayHeight - (2 * OFFSET)) / DISPLAY_HEIGHT_METERS
+            );
+            canvas.width = Math.round(canvasDisplayWidth * CANVAS_RENDER_SCALE);
+            canvas.height = Math.round(canvasDisplayHeight * CANVAS_RENDER_SCALE);
+            ctx.setTransform(CANVAS_RENDER_SCALE, 0, 0, CANVAS_RENDER_SCALE, 0, 0);
+        }
+        syncCanvasResolution();
 
         const dashboardTitle = document.querySelector('.title-wrap h1');
         if (dashboardTitle) {
@@ -921,12 +1380,12 @@
 
         currentDataMode = DEFAULT_DATA_MODE;
 
-        function mapXToCanvas(x) {
-            return OFFSET + ((x - MAP_X_MIN) * PIXELS_PER_METER);
+        function worldToCanvasX(x, y) {
+            return OFFSET + ((y - MAP_Y_MIN) * pixelsPerMeter);
         }
 
-        function mapYToCanvas(y) {
-            return CANVAS_SIZE - OFFSET - ((y - MAP_Y_MIN) * PIXELS_PER_METER);
+        function worldToCanvasY(x, y) {
+            return OFFSET + ((x - MAP_X_MIN) * pixelsPerMeter);
         }
 
         function switchView(mode) {
@@ -957,13 +1416,37 @@
             return Math.max(0, Math.min(frameBuffer.length - 1, index));
         }
 
-        function formatReplayTimestamp(snapshot) {
+        function formatReplayTimestamp(snapshot, currentIndex = null) {
             if (!snapshot) return '-';
             const sourceTimestamp =
                 safeNum(snapshot.fusedStats?.timestamp, null)
                 ?? safeNum(snapshot.optitrackStats?.timestamp, null);
             if (sourceTimestamp === null) return '-';
+
+            if (sourceTimestamp > 1000000) {
+                let baseTimestamp = null;
+                if (currentIndex !== null && frameBuffer.length > 0) {
+                    const firstSnapshot = getSnapshotForFrameIndex(0);
+                    baseTimestamp =
+                        safeNum(firstSnapshot?.fusedStats?.timestamp, null)
+                        ?? safeNum(firstSnapshot?.optitrackStats?.timestamp, null);
+                }
+                if (baseTimestamp !== null) {
+                    return `+${Math.max(0, sourceTimestamp - baseTimestamp).toFixed(3)} s`;
+                }
+            }
+
             return `${sourceTimestamp.toFixed(3)} s`;
+        }
+
+        function setReplayButtonActive(id, active) {
+            const element = document.getElementById(id);
+            if (element) element.classList.toggle('active', active);
+        }
+
+        function setReplayButtonDisabled(id, disabled) {
+            const element = document.getElementById(id);
+            if (element) element.disabled = disabled;
         }
 
         function updateReplayControls() {
@@ -971,29 +1454,32 @@
             const currentIndex = hasFrames
                 ? (playbackMode === 'live' ? frameBuffer.length - 1 : clampReplayIndex(frameCursor))
                 : 0;
-            const currentSnapshot = hasFrames ? frameBuffer[currentIndex] : null;
+            const currentSnapshot = hasFrames ? getSnapshotForFrameIndex(currentIndex) : null;
 
             replayScrubber.max = String(Math.max(0, frameBuffer.length - 1));
             replayScrubber.value = String(currentIndex);
             replayScrubber.disabled = !hasFrames;
 
-            replayFrameLabel.textContent = `Frame ${hasFrames ? currentIndex + 1 : 0} / ${frameBuffer.length}`;
+            replayFrameLabel.textContent = hasFrames
+                ? formatReplayFrameLabel(currentIndex)
+                : '0 / 0';
+            if (replaySourceLabel) {
+                replaySourceLabel.textContent = hasFrames
+                    ? formatReplaySourceLabel(currentIndex)
+                    : 'Fused -';
+            }
             replayModeLabel.textContent = playbackMode === 'live'
-                ? 'Live'
-                : (playbackMode === 'playback' ? 'Prehravani' : 'Pauza');
-            replayTimeLabel.textContent = `Cas ${formatReplayTimestamp(currentSnapshot)}`;
+                ? 'Stream'
+                : (playbackMode === 'playback' ? 'Play' : 'Pause');
+            replayTimeLabel.textContent = formatReplayTimestamp(currentSnapshot, currentIndex);
 
-            document.getElementById('btnReplayLive').classList.toggle('active', playbackMode === 'live');
-            document.getElementById('btnReplayPause').classList.toggle('active', playbackMode === 'paused');
-            document.getElementById('btnReplayPlay').classList.toggle('active', playbackMode === 'playback');
+            setReplayButtonActive('btnReplayPause', playbackMode === 'paused');
+            setReplayButtonActive('btnReplayPlay', playbackMode === 'playback');
 
-            document.getElementById('btnReplayLive').disabled = !hasFrames;
-            document.getElementById('btnReplayPause').disabled = !hasFrames;
-            document.getElementById('btnReplayPlay').disabled = !hasFrames;
-            document.getElementById('btnReplayFirst').disabled = !hasFrames;
-            document.getElementById('btnReplayPrev').disabled = !hasFrames;
-            document.getElementById('btnReplayNext').disabled = !hasFrames;
-            document.getElementById('btnReplayLast').disabled = !hasFrames;
+            setReplayButtonDisabled('btnReplayPause', !hasFrames);
+            setReplayButtonDisabled('btnReplayPlay', !hasFrames);
+            setReplayButtonDisabled('btnReplayPrev', !hasFrames);
+            setReplayButtonDisabled('btnReplayNext', !hasFrames);
         }
 
         function applySnapshot(snapshot) {
@@ -1033,7 +1519,7 @@
             playbackAccumulatorMs = 0;
             if (frameBuffer.length > 0) {
                 frameCursor = frameBuffer.length - 1;
-                applySnapshot(frameBuffer[frameCursor]);
+                applyFrameAtIndex(frameCursor);
             }
             updateReplayControls();
         }
@@ -1054,7 +1540,7 @@
             playbackMode = 'playback';
             playbackAccumulatorMs = 0;
             lastPlaybackTickMs = performance.now();
-            applySnapshot(frameBuffer[frameCursor]);
+            applyFrameAtIndex(frameCursor);
             updateReplayControls();
         }
 
@@ -1063,7 +1549,7 @@
             frameCursor = clampReplayIndex(index);
             playbackMode = 'paused';
             playbackAccumulatorMs = 0;
-            applySnapshot(frameBuffer[frameCursor]);
+            applyFrameAtIndex(frameCursor);
             updateReplayControls();
         }
 
@@ -1076,7 +1562,7 @@
             frameCursor = clampReplayIndex(baseIndex + delta);
             playbackMode = 'paused';
             playbackAccumulatorMs = 0;
-            applySnapshot(frameBuffer[frameCursor]);
+            applyFrameAtIndex(frameCursor);
             updateReplayControls();
         }
 
@@ -1085,7 +1571,7 @@
             frameCursor = which === 'first' ? 0 : frameBuffer.length - 1;
             playbackMode = which === 'last' ? 'paused' : 'paused';
             playbackAccumulatorMs = 0;
-            applySnapshot(frameBuffer[frameCursor]);
+            applyFrameAtIndex(frameCursor);
             updateReplayControls();
         }
 
@@ -1100,11 +1586,13 @@
             lastPlaybackTickMs = nowMs;
 
             while (frameCursor < frameBuffer.length - 1) {
-                const currentSnapshot = frameBuffer[frameCursor];
-                const nextSnapshot = frameBuffer[frameCursor + 1];
+                const currentEntry = frameBuffer[frameCursor];
+                const nextEntry = frameBuffer[frameCursor + 1];
+                const currentFrameMs = getFrameTimestampMs(currentEntry);
+                const nextFrameMs = getFrameTimestampMs(nextEntry);
                 const frameDelayMs = Math.max(
                     16,
-                    Math.min(750, (nextSnapshot.receivedAtMs || 0) - (currentSnapshot.receivedAtMs || 0) || 33)
+                    Math.min(750, (nextFrameMs - currentFrameMs) || 33)
                 );
                 if (playbackAccumulatorMs < frameDelayMs) {
                     break;
@@ -1112,13 +1600,19 @@
 
                 playbackAccumulatorMs -= frameDelayMs;
                 frameCursor += 1;
-                applySnapshot(frameBuffer[frameCursor]);
+                applyFrameAtIndex(frameCursor);
             }
 
             updateReplayControls();
         }
 
         function buildSnapshotFromPayload(data, receivedAtMs) {
+            const fusedTimestamp = safeNum(data.stats?.timestamp, null);
+            const optitrackTimestamp = safeNum(data.optitrack_stats?.timestamp, null);
+            const sourceTimestampMs = fusedTimestamp !== null
+                ? fusedTimestamp * 1000
+                : (optitrackTimestamp !== null ? optitrackTimestamp * 1000 : null);
+
             const radarPoints = Array.isArray(data.radar)
                 ? data.radar.map((r, index) => ({
                     tag_id: `RAW_R_${index}`,
@@ -1198,6 +1692,7 @@
 
             return {
                 receivedAtMs,
+                sourceTimestampMs,
                 radarPoints,
                 radarClusters,
                 blePoints,
@@ -1539,73 +2034,82 @@
         }
 
         function drawMap2D() {
-            ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-            const gridColor = '#d3dde8';
-            const axisColor = '#64748b';
-            const axisStrong = '#475569';
-            const labelColor = '#526277';
+            ctx.setTransform(CANVAS_RENDER_SCALE, 0, 0, CANVAS_RENDER_SCALE, 0, 0);
+            ctx.clearRect(0, 0, canvasDisplayWidth, canvasDisplayHeight);
+            const gridColor = '#d7e2ec';
+            const axisColorX = '#1e3a5f';
+            const axisColorY = '#166534';
+            const axisStrong = '#334155';
+            const labelColor = '#5f7186';
 
-            const mapLeft = mapXToCanvas(MAP_X_MIN);
-            const mapRight = mapXToCanvas(MAP_X_MAX);
-            const mapBottom = mapYToCanvas(MAP_Y_MIN);
-            const mapTop = mapYToCanvas(MAP_Y_MAX);
-            const testLeft = mapXToCanvas(TEST_AREA_X_MIN);
-            const testRight = mapXToCanvas(TEST_AREA_X_MAX);
-            const testBottom = mapYToCanvas(TEST_AREA_Y_MIN);
-            const testTop = mapYToCanvas(TEST_AREA_Y_MAX);
+            const mapLeft = worldToCanvasX(MAP_X_MIN, MAP_Y_MIN);
+            const mapRight = worldToCanvasX(MAP_X_MIN, MAP_Y_MAX);
+            const mapTop = worldToCanvasY(MAP_X_MIN, MAP_Y_MIN);
+            const mapBottom = worldToCanvasY(MAP_X_MAX, MAP_Y_MIN);
+            const testLeft = worldToCanvasX(TEST_AREA_X_MIN, TEST_AREA_Y_MIN);
+            const testRight = worldToCanvasX(TEST_AREA_X_MIN, TEST_AREA_Y_MAX);
+            const testTop = worldToCanvasY(TEST_AREA_X_MIN, TEST_AREA_Y_MIN);
+            const testBottom = worldToCanvasY(TEST_AREA_X_MAX, TEST_AREA_Y_MIN);
 
-            ctx.fillStyle = 'rgba(148, 163, 184, 0.16)';
+            ctx.fillStyle = 'rgba(148, 163, 184, 0.12)';
             ctx.fillRect(testLeft, testTop, testRight - testLeft, testBottom - testTop);
 
             ctx.lineWidth = 1;
             ctx.strokeStyle = gridColor;
-            for (let x = MAP_X_MIN; x <= MAP_X_MAX; x++) {
-                const p = mapXToCanvas(x);
+            for (let y = MAP_Y_MIN; y <= MAP_Y_MAX; y++) {
+                const p = worldToCanvasX(MAP_X_MIN, y);
                 ctx.beginPath(); ctx.moveTo(p, mapBottom); ctx.lineTo(p, mapTop); ctx.stroke();
-                ctx.font = '600 12px Segoe UI';
+                ctx.font = '700 12px Segoe UI';
                 ctx.fillStyle = labelColor;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'top';
-                ctx.fillText(`${x}`, p, mapBottom + 10);
+                ctx.fillText(`${y}`, p, mapTop - 16);
             }
-            for (let y = MAP_Y_MIN; y <= MAP_Y_MAX; y++) {
-                const p = mapYToCanvas(y);
+            for (let x = MAP_X_MIN; x <= MAP_X_MAX; x++) {
+                const p = worldToCanvasY(x, MAP_Y_MIN);
                 ctx.beginPath(); ctx.moveTo(mapLeft, p); ctx.lineTo(mapRight, p); ctx.stroke();
-                ctx.font = '600 12px Segoe UI';
+                ctx.font = '700 12px Segoe UI';
                 ctx.fillStyle = labelColor;
                 ctx.textAlign = 'right';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(`${y}`, mapLeft - 10, p);
+                ctx.fillText(`${x}`, mapLeft - 8, p);
             }
 
             ctx.lineWidth = 2;
-            ctx.strokeStyle = axisStrong;
-            ctx.beginPath(); ctx.moveTo(mapLeft, mapYToCanvas(0)); ctx.lineTo(mapRight, mapYToCanvas(0)); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(mapXToCanvas(0), mapBottom); ctx.lineTo(mapXToCanvas(0), mapTop); ctx.stroke();
+            ctx.strokeStyle = axisColorX;
+            ctx.beginPath(); ctx.moveTo(mapLeft, mapTop); ctx.lineTo(mapRight, mapTop); ctx.stroke();
+            ctx.strokeStyle = axisColorY;
+            ctx.beginPath(); ctx.moveTo(mapLeft, mapBottom); ctx.lineTo(mapLeft, mapTop); ctx.stroke();
 
-            ctx.font = '700 14px Segoe UI';
-            ctx.fillStyle = axisColor;
+            ctx.font = '800 14px Segoe UI';
+            ctx.fillStyle = axisColorX;
             ctx.textAlign = 'right';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText('X [m]', mapRight - 6, mapBottom - 8);
+            ctx.textBaseline = 'top';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+            ctx.strokeText('Y [m]', mapRight - 6, mapTop + 6);
+            ctx.fillText('Y [m]', mapRight - 6, mapTop + 4);
             ctx.save();
-            ctx.translate(mapLeft + 16, mapTop + 18);
+            ctx.translate(mapLeft + 18, mapTop + 20);
             ctx.rotate(-Math.PI / 2);
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
-            ctx.fillText('Y [m]', 0, 0);
+            ctx.fillStyle = axisColorY;
+            ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+            ctx.strokeText('X [m]', 0, 0);
+            ctx.fillText('X [m]', 0, 0);
             ctx.restore();
 
-            ctx.strokeStyle = '#94a3b8';
+            ctx.strokeStyle = axisStrong;
             ctx.lineWidth = 2;
             ctx.strokeRect(testLeft, testTop, testRight - testLeft, testBottom - testTop);
-            ctx.strokeStyle = '#cbd5e1';
+            ctx.strokeStyle = '#cfd8e3';
             ctx.lineWidth = 1;
             ctx.strokeRect(mapLeft, mapTop, mapRight - mapLeft, mapBottom - mapTop);
 
             SENSOR_NODES.forEach(s => {
-                const px = mapXToCanvas(s.x);
-                const py = mapYToCanvas(s.y);
+                const px = worldToCanvasX(s.x, s.y);
+                const py = worldToCanvasY(s.x, s.y);
                 ctx.fillStyle = '#1e293b'; ctx.fillRect(px - 10, py - 10, 20, 20);
                 ctx.fillStyle = 'white';
                 ctx.font = 'bold 10px Arial';
@@ -1622,21 +2126,21 @@
 
             objects.forEach(obj => {
                 const x = safeNum(obj.x); const y = safeNum(obj.y);
-                const px = mapXToCanvas(x); const py = mapYToCanvas(y);
+                const px = worldToCanvasX(x, y); const py = worldToCanvasY(x, y);
                 const source = getSourceCategory(obj); const color = getSourceColor(obj);
                 const rawRadar = isRadarRaw(obj);
                 const bleRay = isBleRay(obj);
                 const isCluster = source === 'radar_cluster';
-                const radius = rawRadar ? 8 : (bleRay ? 10 : (isCluster ? 17 : (source === 'ble_only' ? 15 : 11)));
+                const radius = rawRadar ? 7.5 : (bleRay ? 9.5 : (isCluster ? 15 : (source === 'ble_only' ? 13 : 10.5)));
 
                 if (bleRay) {
-                    const sensorPx = mapXToCanvas(safeNum(obj.sensor_x));
-                    const sensorPy = mapYToCanvas(safeNum(obj.sensor_y));
+                    const sensorPx = worldToCanvasX(safeNum(obj.sensor_x), safeNum(obj.sensor_y));
+                    const sensorPy = worldToCanvasY(safeNum(obj.sensor_x), safeNum(obj.sensor_y));
                     ctx.globalAlpha = 0.9;
                     ctx.beginPath();
                     ctx.moveTo(sensorPx, sensorPy);
                     ctx.lineTo(px, py);
-                    ctx.lineWidth = 3;
+                    ctx.lineWidth = 2.5;
                     ctx.strokeStyle = color;
                     ctx.setLineDash([10, 6]);
                     ctx.stroke();
@@ -1647,12 +2151,12 @@
                 ctx.beginPath(); ctx.arc(px, py, radius, 0, 2 * Math.PI);
                 ctx.fillStyle = color; ctx.fill();
 
-                ctx.lineWidth = rawRadar ? 2 : (bleRay ? 3 : (isCluster ? 4 : 3));
+                ctx.lineWidth = rawRadar ? 2 : (bleRay ? 2.75 : (isCluster ? 3.25 : 2.75));
                 ctx.strokeStyle = rawRadar ? 'rgba(255, 255, 255, 0.85)' : '#ffffff';
                 ctx.shadowColor = rawRadar
                     ? 'rgba(14, 165, 233, 0.85)'
                     : (bleRay ? 'rgba(15, 23, 42, 0.18)' : (isCluster ? 'rgba(14, 165, 233, 0.75)' : 'rgba(0, 0, 0, 0.35)'));
-                ctx.shadowBlur = rawRadar ? 12 : (bleRay ? 8 : (isCluster ? 14 : 6)); ctx.stroke();
+                ctx.shadowBlur = rawRadar ? 10 : (bleRay ? 7 : (isCluster ? 12 : 5)); ctx.stroke();
                 ctx.shadowColor = 'transparent';
                 ctx.shadowBlur = 0;
 
@@ -1665,7 +2169,7 @@
                 }
 
                 if (source !== 'radar' && !rawRadar && !bleRay && !isCluster) {
-                    ctx.beginPath(); ctx.arc(px, py, source === 'ble_only' ? 22 : 18, 0, 2 * Math.PI);
+                    ctx.beginPath(); ctx.arc(px, py, source === 'ble_only' ? 21 : 17.5, 0, 2 * Math.PI);
                     ctx.lineWidth = 2; ctx.strokeStyle = source === 'ble_only' ? 'rgba(234, 179, 8, 0.55)' : 'rgba(239, 68, 68, 0.45)';
                     ctx.stroke();
                 }
@@ -1676,7 +2180,8 @@
         // 3D scena kopiruje stejnou 6x6m mapu jako 2D canvas. Osy jsou
         // prevedene do Three.js souradnic pres helper `toScenePosition`.
         const scene = new THREE.Scene(); scene.background = new THREE.Color(0xf8fafc);
-        const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100); camera.position.set(6.8, 7.1, 5.6);
+        const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+        camera.position.set(MAP_CENTER_X + 3.9, 6.8, 3.1);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio || 1); renderer.outputEncoding = THREE.sRGBEncoding;
         renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
@@ -1684,21 +2189,37 @@
 
         function syncViewSize() {
             if (!viewContainer) return;
-            const panel = document.querySelector('.view-panel');
-            const panelRect = panel?.getBoundingClientRect();
-            const availableWidth = Math.max(240, Math.floor((panelRect?.width ?? CANVAS_SIZE) - 24));
-            const availableHeight = Math.max(240, Math.floor((panelRect?.height ?? availableWidth) - 24));
-            const side = Math.max(240, Math.min(availableWidth, availableHeight));
-            viewContainer.style.width = `${side}px`;
-            viewContainer.style.height = `${side}px`;
-            renderer.setSize(side, side, false);
-            camera.aspect = 1;
+            const mapSlot = document.querySelector('.view-map-slot');
+            const panelRect = mapSlot?.getBoundingClientRect();
+            const slotStyles = mapSlot ? window.getComputedStyle(mapSlot) : null;
+            const horizontalPadding =
+                (parseFloat(slotStyles?.paddingLeft ?? '0') || 0)
+                + (parseFloat(slotStyles?.paddingRight ?? '0') || 0);
+            const verticalPadding =
+                (parseFloat(slotStyles?.paddingTop ?? '0') || 0)
+                + (parseFloat(slotStyles?.paddingBottom ?? '0') || 0);
+            const availableWidth = Math.max(260, Math.floor((panelRect?.width ?? CANVAS_WIDTH) - horizontalPadding));
+            const availableHeight = Math.max(260, Math.floor((panelRect?.height ?? CANVAS_HEIGHT) - verticalPadding));
+            const aspect = CANVAS_WIDTH / Math.max(CANVAS_HEIGHT, 1);
+            let width = availableWidth;
+            let height = Math.floor(width / aspect);
+
+            if (height > availableHeight) {
+                height = availableHeight;
+                width = Math.floor(height * aspect);
+            }
+
+            viewContainer.style.width = `${width}px`;
+            viewContainer.style.height = `${height}px`;
+            syncCanvasResolution(width, height);
+            renderer.setSize(width, height, false);
+            camera.aspect = width / Math.max(height, 1);
             camera.updateProjectionMatrix();
         }
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.target.set(2.0, 1.0, -3.0); controls.enableDamping = true; controls.dampingFactor = 0.08;
-        controls.maxPolarAngle = Math.PI * 0.49; controls.minDistance = 4.0; controls.maxDistance = 14.0;
+        controls.target.set(MAP_CENTER_X, 0.45, -MAP_CENTER_Y); controls.enableDamping = true; controls.dampingFactor = 0.08;
+        controls.maxPolarAngle = Math.PI * 0.49; controls.minDistance = 3.8; controls.maxDistance = 14.0;
 
         const floor = new THREE.Mesh(
             new THREE.PlaneGeometry(MAP_WIDTH_METERS, MAP_HEIGHT_METERS),
@@ -1756,9 +2277,9 @@
         }
 
         function addReference3D() {
-            const xColor = 0x64748b;
+            const xColor = 0x1e3a5f;
             const yColor = 0x64748b;
-            const zColor = 0x16a34a;
+            const zColor = 0x15803d;
             const boxColor = 0x94a3b8;
 
             const bottom = [
@@ -1779,9 +2300,9 @@
             addLine(toScenePosition(0, MAP_Y_MIN, 0.025), toScenePosition(0, MAP_Y_MAX + 0.25, 0.025), yColor, 1);
             addLine(toScenePosition(0, 0, 0), toScenePosition(0, 0, 3.25), zColor, 1);
 
-            addTextLabel('X', toScenePosition(MAP_X_MAX + 0.38, 0, 0.12), '#64748b', 0.22);
+            addTextLabel('X', toScenePosition(MAP_X_MAX + 0.38, 0, 0.12), '#1e3a5f', 0.26);
             addTextLabel('Y', toScenePosition(0, MAP_Y_MAX + 0.38, 0.12), '#64748b', 0.22);
-            addTextLabel('Z', toScenePosition(0, 0, 3.38), '#16a34a', 0.22);
+            addTextLabel('Z', toScenePosition(0, 0, 3.38), '#15803d', 0.26);
 
             for (let x = MAP_X_MIN; x <= MAP_X_MAX; x++) {
                 addTextLabel(`${x}`, toScenePosition(x, -0.18, 0.04), '#526277', 0.13);
@@ -1923,6 +2444,63 @@
             };
         }
 
+        async function preloadReplayFrames() {
+            try {
+                const timelineResponse = await fetch('/api/replay/timeline', { cache: 'no-store' });
+                if (timelineResponse.ok) {
+                    const [timelineText, framesResponse] = await Promise.all([
+                        timelineResponse.text(),
+                        fetch('/api/replay/frames', { cache: 'no-store' }),
+                    ]);
+                    if (!framesResponse.ok) return false;
+
+                    const framesText = await framesResponse.text();
+                    const timelineLines = timelineText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+                    const frameLines = framesText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+                    if (timelineLines.length === 0 || frameLines.length === 0) return false;
+
+                    replayTimeline = timelineLines.map(line => JSON.parse(line));
+                    replayFusedFrames = frameLines.map((line, index) => buildSnapshotFromPayload(JSON.parse(line), index));
+                    frameBuffer = replayTimeline;
+                    frameCursor = 0;
+                    playbackMode = 'paused';
+                    playbackAccumulatorMs = 0;
+                    applyFrameAtIndex(0);
+
+                    const status = document.getElementById('status');
+                    if (status) {
+                        status.className = 'status';
+                        status.innerText = 'BUNDLE';
+                    }
+                    return true;
+                }
+
+                const response = await fetch('/api/replay/frames', { cache: 'no-store' });
+                if (!response.ok) return false;
+
+                const text = await response.text();
+                const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+                if (lines.length === 0) return false;
+
+                replayTimeline = null;
+                replayFusedFrames = null;
+                frameBuffer = lines.map((line, index) => buildSnapshotFromPayload(JSON.parse(line), index));
+                frameCursor = 0;
+                playbackMode = 'paused';
+                playbackAccumulatorMs = 0;
+                applyFrameAtIndex(0);
+
+                const status = document.getElementById('status');
+                if (status) {
+                    status.className = 'status';
+                    status.innerText = 'CACHE';
+                }
+                return true;
+            } catch (_error) {
+                return false;
+            }
+        }
+
         function renderStatsPanel() {
             // Diagnostika je prepisovana jako cele HTML. Je mala, takze je to
             // jednodussi a citelnejsi nez udrzovat mnoho jednotlivych uzlu.
@@ -1947,14 +2525,15 @@
             const conf = safeNum(obj.confidence, 0);
             const confPct = Math.max(0, Math.min(100, conf * 100));
             const tagId = escapeHtml(obj.tag_id || 'UNKNOWN');
+            const typeLabel = getTypeLabel(obj);
 
             const metrics = [
                 buildMetricHtml('X', formatMeters(obj.x)),
                 buildMetricHtml('Y', formatMeters(obj.y)),
-                buildMetricHtml('Z', formatMeters(obj.z)),
-                buildMetricHtml('Confidence', formatConf(conf))
+                buildMetricHtml('Z', formatMeters(obj.z))
             ];
 
+            if (primary) metrics.push(buildMetricHtml('Confidence', formatConf(conf)));
             if (obj.points !== undefined) metrics.push(buildMetricHtml('Body clusteru', escapeHtml(obj.points)));
             if (obj.pair_distance !== undefined) metrics.push(buildMetricHtml('BLE-Radar', formatMeters(obj.pair_distance)));
             if (primary && obj.pair_mode) metrics.push(buildMetricHtml('Párování', escapeHtml(obj.pair_mode)));
@@ -1967,11 +2546,11 @@
                     <div class="tile-head">
                         <div>
                             <h3 class="tile-title">${tagId}</h3>
-                            <div class="tile-sub">${escapeHtml(String(obj.source || 'fused-stream'))}</div>
+                            <div class="tile-sub">${primary ? `Typ ${escapeHtml(typeLabel)} · zdroj ${escapeHtml(sourceLabel)}` : `Zdroj ${escapeHtml(sourceLabel)}`}</div>
                         </div>
                         <div class="badge-row">
                             <span class="badge ${sourceBadgeClass}">${sourceLabel}</span>
-                            <span class="badge badge-type">${getTypeLabel(obj)}</span>
+                            <span class="badge badge-type">${typeLabel}</span>
                         </div>
                     </div>
                     <div class="tile-grid">
@@ -2011,6 +2590,42 @@
                         <div class="inspector-section-title">Ostatní objekty</div>
                         ${secondary.length
                             ? secondary.map(obj => buildObjectCard(obj)).join('')
+                            : '<div class="empty-state compact">Žádný další objekt v aktuálním snímku.</div>'}
+                    </section>
+                </div>`;
+        }
+
+        function renderTilesV2(drawList) {
+            renderStatsPanel();
+            const filteredForTiles = drawList.filter(obj => !isRadarRaw(obj));
+            if (inspectorCount) {
+                inspectorCount.textContent = String(filteredForTiles.length);
+            }
+
+            if (filteredForTiles.length === 0) {
+                tilesContainer.innerHTML = `<div class="empty-state">${escapeHtml(getEmptyStateMessage())}</div>`;
+                return;
+            }
+
+            const sorted = [...filteredForTiles].sort((a, b) => safeNum(b.confidence) - safeNum(a.confidence));
+            const primary = sorted[0];
+            const secondary = sorted.slice(1);
+
+            tilesContainer.innerHTML = `
+                <div class="inspector-layout">
+                    <section class="inspector-section">
+                        <div class="inspector-section-head">
+                            <div class="inspector-section-title">Hlavní objekt</div>
+                        </div>
+                        ${buildObjectCard(primary, { primary: true })}
+                    </section>
+                    <section class="inspector-section">
+                        <div class="inspector-section-head">
+                            <div class="inspector-section-title">Ostatní objekty</div>
+                            <span class="section-count">${secondary.length}</span>
+                        </div>
+                        ${secondary.length
+                            ? `<div class="secondary-list">${secondary.map(obj => buildObjectCard(obj)).join('')}</div>`
                             : '<div class="empty-state compact">Žádný další objekt v aktuálním snímku.</div>'}
                     </section>
                 </div>`;
@@ -2063,18 +2678,26 @@
 
             const drawList = getCurrentDrawList();
             if (currentMode === '2d') { drawObjects2D(drawList); } else { controls.update(); updateObjects3D(drawList); renderer.render(scene, camera); }
-            renderTiles(drawList);
+            renderTilesV2(drawList);
         }
 
-        connect();
-        updateReplayControls();
-        syncLayoutMetrics();
-        syncViewSize();
-        window.addEventListener('resize', () => {
+        async function initDashboard() {
+            const preloaded = await preloadReplayFrames();
+            if (!preloaded) {
+                connect();
+            }
+
+            updateReplayControls();
             syncLayoutMetrics();
             syncViewSize();
-        });
-        animationLoop();
+            window.addEventListener('resize', () => {
+                syncLayoutMetrics();
+                syncViewSize();
+            });
+            animationLoop();
+        }
+
+        initDashboard();
     </script>
 </body>
 </html>
