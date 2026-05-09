@@ -83,6 +83,12 @@ BLE_ONLY_SCENARIOS = {
     "ble1": "ble_1_raw",
     "ble2": "ble_2_raw",
 }
+SINGLE_ANCHOR_SCENARIOS = {
+    "radar1_ble1": "ble_1_raw",
+    "radar2_ble2": "ble_2_raw",
+    "2x_radar_ble1": "ble_1_raw",
+    "2x_radar_ble2": "ble_2_raw",
+}
 RADAR_ONLY_SCENARIOS = {"radar1", "radar2", "2x_radar"}
 RADAR_MATCH_MAX_DISTANCE_M = 2.5
 
@@ -414,6 +420,68 @@ def load_ble_only_metrics(
     }
 
 
+def load_single_anchor_track(
+    fused_path: Path,
+    raw_field_name: str,
+    tag_id: str,
+) -> dict[str, np.ndarray]:
+    timestamps = []
+    positions = []
+    cluster_ray_distances = []
+
+    for timestamp, payload in load_fused_frames(fused_path):
+        ray_record = None
+        for ray in payload.get(raw_field_name, []):
+            if str(ray.get("tag_id", "")).strip().upper() == tag_id:
+                ray_record = ray
+                break
+        if ray_record is None:
+            continue
+
+        try:
+            origin = np.asarray(
+                [float(ray_record["sensor_x"]), float(ray_record["sensor_y"]), float(ray_record["sensor_z"])],
+                dtype=float,
+            )
+            endpoint = np.asarray(
+                [float(ray_record["x"]), float(ray_record["y"]), float(ray_record["z"])],
+                dtype=float,
+            )
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        best_cluster = None
+        best_ray_distance = None
+        for cluster in payload.get("radar_clusters", []):
+            try:
+                cluster_position = np.asarray(
+                    [float(cluster["x"]), float(cluster["y"]), float(cluster["z"])],
+                    dtype=float,
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+
+            ray_distance, _ = compute_ble_ray_metrics(cluster_position, origin, endpoint)
+            if np.isnan(ray_distance):
+                continue
+            if best_ray_distance is None or ray_distance < best_ray_distance:
+                best_cluster = cluster_position
+                best_ray_distance = ray_distance
+
+        if best_cluster is None or best_ray_distance is None:
+            continue
+
+        timestamps.append(timestamp)
+        positions.append(best_cluster)
+        cluster_ray_distances.append(best_ray_distance)
+
+    return {
+        "times": np.asarray(timestamps, dtype=float),
+        "positions": np.asarray(positions, dtype=float) if positions else np.empty((0, 3), dtype=float),
+        "cluster_ray_distances": np.asarray(cluster_ray_distances, dtype=float),
+    }
+
+
 def build_stats(
     scenario_name: str,
     target_name: str,
@@ -522,6 +590,24 @@ def get_ble_summary_boxplots_dir(scenario_root: Path) -> Path:
     return path
 
 
+def get_single_anchor_eval_dir(scenario_dir: Path) -> Path:
+    path = scenario_dir / "single_anchor_eval"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def get_single_anchor_summary_tables_dir(scenario_root: Path) -> Path:
+    path = get_summary_root(scenario_root) / "radar_ble_single_anchor" / "tables"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def get_single_anchor_summary_boxplots_dir(scenario_root: Path) -> Path:
+    path = get_summary_root(scenario_root) / "radar_ble_single_anchor" / "boxplots"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def write_summary_readme(summary_root: Path) -> None:
     content = """Souhrn scenario evaluace
 
@@ -532,8 +618,8 @@ Struktura:
 - evaluation_summary.json
   Strojove citelny souhrn celeho behu.
 - position/
-  Evaluace scenaru, ktere produkuji prostorovou pozici:
-  radar1, radar2, 2x_radar, 2x_ble, radar1_2x_ble, radar2_2x_ble, fusion
+  Evaluace scenaru v hlavni 3D sekci:
+  radar1, radar2, radar1_ble1, radar2_ble2, 2x_radar, 2x_ble, radar1_2x_ble, radar2_2x_ble, fusion
 - position/tables/
   Per-target serazene tabulky s 3D metrikami.
 - position/boxplots/
@@ -544,15 +630,27 @@ Struktura:
   Per-target serazene tabulky BLE-only metrik.
 - ble_only/boxplots/
   Per-target boxploty ray distance a angle error.
+- radar_ble_single_anchor/
+  Offline evaluace scenaru radar1_ble1, radar2_ble2, 2x_radar_ble1 a 2x_radar_ble2
+- radar_ble_single_anchor/tables/
+  Per-target serazene tabulky pro radar cluster vybrany podle BLE paprsku.
+- radar_ble_single_anchor/boxplots/
+  Per-target boxploty 3D chyby pro single-anchor radar+BLE evaluaci.
 
 Per-scenario slozky:
 - <scenario>/position_eval/
   Per-target stats JSON + 2D mapa + timeline 3D chyby + XYZ timeline.
 - <scenario>/ble_only_eval/
   Per-target stats JSON + ray-distance timeline + angle-error timeline.
+- <scenario>/single_anchor_eval/
+  Per-target stats JSON + 2D mapa + timeline 3D chyby + XYZ timeline + cluster-ray timeline.
 
 Rozdeleni metrik:
 - position metriky porovnavaji odhadnutou 3D pozici proti OptiTracku
+- nektere scenare mohou v aktualni fusion logice skoncit jako no_data,
+  pokud nevytvori tagovanou 3D pozici pro dany cil
+- radar_ble_single_anchor pouziva offline heuristiku:
+  pro kazdy BLE paprsek vezme radar cluster nejblizsi paprsku
 - BLE-only metriky neporovnavaji plnou 3D pozici, ale:
   - ray distance: kolma vzdalenost GT bodu od BLE paprsku
   - angle error: uhlova chyba mezi BLE paprskem a smerem na GT
@@ -560,9 +658,10 @@ Rozdeleni metrik:
 Doporucene poradi otevreni:
 1. _summary/position/tables/summary_table_Phantom4.jpg
 2. _summary/position/tables/summary_table_Vysavac3.jpg
-3. _summary/position/boxplots/
-4. _summary/ble_only/tables/
-5. detailni slozky jednotlivych scenaru
+3. _summary/radar_ble_single_anchor/tables/
+4. _summary/position/boxplots/
+5. _summary/ble_only/tables/
+6. detailni slozky jednotlivych scenaru
 """
     (summary_root / "README.txt").write_text(content, encoding="utf-8")
 
@@ -852,6 +951,33 @@ def save_ble_summary_table_csv(output_path: Path, rows: list[dict]) -> None:
             writer.writerow({field: row.get(field) for field in fieldnames})
 
 
+def save_single_anchor_summary_table_csv(output_path: Path, rows: list[dict]) -> None:
+    ensure_parent_dir(output_path)
+    fieldnames = [
+        "rank",
+        "scenario",
+        "target",
+        "status",
+        "matched_samples",
+        "fused_samples_total",
+        "mean_error_3d_m",
+        "median_error_3d_m",
+        "p95_error_3d_m",
+        "max_error_3d_m",
+        "rmse_3d_m",
+        "mean_error_xy_m",
+        "mean_abs_error_z_m",
+        "mean_cluster_ray_distance_m",
+        "p95_cluster_ray_distance_m",
+        "reason",
+    ]
+    with output_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field) for field in fieldnames})
+
+
 def format_table_value(value) -> str:
     if value is None:
         return "-"
@@ -950,6 +1076,51 @@ def save_ble_summary_table_image(output_path: Path, rows: list[dict]) -> None:
 
     target_name = rows[0].get("target", "Unknown target") if rows else "Unknown target"
     ax.set_title(f"BLE-only evaluation summary | {target_name}", color=COLOR_TEXT, pad=12)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def save_single_anchor_summary_table_image(output_path: Path, rows: list[dict]) -> None:
+    ensure_parent_dir(output_path)
+    columns = [
+        ("rank", "Rank"),
+        ("scenario", "Scenario"),
+        ("status", "Status"),
+        ("matched_samples", "Matched"),
+        ("rmse_3d_m", "RMSE 3D"),
+        ("mean_error_3d_m", "Mean 3D"),
+        ("p95_error_3d_m", "P95 3D"),
+        ("mean_cluster_ray_distance_m", "Mean ray-cluster"),
+        ("p95_cluster_ray_distance_m", "P95 ray-cluster"),
+    ]
+    table_data = [[format_table_value(row.get(key)) for key, _ in columns] for row in rows]
+    headers = [label for _, label in columns]
+
+    row_count = max(1, len(table_data))
+    fig_height = max(4.0, 1.0 + (row_count * 0.35))
+    fig, ax = plt.subplots(figsize=(14, fig_height))
+    ax.axis("off")
+    table = ax.table(cellText=table_data, colLabels=headers, loc="center", cellLoc="center")
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1, 1.3)
+
+    for (row_index, col_index), cell in table.get_celld().items():
+        cell.set_edgecolor(COLOR_GRID)
+        cell.set_linewidth(0.8)
+        if row_index == 0:
+            cell.set_facecolor(COLOR_OPTITRACK)
+            cell.set_text_props(color="white", weight="bold")
+        else:
+            cell.set_facecolor("#F8FAFC" if row_index % 2 else "#EEF2F7")
+            if col_index == 2 and row_index - 1 < len(rows):
+                status = rows[row_index - 1].get("status")
+                if status != "ok":
+                    cell.set_text_props(color=COLOR_ERROR, weight="bold")
+
+    target_name = rows[0].get("target", "Unknown target") if rows else "Unknown target"
+    ax.set_title(f"Single-anchor radar+BLE summary | {target_name}", color=COLOR_TEXT, pad=12)
     fig.tight_layout()
     fig.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -1166,6 +1337,114 @@ def evaluate_ble_only_target_in_scenario(
     }
 
 
+def evaluate_single_anchor_target_in_scenario(
+    scenario_name: str,
+    scenario_dir: Path,
+    target_name: str,
+    target_config: dict,
+    reference_track: dict[str, np.ndarray],
+    raw_field_name: str,
+) -> dict:
+    fused_path = scenario_dir / "fused.ndjson"
+    output_dir = get_single_anchor_eval_dir(scenario_dir)
+    single_anchor = load_single_anchor_track(fused_path, raw_field_name, target_config["tag_id"])
+    sensor_times = single_anchor["times"]
+    sensor_positions = single_anchor["positions"]
+    cluster_ray_distances = single_anchor["cluster_ray_distances"]
+
+    if sensor_times.size == 0:
+        reference_positions = np.empty((0, 3), dtype=float)
+        valid_mask = np.asarray([], dtype=bool)
+        stats = build_stats(
+            scenario_name,
+            target_name,
+            target_config["tag_id"],
+            sensor_times,
+            sensor_positions,
+            reference_positions,
+            valid_mask,
+            reason="V tomto scenari nebyl nalezen radar cluster pro BLE paprsek daneho tagu.",
+        )
+    else:
+        reference_positions, valid_mask = interpolate_reference(sensor_times, reference_track)
+        if not np.any(valid_mask):
+            stats = build_stats(
+                scenario_name,
+                target_name,
+                target_config["tag_id"],
+                sensor_times,
+                sensor_positions,
+                reference_positions,
+                valid_mask,
+                reason="Single-anchor evaluace nema casovy prekryv s OptiTrack referenci.",
+            )
+        else:
+            stats = build_stats(
+                scenario_name,
+                target_name,
+                target_config["tag_id"],
+                sensor_times,
+                sensor_positions,
+                reference_positions,
+                valid_mask,
+            )
+
+    if cluster_ray_distances.size == 0:
+        stats["mean_cluster_ray_distance_m"] = None
+        stats["median_cluster_ray_distance_m"] = None
+        stats["p95_cluster_ray_distance_m"] = None
+        stats["max_cluster_ray_distance_m"] = None
+    else:
+        stats["mean_cluster_ray_distance_m"] = float(np.mean(cluster_ray_distances))
+        stats["median_cluster_ray_distance_m"] = float(np.median(cluster_ray_distances))
+        stats["p95_cluster_ray_distance_m"] = float(np.percentile(cluster_ray_distances, 95))
+        stats["max_cluster_ray_distance_m"] = float(np.max(cluster_ray_distances))
+
+    _, err_3d, _ = build_error_vectors(sensor_positions, reference_positions, valid_mask)
+
+    write_json(output_dir / f"stats_single_anchor_{target_name}.json", stats)
+    save_2d_map(
+        output_dir / f"{scenario_name}_{target_name}_2D_map.jpg",
+        scenario_name,
+        target_name,
+        sensor_positions,
+        reference_positions,
+        valid_mask,
+    )
+    save_error_timeline(
+        output_dir / f"{scenario_name}_{target_name}_error_timeline.jpg",
+        scenario_name,
+        target_name,
+        sensor_times,
+        sensor_positions,
+        reference_positions,
+        valid_mask,
+        stats,
+    )
+    save_axes_timeline(
+        output_dir / f"{scenario_name}_{target_name}_axes_timeline.jpg",
+        scenario_name,
+        target_name,
+        sensor_times,
+        sensor_positions,
+        reference_positions,
+        valid_mask,
+    )
+    save_simple_timeline(
+        output_dir / f"{scenario_name}_{target_name}_cluster_ray_distance_timeline.jpg",
+        f"{scenario_name} | {target_name} | cluster ray distance timeline",
+        "Cluster to BLE ray distance [m]",
+        sensor_times,
+        cluster_ray_distances,
+        COLOR_FUSION,
+    )
+    return {
+        "stats": stats,
+        "error_3d": err_3d,
+        "cluster_ray_distances": cluster_ray_distances,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     run_dir = resolve_run_dir(args.run_dir)
@@ -1189,11 +1468,15 @@ def main(argv: list[str] | None = None) -> int:
     position_boxplots_dir = get_position_summary_boxplots_dir(scenario_root)
     ble_tables_dir = get_ble_summary_tables_dir(scenario_root)
     ble_boxplots_dir = get_ble_summary_boxplots_dir(scenario_root)
+    single_anchor_tables_dir = get_single_anchor_summary_tables_dir(scenario_root)
+    single_anchor_boxplots_dir = get_single_anchor_summary_boxplots_dir(scenario_root)
     boxplot_data = {target_name: {} for target_name in TARGETS}
     ble_boxplot_ray_data = {target_name: {} for target_name in TARGETS}
     ble_boxplot_angle_data = {target_name: {} for target_name in TARGETS}
+    single_anchor_boxplot_data = {target_name: {} for target_name in TARGETS}
     position_summary_rows = []
     ble_summary_rows = []
+    single_anchor_summary_rows = []
     evaluation_summary = {
         "scenario_root": str(scenario_root),
         "optitrack_csv": str(optitrack_csv),
@@ -1208,6 +1491,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         "position_scenarios": {},
         "ble_only_scenarios": {},
+        "single_anchor_scenarios": {},
         "scenarios": {},
     }
 
@@ -1245,6 +1529,32 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     print(f"- {target_name}: bez platneho BLE-only prekryvu ({stats['reason']})")
             evaluation_summary["ble_only_scenarios"][scenario_name] = scenario_results
+        elif scenario_name in SINGLE_ANCHOR_SCENARIOS:
+            raw_field_name = SINGLE_ANCHOR_SCENARIOS[scenario_name]
+            for target_name, target_config in TARGETS.items():
+                evaluation_result = evaluate_single_anchor_target_in_scenario(
+                    scenario_name,
+                    scenario_dir,
+                    target_name,
+                    target_config,
+                    reference[target_name],
+                    raw_field_name,
+                )
+                stats = evaluation_result["stats"]
+                scenario_results[target_name] = stats
+                single_anchor_boxplot_data[target_name][scenario_name] = evaluation_result["error_3d"]
+                summary_row = dict(stats)
+                summary_row["reason"] = stats.get("reason")
+                single_anchor_summary_rows.append(summary_row)
+                if stats["status"] == "ok":
+                    print(
+                        f"- {target_name}: RMSE 3D = {stats['rmse_3d_m']:.3f} m "
+                        f"({stats['matched_samples']} vzorku), ray-cluster mean = "
+                        f"{stats['mean_cluster_ray_distance_m']:.3f} m"
+                    )
+                else:
+                    print(f"- {target_name}: bez platneho single-anchor matchingu ({stats['reason']})")
+            evaluation_summary["single_anchor_scenarios"][scenario_name] = scenario_results
         elif scenario_name in RADAR_ONLY_SCENARIOS:
             output_dir = get_position_eval_dir(scenario_dir)
             radar_tracks = load_radar_tracks_by_matching(
@@ -1389,11 +1699,26 @@ def main(argv: list[str] | None = None) -> int:
         save_ble_summary_table_image(ble_tables_dir / f"summary_table_ble_only_{target_name}.jpg", ranked_rows)
 
     write_json(ble_tables_dir / "summary_table_ble_only.json", ble_ranked_tables)
+    single_anchor_rows_by_target = {target_name: [] for target_name in TARGETS}
+    for row in single_anchor_summary_rows:
+        single_anchor_rows_by_target[row["target"]].append(row)
+
+    single_anchor_ranked_tables = {}
+    single_anchor_rank_label_maps = {}
+    for target_name, rows in single_anchor_rows_by_target.items():
+        ranked_rows = rank_summary_rows(rows, list(SINGLE_ANCHOR_SCENARIOS.keys()))
+        single_anchor_ranked_tables[target_name] = ranked_rows
+        single_anchor_rank_label_maps[target_name] = build_rank_label_map(ranked_rows)
+        write_json(single_anchor_tables_dir / f"summary_table_single_anchor_{target_name}.json", {"rows": ranked_rows})
+        save_single_anchor_summary_table_csv(single_anchor_tables_dir / f"summary_table_single_anchor_{target_name}.csv", ranked_rows)
+        save_single_anchor_summary_table_image(single_anchor_tables_dir / f"summary_table_single_anchor_{target_name}.jpg", ranked_rows)
+
+    write_json(single_anchor_tables_dir / "summary_table_single_anchor.json", single_anchor_ranked_tables)
     for target_name in TARGETS:
         save_boxplot(
             position_boxplots_dir / f"boxplot_all_scenarios_{target_name}.jpg",
             target_name,
-            [name for name in requested if name not in BLE_ONLY_SCENARIOS],
+            [name for name in requested if name not in BLE_ONLY_SCENARIOS and name not in SINGLE_ANCHOR_SCENARIOS],
             boxplot_data[target_name],
             rank_label_maps.get(target_name),
         )
@@ -1414,6 +1739,13 @@ def main(argv: list[str] | None = None) -> int:
             ble_boxplot_angle_data[target_name],
             color=COLOR_OPTITRACK,
             label_map=ble_rank_label_maps.get(target_name),
+        )
+        save_boxplot(
+            single_anchor_boxplots_dir / f"boxplot_single_anchor_{target_name}.jpg",
+            target_name,
+            [name for name in requested if name in SINGLE_ANCHOR_SCENARIOS],
+            single_anchor_boxplot_data[target_name],
+            single_anchor_rank_label_maps.get(target_name),
         )
     print(f"Evaluace hotova: {summary_root}")
     return 0

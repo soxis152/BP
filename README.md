@@ -348,7 +348,11 @@ Testovane scenare:
 - `ble2`
 - `radar1`
 - `radar2`
+- `radar1_ble1`
+- `radar2_ble2`
 - `2x_radar`
+- `2x_radar_ble1`
+- `2x_radar_ble2`
 - `2x_ble`
 - `radar1_2x_ble`
 - `radar2_2x_ble`
@@ -365,8 +369,11 @@ Pipeline vytvori:
 Vyhodnoceni je rozdelene na dve metodiky:
 
 - `position`
-  - pro scenare, ktere produkuji prostorovou pozici
+  - pro scenare hodnocene v hlavni 3D sekci
   - `radar1`, `radar2`, `2x_radar`, `2x_ble`, `radar1_2x_ble`, `radar2_2x_ble`, `fusion`
+- `radar_ble_single_anchor`
+  - pro `radar1_ble1`, `radar2_ble2`, `2x_radar_ble1` a `2x_radar_ble2`
+  - offline vybere radar cluster nejblizsi BLE paprsku jedne kotvy
 - `ble_only`
   - pro `ble1` a `ble2`
   - nepouziva 3D pozici, ale:
@@ -377,6 +384,8 @@ Souhrny jsou v:
 
 - `scenario_splits/_summary/position/tables/`
 - `scenario_splits/_summary/position/boxplots/`
+- `scenario_splits/_summary/radar_ble_single_anchor/tables/`
+- `scenario_splits/_summary/radar_ble_single_anchor/boxplots/`
 - `scenario_splits/_summary/ble_only/tables/`
 - `scenario_splits/_summary/ble_only/boxplots/`
 
@@ -387,6 +396,12 @@ Per-scenario detail:
   - `[scenar]_[objekt]_2D_map.jpg`
   - `[scenar]_[objekt]_error_timeline.jpg`
   - `[scenar]_[objekt]_axes_timeline.jpg`
+- `single_anchor_eval/`
+  - `stats_single_anchor_[Objekt].json`
+  - `[scenar]_[objekt]_2D_map.jpg`
+  - `[scenar]_[objekt]_error_timeline.jpg`
+  - `[scenar]_[objekt]_axes_timeline.jpg`
+  - `[scenar]_[objekt]_cluster_ray_distance_timeline.jpg`
 - `ble_only_eval/`
   - `stats_ble_only_[Objekt].json`
   - `[scenar]_[objekt]_ray_distance_timeline.jpg`
@@ -398,6 +413,9 @@ Interpretace:
   sparovane na GT v case.
 - `ble1` a `ble2` nejsou v hlavni 3D tabulce, protoze jednotlive BLE kotvy
   samy nevytvareji plnou 3D pozici cile.
+- `radar1_ble1`, `radar2_ble2`, `2x_radar_ble1` a `2x_radar_ble2`
+  nejsou v hlavni 3D tabulce.
+  Hodnoti se zvlast pres offline heuristiku `nearest radar cluster to BLE ray`.
 - `scenario_splits/_summary/README.txt` obsahuje kratke vysvetleni struktury
   primo vedle vygenerovanych vystupu.
 

@@ -21,6 +21,22 @@ Offline pipeline pro porovnani kombinaci senzoru proti OptiTracku:
 2. `run_offline_fusion.py`
 3. `evaluate_all.py`
 
+Aktualni sada scenaru:
+
+- `ble1`
+- `ble2`
+- `radar1`
+- `radar2`
+- `radar1_ble1`
+- `radar2_ble2`
+- `2x_radar`
+- `2x_radar_ble1`
+- `2x_radar_ble2`
+- `2x_ble`
+- `radar1_2x_ble`
+- `radar2_2x_ble`
+- `fusion`
+
 Jednim prikazem:
 
 ```powershell
@@ -66,6 +82,8 @@ Poznamka:
   - `runs/experiment/<run>/scenario_splits/<scenario>/`
 - 3D vyhodnoceni:
   - `<scenario>/position_eval/`
+- single-anchor radar+BLE vyhodnoceni:
+  - `<scenario>/single_anchor_eval/`
 - BLE-only vyhodnoceni:
   - `<scenario>/ble_only_eval/`
 - souhrny:

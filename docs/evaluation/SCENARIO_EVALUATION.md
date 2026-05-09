@@ -11,7 +11,7 @@ Pipeline ma tri kroky:
 
 1. `split_scenarios.py`
    - vezme jeden hlavni `raw.ndjson`
-   - vytvori 9 scenaru
+   - vytvori 13 scenaru
    - do kazde slozky ulozi filtrovanou verzi `raw.ndjson`
 
 2. `run_offline_fusion.py`
@@ -31,7 +31,11 @@ data a lze ho kdykoliv znovu vytvorit.
 - `ble2`
 - `radar1`
 - `radar2`
+- `radar1_ble1`
+- `radar2_ble2`
 - `2x_radar`
+- `2x_radar_ble1`
+- `2x_radar_ble2`
 - `2x_ble`
 - `radar1_2x_ble`
 - `radar2_2x_ble`
@@ -98,6 +102,28 @@ Poznamka:
 - `radar1`, `radar2`, `2x_radar` nevytvareji tagovane objekty
 - evaluator proto sparuje anonymni radar track/clustery na GT cile v case
 
+### Radar + single BLE anchor
+
+Do samostatne evaluace patri:
+
+- `radar1_ble1`
+- `radar2_ble2`
+- `2x_radar_ble1`
+- `2x_radar_ble2`
+
+Tyto scenare se nehodnoti pres hlavni fusion vystup, protoze aktualni online
+fusion logika z `1x radar + 1x BLE` nevytvari tagovanou 3D pozici.
+
+Misto toho evaluator offline:
+
+- vezme BLE paprsek odpovidajici danemu tagu
+- vezme radar clustery ve stejnem case
+- vybere radar cluster nejblizsi BLE paprsku
+- ten porovna proti OptiTracku stejnymi 3D metrikami
+
+Proto jsou tyto scenare v samostatne summary sekci
+`radar_ble_single_anchor/` a ne v hlavni `position/`.
+
 ### BLE-only scenare
 
 Do BLE-only evaluace patri:
@@ -126,11 +152,15 @@ scenario_splits/
 |  +- fused.ndjson
 |  +- metadata.json
 |  +- position_eval/
+|  +- single_anchor_eval/
 |  \- ble_only_eval/
 \- _summary/
    +- README.txt
    +- evaluation_summary.json
    +- position/
+   |  +- tables/
+   |  \- boxplots/
+   +- radar_ble_single_anchor/
    |  +- tables/
    |  \- boxplots/
    \- ble_only/
