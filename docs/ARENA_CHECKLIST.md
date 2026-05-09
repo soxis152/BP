@@ -126,7 +126,10 @@ Poznamka pro `2x UP Board`:
 - [ ] Upravit parametry ve `fusion.py`.
 - [ ] Spustit replay `raw.ndjson`.
 - [ ] Ziskat novy fused vystup.
-- [ ] Pustit evaluator proti OptiTrack `.xlsx`.
+- [ ] Spustit scenario pipeline (`split -> offline fusion -> evaluate`).
+- [ ] Otevrit `scenario_splits\_summary\README.txt`.
+- [ ] Zkontrolovat `position` tabulky a boxploty.
+- [ ] Zkontrolovat `ble_only` tabulky a boxploty.
 - [ ] Zapsat si zmenu parametru a vysledne metriky.
 - [ ] Nemenit zaroven geometrii senzoru a fusion parametry bez zapisu.
 

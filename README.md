@@ -19,8 +19,8 @@ uzlu.
 ```text
 Four/
 +- data/optitrack/         # OptiTrack XLSX/CSV vstupy
-+- docs/                   # provozni navody pro mereni a 2x UP Board
-+- experiment_tools/       # recorder, replay a evaluator
++- docs/                   # provozni navody a rozcestnik dokumentace
++- experiment_tools/       # recorder, replay a offline scenario evaluace
 +- radar/                  # radar parser, interface a cfg profily
 +- runs/
 |  +- diagnostic/          # raw serial dumpy senzoru
@@ -305,28 +305,101 @@ na prikazove radce. Rucni override casoveho posunu:
 python .\experiment_tools\replay_compare.py --optitrack-delay-sec 75.35
 ```
 
-Vyhodnoceni proti OptiTracku:
+### Scenario evaluation pipeline
+
+Pro porovnani jednotlivych kombinaci senzoru proti OptiTracku je v projektu
+nova offline pipeline:
+
+1. `split_scenarios.py`
+2. `run_offline_fusion.py`
+3. `evaluate_all.py`
+
+Nejjednodussi spusteni vseho najednou:
 
 ```powershell
-python -m experiment_tools.evaluate_optitrack `
-  --input-dir ".\runs\experiment\20260425_150000_static_01" `
-  --xlsx ".\data\optitrack\Take 2026-05-05 11.47.22 AM.csv" `
-  --tag-map "20BA360ABBB8=Phantom4" `
-  --tag-map "AABBCCDDEEFF=Vysavac"
+.\experiment_tools\run_scenario_pipeline.ps1 `
+  -RunDir .\runs\experiment\20260507_104346_Dronarena_04
 ```
 
-Evaluator umi:
+Kdyz PowerShell blokuje lokalni skripty:
 
-- automaticky odhadnout casovy posun
-- vyhodnotit zdroje `fusion`, `ble` a `radar`
-- spocitat chyby proti ground truth celkove i po jednotlivych tagach
-- pracovat s vice rigid body najednou pres opakovane `--tag-map TAG_ID=RigidBodyName`
-- ulozit `evaluation.json` do slozky experimentu, nebo pres `--output` zvolit vlastni nazev, napr. `evaluation_multi.json`
-- vygenerovat PNG grafy do `evaluation_plots/`, pokud nepouzijes `--skip-plots`
+```powershell
+powershell -ExecutionPolicy Bypass -File .\experiment_tools\run_scenario_pipeline.ps1 `
+  -RunDir .\runs\experiment\20260507_104346_Dronarena_04
+```
 
-Pokud `tag_id` neodpovida nazvu rigid body, nespolehej na automaticke mapovani
-a zadej `--tag-map` explicitne. To plati typicky pro BLE tagy ve tvaru MAC
-adresy.
+Rucni spusteni po krocich:
+
+```powershell
+python .\experiment_tools\split_scenarios.py `
+  --run-dir .\runs\experiment\20260507_104346_Dronarena_04
+
+python .\experiment_tools\run_offline_fusion.py `
+  --run-dir .\runs\experiment\20260507_104346_Dronarena_04
+
+python .\experiment_tools\evaluate_all.py `
+  --run-dir .\runs\experiment\20260507_104346_Dronarena_04 `
+  --optitrack-csv .\data\optitrack\Take_2026-05-07_12.43.55_PM_Final.csv
+```
+
+Testovane scenare:
+
+- `ble1`
+- `ble2`
+- `radar1`
+- `radar2`
+- `2x_radar`
+- `2x_ble`
+- `radar1_2x_ble`
+- `radar2_2x_ble`
+- `fusion`
+
+Pipeline vytvori:
+
+- `runs/experiment/<RUN>/scenario_splits/<scenario>/raw.ndjson`
+- `runs/experiment/<RUN>/scenario_splits/<scenario>/fused.ndjson`
+- `runs/experiment/<RUN>/scenario_splits/<scenario>/position_eval/`
+- `runs/experiment/<RUN>/scenario_splits/<scenario>/ble_only_eval/`
+- `runs/experiment/<RUN>/scenario_splits/_summary/`
+
+Vyhodnoceni je rozdelene na dve metodiky:
+
+- `position`
+  - pro scenare, ktere produkuji prostorovou pozici
+  - `radar1`, `radar2`, `2x_radar`, `2x_ble`, `radar1_2x_ble`, `radar2_2x_ble`, `fusion`
+- `ble_only`
+  - pro `ble1` a `ble2`
+  - nepouziva 3D pozici, ale:
+    - vzdalenost GT bodu od BLE paprsku
+    - uhlovou chybu mezi BLE paprskem a smerem na GT
+
+Souhrny jsou v:
+
+- `scenario_splits/_summary/position/tables/`
+- `scenario_splits/_summary/position/boxplots/`
+- `scenario_splits/_summary/ble_only/tables/`
+- `scenario_splits/_summary/ble_only/boxplots/`
+
+Per-scenario detail:
+
+- `position_eval/`
+  - `stats_[Objekt].json`
+  - `[scenar]_[objekt]_2D_map.jpg`
+  - `[scenar]_[objekt]_error_timeline.jpg`
+  - `[scenar]_[objekt]_axes_timeline.jpg`
+- `ble_only_eval/`
+  - `stats_ble_only_[Objekt].json`
+  - `[scenar]_[objekt]_ray_distance_timeline.jpg`
+  - `[scenar]_[objekt]_angle_error_timeline.jpg`
+
+Interpretace:
+
+- `radar-only` scenare jsou vyhodnocene pres anonymni radar track/clustery
+  sparovane na GT v case.
+- `ble1` a `ble2` nejsou v hlavni 3D tabulce, protoze jednotlive BLE kotvy
+  samy nevytvareji plnou 3D pozici cile.
+- `scenario_splits/_summary/README.txt` obsahuje kratke vysvetleni struktury
+  primo vedle vygenerovanych vystupu.
 
 ## OptiTrack replay
 
@@ -369,9 +442,20 @@ To je uzitecne pro oddeleni problemu na vrstve portu, parseru a fusion logiky.
 
 ## Dulezite dokumenty
 
+Kdyz potrebujes rychly vstup do projektu, otevri nejdriv:
+
+- `docs/README.md`
+- `experiment_tools/README.md`
+
 - `docs/ARENA_CHECKLIST.md`
+- `docs/README.md`
+- `docs/SCENARIO_EVALUATION.md`
 - `docs/UPBOARD_START.md`
-- `experiment_tools/evaluate_optitrack.py`
+- `experiment_tools/README.md`
+- `experiment_tools/run_scenario_pipeline.ps1`
+- `experiment_tools/split_scenarios.py`
+- `experiment_tools/run_offline_fusion.py`
+- `experiment_tools/evaluate_all.py`
 - `experiment_tools/optitrack_replay.py`
 - `data/optitrack/Take 2026-05-05 11.47.22 AM.csv`
 
