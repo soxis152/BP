@@ -3,7 +3,7 @@
 Tento dokument popisuje offline pipeline pro porovnani jednotlivych kombinaci
 senzoru proti OptiTracku.
 
-Strucny prehled souboru je take v `../experiment_tools/README.md`.
+Strucny prehled souboru je take v `../../experiment_tools/README.md`.
 
 ## Co pipeline dela
 
@@ -21,6 +21,9 @@ Pipeline ma tri kroky:
 3. `evaluate_all.py`
    - porovna fused vystupy s OptiTrack CSV
    - vygeneruje per-scenario grafy a souhrny
+
+`scenario_splits/` je generovany vystup pipeline. Nejsou to puvodni namerena
+data a lze ho kdykoliv znovu vytvorit.
 
 ## Scenare
 
@@ -134,6 +137,26 @@ scenario_splits/
       +- tables/
       \- boxplots/
 ```
+
+## Referencni Priklad
+
+Aktualne je v repozitari hotove vyhodnoceni pro:
+
+- run dir:
+  - `runs/experiment/20260507_104346_Dronarena_04/`
+- OptiTrack CSV:
+  - `data/optitrack/Take_2026-05-07_12.43.55_PM_Final.csv`
+- souhrny:
+  - `runs/experiment/20260507_104346_Dronarena_04/scenario_splits/_summary/`
+
+Strucny vysledek:
+
+- `Phantom4`
+  - nejlepsi 3D scenar: `2x_radar`, `rmse_3d_m = 0.397`
+  - nejlepsi BLE-only scenar: `ble2`, `rmse_ray_distance_m = 0.375`
+- `Vysavac3`
+  - nejlepsi 3D scenar: `radar1`, `rmse_3d_m = 0.234`
+  - nejlepsi BLE-only scenar: `ble1`, `rmse_ray_distance_m = 0.331`
 
 ## Co otevrit jako prvni
 

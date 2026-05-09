@@ -523,45 +523,46 @@ def get_ble_summary_boxplots_dir(scenario_root: Path) -> Path:
 
 
 def write_summary_readme(summary_root: Path) -> None:
-    content = """Scenario evaluation summary
+    content = """Souhrn scenario evaluace
 
-This folder contains post-processed evaluation outputs for the scenario pipeline.
+Tato slozka obsahuje post-processed vystupy offline pipeline pro porovnani
+scenaru senzoru proti OptiTracku.
 
-Structure:
+Struktura:
 - evaluation_summary.json
-  Machine-readable top-level summary for the whole run.
+  Strojove citelny souhrn celeho behu.
 - position/
-  Evaluation for scenarios that produce spatial positions:
+  Evaluace scenaru, ktere produkuji prostorovou pozici:
   radar1, radar2, 2x_radar, 2x_ble, radar1_2x_ble, radar2_2x_ble, fusion
 - position/tables/
-  Per-target ranked summary tables for 3D metrics.
+  Per-target serazene tabulky s 3D metrikami.
 - position/boxplots/
-  Per-target boxplots for 3D error distributions.
+  Per-target boxploty rozdeleni 3D chyby.
 - ble_only/
-  Evaluation for single-BLE scenarios: ble1, ble2
+  Evaluace single-BLE scenaru: ble1, ble2
 - ble_only/tables/
-  Per-target ranked summary tables for BLE-only metrics.
+  Per-target serazene tabulky BLE-only metrik.
 - ble_only/boxplots/
-  Per-target boxplots for BLE-only ray-distance and angle-error distributions.
+  Per-target boxploty ray distance a angle error.
 
-Per-scenario folders:
+Per-scenario slozky:
 - <scenario>/position_eval/
-  Per-target stats JSON + 2D map + 3D error timeline + XYZ timeline.
+  Per-target stats JSON + 2D mapa + timeline 3D chyby + XYZ timeline.
 - <scenario>/ble_only_eval/
   Per-target stats JSON + ray-distance timeline + angle-error timeline.
 
-Metric split:
-- position metrics compare estimated 3D positions against OptiTrack.
-- BLE-only metrics do not estimate 3D position. They evaluate:
-  - ray distance: perpendicular distance from GT point to BLE ray
-  - angle error: angular difference between BLE ray and GT direction
+Rozdeleni metrik:
+- position metriky porovnavaji odhadnutou 3D pozici proti OptiTracku
+- BLE-only metriky neporovnavaji plnou 3D pozici, ale:
+  - ray distance: kolma vzdalenost GT bodu od BLE paprsku
+  - angle error: uhlova chyba mezi BLE paprskem a smerem na GT
 
-Recommended reading order:
+Doporucene poradi otevreni:
 1. _summary/position/tables/summary_table_Phantom4.jpg
 2. _summary/position/tables/summary_table_Vysavac3.jpg
 3. _summary/position/boxplots/
 4. _summary/ble_only/tables/
-5. scenario-specific folders for detailed timelines
+5. detailni slozky jednotlivych scenaru
 """
     (summary_root / "README.txt").write_text(content, encoding="utf-8")
 

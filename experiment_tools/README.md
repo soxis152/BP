@@ -41,6 +41,12 @@ python .\experiment_tools\evaluate_all.py `
   --run-dir .\runs\experiment\20260507_104346_Dronarena_04
 ```
 
+Poznamka:
+
+- `scenario_splits/` je vystup teto pipeline
+- neni to soucast puvodniho experimentu
+- lze ho kdykoliv znovu vygenerovat
+
 ## Co Ktery Soubor Dela
 
 - `scenario_pipeline_common.py`
@@ -69,8 +75,26 @@ Prvni soubor, ktery ma smysl otevrit po dobehu pipeline:
 
 - `runs/experiment/<run>/scenario_splits/_summary/README.txt`
 
+## Aktualni Hotovy Priklad
+
+V repozitari je uz hotovy prepocitany a vyhodnoceny beh:
+
+- `runs/experiment/20260507_104346_Dronarena_04/`
+
+Souhrny:
+
+- `runs/experiment/20260507_104346_Dronarena_04/scenario_splits/_summary/`
+
+Nejkratsi cesta:
+
+1. `_summary/README.txt`
+2. `position/tables/summary_table_Phantom4.csv`
+3. `position/tables/summary_table_Vysavac3.csv`
+4. `ble_only/tables/summary_table_ble_only_Phantom4.csv`
+5. `ble_only/tables/summary_table_ble_only_Vysavac3.csv`
+
 ## Souvisejici Dokumentace
 
-- `../docs/SCENARIO_EVALUATION.md`
-- `../docs/ARENA_CHECKLIST.md`
+- `../docs/evaluation/SCENARIO_EVALUATION.md`
+- `../docs/operations/ARENA_CHECKLIST.md`
 - `../README.md`

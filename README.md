@@ -217,7 +217,7 @@ Start skripty:
 ```
 
 Skripty nastavuji spravne `FOUR_NODE_ROLE`, `FOUR_ENABLED_SENSORS` a
-`FOUR_INGEST_ENABLE_DB`. Aktualni detaily jsou v `docs/UPBOARD_START.md`.
+`FOUR_INGEST_ENABLE_DB`. Aktualni detaily jsou v `docs/operations/UPBOARD_START.md`.
 
 Dulezite:
 
@@ -401,10 +401,49 @@ Interpretace:
 - `scenario_splits/_summary/README.txt` obsahuje kratke vysvetleni struktury
   primo vedle vygenerovanych vystupu.
 
+### Aktualni referencni beh
+
+V repozitari je uz hotove vyhodnoceni behu:
+
+- `runs/experiment/20260507_104346_Dronarena_04/`
+
+Pouzita OptiTrack reference:
+
+- `data/optitrack/Take_2026-05-07_12.43.55_PM_Final.csv`
+
+Hotove souhrny jsou v:
+
+- `runs/experiment/20260507_104346_Dronarena_04/scenario_splits/_summary/`
+
+Nejdulezitejsi vystupy:
+
+- `position/tables/summary_table_Phantom4.csv`
+- `position/tables/summary_table_Vysavac3.csv`
+- `ble_only/tables/summary_table_ble_only_Phantom4.csv`
+- `ble_only/tables/summary_table_ble_only_Vysavac3.csv`
+
+Strucne vysledky teto analyzy:
+
+- `Phantom4`
+  - nejlepsi 3D scenar: `2x_radar`, `rmse_3d_m = 0.397`
+  - nejlepsi BLE-only scenar: `ble2`, `rmse_ray_distance_m = 0.375`
+- `Vysavac3`
+  - nejlepsi 3D scenar: `radar1`, `rmse_3d_m = 0.234`
+  - nejlepsi BLE-only scenar: `ble1`, `rmse_ray_distance_m = 0.331`
+
+Dulezite:
+
+- `scenario_splits/` je generovany vystup pipeline, ne puvodni namerena data
+- kdykoliv ho lze smazat a znovu vytvorit pres `run_scenario_pipeline.ps1`
+
 ## OptiTrack replay
 
 `experiment_tools.optitrack_replay` umi prehrat OptiTrack jako samostatnou
 dashboard referenci bez synthetic radar/BLE vrstvy.
+
+Tohle je pomocny replay workflow pro dashboard.
+Pro scenario evaluaci `Dronarena_04` pouzij sekci `Scenario evaluation pipeline`
+vyse a referencni CSV `Take_2026-05-07_12.43.55_PM_Final.csv`.
 
 Priklad:
 
@@ -446,18 +485,17 @@ Kdyz potrebujes rychly vstup do projektu, otevri nejdriv:
 
 - `docs/README.md`
 - `experiment_tools/README.md`
-
-- `docs/ARENA_CHECKLIST.md`
-- `docs/README.md`
-- `docs/SCENARIO_EVALUATION.md`
-- `docs/UPBOARD_START.md`
-- `experiment_tools/README.md`
+- `docs/operations/README.md`
+- `docs/operations/ARENA_CHECKLIST.md`
+- `docs/evaluation/README.md`
+- `docs/evaluation/SCENARIO_EVALUATION.md`
+- `docs/operations/UPBOARD_START.md`
 - `experiment_tools/run_scenario_pipeline.ps1`
 - `experiment_tools/split_scenarios.py`
 - `experiment_tools/run_offline_fusion.py`
 - `experiment_tools/evaluate_all.py`
 - `experiment_tools/optitrack_replay.py`
-- `data/optitrack/Take 2026-05-05 11.47.22 AM.csv`
+- `data/optitrack/Take_2026-05-07_12.43.55_PM_Final.csv`
 
 ## Rychla kontrola syntaxe
 
