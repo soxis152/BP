@@ -1,0 +1,13 @@
+{
+  "run_id": "Dronarena_02",
+  "created_at_iso": "2026-05-05T09:45:19.103030",
+  "capture_raw_serial": true,
+  "ble_ids": [
+    "ble_1",
+    "ble_2"
+  ],
+  "radar_ids": [
+    "radar_1",
+    "radar_2"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "scenario": "radar2",
+  "target": "Vysavac3",
+  "tag_id": "20BA360ABB32",
+  "matched_samples": 5345,
+  "fused_samples_total": 5345,
+  "mean_error_3d_m": 0.268434464636366,
+  "median_error_3d_m": 0.1949639611989919,
+  "p95_error_3d_m": 0.4731324848381586,
+  "max_error_3d_m": 2.492834141070642,
+  "rmse_3d_m": 0.4488540185912727,
+  "mean_error_xy_m": 0.24336843402039313,
+  "median_error_xy_m": 0.16757822820228985,
+  "mean_abs_error_z_m": 0.07849066312014864,
+  "median_abs_error_z_m": 0.06497602025374016,
+  "status": "ok"
+}

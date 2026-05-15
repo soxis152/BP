@@ -1,0 +1,20 @@
+{
+  "label": "Dronarena_02",
+  "run_id": "Dronarena_02",
+  "note": "",
+  "mqtt_host": "127.0.0.1",
+  "mqtt_port": 1883,
+  "topics": [
+    "sensors/raw/#",
+    "sensors/fused"
+  ],
+  "started_at": 1777974318.7084415,
+  "started_at_iso": "2026-05-05T09:45:18.708441",
+  "raw_file": "raw.ndjson",
+  "fused_file": "fused.ndjson",
+  "ended_at": 1777975386.6862426,
+  "ended_at_iso": "2026-05-05T10:03:06.686243",
+  "duration_seconds": 1067.9778010845184,
+  "raw_messages": 95549,
+  "fused_messages": 17594
+}

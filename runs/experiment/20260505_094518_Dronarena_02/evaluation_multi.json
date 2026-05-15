@@ -1,0 +1,175 @@
+{
+  "input_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260505_094518_Dronarena_02",
+  "xlsx": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\data\\optitrack\\Take 2026-05-05 11.47.22 AM.csv",
+  "sheet": "Take 2026-05-05 11.47.22 AM.csv",
+  "axis_mapping": {
+    "x": "-x",
+    "y": "z",
+    "z": "y",
+    "yaw_deg": -89.4461
+  },
+  "offset_m": {
+    "x": 2.6268,
+    "y": 3.8304,
+    "z": -0.1569
+  },
+  "time_offset_seconds": -26.75,
+  "time_offset_source": "manual",
+  "mapped_tags": {
+    "20BA360ABBB8": "Phantom4"
+  },
+  "sources_requested": [
+    "fusion",
+    "ble",
+    "radar"
+  ],
+  "plot_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260505_094518_Dronarena_02\\evaluation_plots",
+  "sources": {
+    "fusion": {
+      "source": "fusion",
+      "label": "FUSION",
+      "snapshots": 17594,
+      "overall": {
+        "count": 16079,
+        "mean_error_3d_m": 0.17441788478584533,
+        "median_error_3d_m": 0.13108363560575137,
+        "p95_error_3d_m": 0.4453980635552127,
+        "max_error_3d_m": 1.2351240413338567,
+        "rmse_3d_m": 0.22737172225642435,
+        "mean_error_xy_m": 0.13721076914746294,
+        "median_error_xy_m": 0.09649176798265437,
+        "mean_abs_error_z_m": 0.08772395154450424,
+        "median_abs_error_z_m": 0.06149331716918849
+      },
+      "per_tag": {
+        "20BA360ABBB8": {
+          "count": 16079,
+          "mean_error_3d_m": 0.17441788478584533,
+          "median_error_3d_m": 0.13108363560575137,
+          "p95_error_3d_m": 0.4453980635552127,
+          "max_error_3d_m": 1.2351240413338567,
+          "rmse_3d_m": 0.22737172225642435,
+          "mean_error_xy_m": 0.13721076914746294,
+          "median_error_xy_m": 0.09649176798265437,
+          "mean_abs_error_z_m": 0.08772395154450424,
+          "median_abs_error_z_m": 0.06149331716918849,
+          "body_name": "Phantom4",
+          "presence_ratio": 0.9926111174263954,
+          "suspected_identity_mismatches": 0,
+          "plot_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260505_094518_Dronarena_02\\evaluation_plots\\fusion_20BA360ABBB8.png"
+        }
+      },
+      "plot_files": {
+        "20BA360ABBB8": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260505_094518_Dronarena_02\\evaluation_plots\\fusion_20BA360ABBB8.png"
+      }
+    },
+    "ble": {
+      "source": "ble",
+      "label": "BLE",
+      "snapshots": 17594,
+      "overall": {
+        "count": 16079,
+        "mean_error_3d_m": 0.31551725094232264,
+        "median_error_3d_m": 0.29599658126461725,
+        "p95_error_3d_m": 0.5673022529722972,
+        "max_error_3d_m": 1.4106841532943648,
+        "rmse_3d_m": 0.34713087712480045,
+        "mean_error_xy_m": 0.23325997043086577,
+        "median_error_xy_m": 0.2109053299404935,
+        "mean_abs_error_z_m": 0.17997744689368325,
+        "median_abs_error_z_m": 0.15963117402082938
+      },
+      "per_tag": {
+        "20BA360ABBB8": {
+          "count": 16079,
+          "mean_error_3d_m": 0.31551725094232264,
+          "median_error_3d_m": 0.29599658126461725,
+          "p95_error_3d_m": 0.5673022529722972,
+          "max_error_3d_m": 1.4106841532943648,
+          "rmse_3d_m": 0.34713087712480045,
+          "mean_error_xy_m": 0.23325997043086577,
+          "median_error_xy_m": 0.2109053299404935,
+          "mean_abs_error_z_m": 0.17997744689368325,
+          "median_abs_error_z_m": 0.15963117402082938,
+          "body_name": "Phantom4",
+          "presence_ratio": 0.9926111174263954,
+          "suspected_identity_mismatches": 0,
+          "plot_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260505_094518_Dronarena_02\\evaluation_plots\\ble_20BA360ABBB8.png"
+        }
+      },
+      "plot_files": {
+        "20BA360ABBB8": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260505_094518_Dronarena_02\\evaluation_plots\\ble_20BA360ABBB8.png"
+      }
+    },
+    "radar": {
+      "source": "radar",
+      "label": "RADAR",
+      "snapshots": 17594,
+      "overall": {
+        "count": 8583,
+        "mean_error_3d_m": 0.2983512476840121,
+        "median_error_3d_m": 0.13338251570973697,
+        "p95_error_3d_m": 1.7207182585148206,
+        "max_error_3d_m": 1.9993143528786828,
+        "rmse_3d_m": 0.5661540343650787,
+        "mean_error_xy_m": 0.26109068093447313,
+        "median_error_xy_m": 0.10759528789125317,
+        "mean_abs_error_z_m": 0.12234670595911533,
+        "median_abs_error_z_m": 0.05842847805091167
+      },
+      "per_tag": {
+        "20BA360ABBB8": {
+          "count": 8583,
+          "mean_error_3d_m": 0.2983512476840121,
+          "median_error_3d_m": 0.13338251570973697,
+          "p95_error_3d_m": 1.7207182585148206,
+          "max_error_3d_m": 1.9993143528786828,
+          "rmse_3d_m": 0.5661540343650787,
+          "mean_error_xy_m": 0.26109068093447313,
+          "median_error_xy_m": 0.10759528789125317,
+          "mean_abs_error_z_m": 0.12234670595911533,
+          "median_abs_error_z_m": 0.05842847805091167,
+          "body_name": "Phantom4",
+          "presence_ratio": 0.4878367625326816,
+          "suspected_identity_mismatches": 0,
+          "plot_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260505_094518_Dronarena_02\\evaluation_plots\\radar_20BA360ABBB8.png"
+        }
+      },
+      "match_max_distance_m": 2.0,
+      "plot_files": {
+        "20BA360ABBB8": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260505_094518_Dronarena_02\\evaluation_plots\\radar_20BA360ABBB8.png"
+      }
+    }
+  },
+  "fused_snapshots": 17594,
+  "overall": {
+    "count": 16079,
+    "mean_error_3d_m": 0.17441788478584533,
+    "median_error_3d_m": 0.13108363560575137,
+    "p95_error_3d_m": 0.4453980635552127,
+    "max_error_3d_m": 1.2351240413338567,
+    "rmse_3d_m": 0.22737172225642435,
+    "mean_error_xy_m": 0.13721076914746294,
+    "median_error_xy_m": 0.09649176798265437,
+    "mean_abs_error_z_m": 0.08772395154450424,
+    "median_abs_error_z_m": 0.06149331716918849
+  },
+  "per_tag": {
+    "20BA360ABBB8": {
+      "count": 16079,
+      "mean_error_3d_m": 0.17441788478584533,
+      "median_error_3d_m": 0.13108363560575137,
+      "p95_error_3d_m": 0.4453980635552127,
+      "max_error_3d_m": 1.2351240413338567,
+      "rmse_3d_m": 0.22737172225642435,
+      "mean_error_xy_m": 0.13721076914746294,
+      "median_error_xy_m": 0.09649176798265437,
+      "mean_abs_error_z_m": 0.08772395154450424,
+      "median_abs_error_z_m": 0.06149331716918849,
+      "body_name": "Phantom4",
+      "presence_ratio": 0.9926111174263954,
+      "suspected_identity_mismatches": 0,
+      "plot_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260505_094518_Dronarena_02\\evaluation_plots\\fusion_20BA360ABBB8.png"
+    }
+  }
+}

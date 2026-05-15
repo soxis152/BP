@@ -1,0 +1,16 @@
+{
+  "scenario": "ble2",
+  "target": "Phantom4",
+  "tag_id": "20BA360ABBB8",
+  "matched_samples": 13333,
+  "mean_ray_distance_m": 0.31923961548169755,
+  "median_ray_distance_m": 0.28543174312970526,
+  "p95_ray_distance_m": 0.6275255848126478,
+  "max_ray_distance_m": 1.4339846300338486,
+  "rmse_ray_distance_m": 0.3747942611797199,
+  "mean_angle_error_deg": 6.384876462887319,
+  "median_angle_error_deg": 5.770666429635296,
+  "p95_angle_error_deg": 12.00711721068437,
+  "max_angle_error_deg": 33.399589002410075,
+  "status": "ok"
+}

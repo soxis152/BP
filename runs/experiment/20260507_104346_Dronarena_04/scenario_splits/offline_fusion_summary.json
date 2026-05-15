@@ -1,0 +1,122 @@
+{
+  "scenario_root": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits",
+  "results": {
+    "ble1": {
+      "scenario_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\ble1",
+      "raw_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\ble1\\raw.ndjson",
+      "fused_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\ble1\\fused.ndjson",
+      "raw_messages": 22577,
+      "fused_messages": 15244,
+      "started_at": 1778150626.8813307,
+      "ended_at": 1778151389.0189586
+    },
+    "ble2": {
+      "scenario_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\ble2",
+      "raw_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\ble2\\raw.ndjson",
+      "fused_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\ble2\\fused.ndjson",
+      "raw_messages": 23039,
+      "fused_messages": 15244,
+      "started_at": 1778150626.8824043,
+      "ended_at": 1778151389.0097737
+    },
+    "radar1": {
+      "scenario_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar1",
+      "raw_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar1\\raw.ndjson",
+      "fused_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar1\\fused.ndjson",
+      "raw_messages": 5976,
+      "fused_messages": 15242,
+      "started_at": 1778150626.8846803,
+      "ended_at": 1778151388.9275236
+    },
+    "radar2": {
+      "scenario_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar2",
+      "raw_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar2\\raw.ndjson",
+      "fused_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar2\\fused.ndjson",
+      "raw_messages": 11457,
+      "fused_messages": 15238,
+      "started_at": 1778150626.8925295,
+      "ended_at": 1778151388.7409718
+    },
+    "radar1_ble1": {
+      "scenario_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar1_ble1",
+      "raw_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar1_ble1\\raw.ndjson",
+      "fused_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar1_ble1\\fused.ndjson",
+      "raw_messages": 28553,
+      "fused_messages": 15244,
+      "started_at": 1778150626.8813307,
+      "ended_at": 1778151389.0189586
+    },
+    "radar2_ble2": {
+      "scenario_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar2_ble2",
+      "raw_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar2_ble2\\raw.ndjson",
+      "fused_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar2_ble2\\fused.ndjson",
+      "raw_messages": 34496,
+      "fused_messages": 15244,
+      "started_at": 1778150626.8824043,
+      "ended_at": 1778151389.0097737
+    },
+    "2x_radar": {
+      "scenario_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_radar",
+      "raw_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_radar\\raw.ndjson",
+      "fused_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_radar\\fused.ndjson",
+      "raw_messages": 17433,
+      "fused_messages": 15242,
+      "started_at": 1778150626.8846803,
+      "ended_at": 1778151388.9275236
+    },
+    "2x_radar_ble1": {
+      "scenario_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_radar_ble1",
+      "raw_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_radar_ble1\\raw.ndjson",
+      "fused_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_radar_ble1\\fused.ndjson",
+      "raw_messages": 40010,
+      "fused_messages": 15244,
+      "started_at": 1778150626.8813307,
+      "ended_at": 1778151389.0189586
+    },
+    "2x_radar_ble2": {
+      "scenario_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_radar_ble2",
+      "raw_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_radar_ble2\\raw.ndjson",
+      "fused_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_radar_ble2\\fused.ndjson",
+      "raw_messages": 40472,
+      "fused_messages": 15244,
+      "started_at": 1778150626.8824043,
+      "ended_at": 1778151389.0097737
+    },
+    "2x_ble": {
+      "scenario_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_ble",
+      "raw_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_ble\\raw.ndjson",
+      "fused_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_ble\\fused.ndjson",
+      "raw_messages": 45616,
+      "fused_messages": 15244,
+      "started_at": 1778150626.8813307,
+      "ended_at": 1778151389.0189586
+    },
+    "radar1_2x_ble": {
+      "scenario_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar1_2x_ble",
+      "raw_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar1_2x_ble\\raw.ndjson",
+      "fused_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar1_2x_ble\\fused.ndjson",
+      "raw_messages": 51592,
+      "fused_messages": 15244,
+      "started_at": 1778150626.8813307,
+      "ended_at": 1778151389.0189586
+    },
+    "radar2_2x_ble": {
+      "scenario_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar2_2x_ble",
+      "raw_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar2_2x_ble\\raw.ndjson",
+      "fused_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar2_2x_ble\\fused.ndjson",
+      "raw_messages": 57073,
+      "fused_messages": 15244,
+      "started_at": 1778150626.8813307,
+      "ended_at": 1778151389.0189586
+    },
+    "fusion": {
+      "scenario_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\fusion",
+      "raw_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\fusion\\raw.ndjson",
+      "fused_path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\fusion\\fused.ndjson",
+      "raw_messages": 63049,
+      "fused_messages": 15244,
+      "started_at": 1778150626.8813307,
+      "ended_at": 1778151389.0189586
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "scenario": "fusion",
+  "target": "Phantom4",
+  "tag_id": "20BA360ABBB8",
+  "matched_samples": 13145,
+  "fused_samples_total": 15010,
+  "mean_error_3d_m": 0.2613449076982036,
+  "median_error_3d_m": 0.13385951767183327,
+  "p95_error_3d_m": 0.9887479046737838,
+  "max_error_3d_m": 2.0717736233328847,
+  "rmse_3d_m": 0.419413937764551,
+  "mean_error_xy_m": 0.2120800184310097,
+  "median_error_xy_m": 0.10806942453416647,
+  "mean_abs_error_z_m": 0.10499833269729893,
+  "median_abs_error_z_m": 0.05725978951175681,
+  "status": "ok"
+}

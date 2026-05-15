@@ -1,0 +1,30 @@
+{
+  "run_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04",
+  "optitrack_input": {
+    "path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\data\\optitrack\\Take_2026-05-07_12.43.55_PM_Final.csv",
+    "size": 11946182,
+    "mtime_ns": 1778291329168864700
+  },
+  "fused_dataset": {
+    "path": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\fused.ndjson",
+    "size": 53649103,
+    "mtime_ns": 1778151936630931400
+  },
+  "builder": {
+    "optitrack_sheet": null,
+    "optitrack_axis_x": "z",
+    "optitrack_axis_y": "x",
+    "optitrack_axis_z": "y",
+    "optitrack_yaw_deg": 0.0,
+    "optitrack_offset_x": 2.371,
+    "optitrack_offset_y": 3.815,
+    "optitrack_offset_z": 0.067,
+    "optitrack_frame_stride": 1,
+    "optitrack_max_frames": 0,
+    "optitrack_start_on_body": "Phantom4"
+  },
+  "run": {
+    "run_id": "Dronarena04",
+    "fused_messages": 12662
+  }
+}

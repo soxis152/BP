@@ -1,0 +1,16 @@
+{
+  "scenario": "ble2",
+  "target": "Vysavac3",
+  "tag_id": "20BA360ABB32",
+  "matched_samples": 13333,
+  "mean_ray_distance_m": 0.2669660272109966,
+  "median_ray_distance_m": 0.20046645420808953,
+  "p95_ray_distance_m": 0.7574980725400461,
+  "max_ray_distance_m": 1.1899453209288287,
+  "rmse_ray_distance_m": 0.3408316555868002,
+  "mean_angle_error_deg": 5.121538770541157,
+  "median_angle_error_deg": 3.901284788216349,
+  "p95_angle_error_deg": 13.011451263862128,
+  "max_angle_error_deg": 19.272527475156647,
+  "status": "ok"
+}

@@ -1,0 +1,17 @@
+{
+  "scenario": "2x_radar",
+  "target": "Phantom4",
+  "tag_id": "20BA360ABBB8",
+  "matched_samples": 9861,
+  "fused_samples_total": 9861,
+  "mean_error_3d_m": 0.21880192023339612,
+  "median_error_3d_m": 0.14038754908914491,
+  "p95_error_3d_m": 0.7963214069634621,
+  "max_error_3d_m": 2.4614990861593853,
+  "rmse_3d_m": 0.39710073679189484,
+  "mean_error_xy_m": 0.20290881389034776,
+  "median_error_xy_m": 0.12540240210471176,
+  "mean_abs_error_z_m": 0.058535834519762873,
+  "median_abs_error_z_m": 0.05085102344453696,
+  "status": "ok"
+}

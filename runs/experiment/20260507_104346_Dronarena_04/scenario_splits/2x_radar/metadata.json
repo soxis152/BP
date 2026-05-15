@@ -1,0 +1,32 @@
+{
+  "label": "Dronarena04",
+  "run_id": "Dronarena04",
+  "note": "",
+  "mqtt_host": "127.0.0.1",
+  "mqtt_port": 1883,
+  "topics": [
+    "sensors/raw/#",
+    "sensors/fused"
+  ],
+  "started_at": 1778150626.8846803,
+  "started_at_iso": "2026-05-07T10:43:46.816195",
+  "raw_file": "raw.ndjson",
+  "fused_file": "fused.ndjson",
+  "ended_at": 1778151388.9275236,
+  "ended_at_iso": "2026-05-07T10:56:29.048909",
+  "duration_seconds": 762.0428433418274,
+  "raw_messages": 17433,
+  "fused_messages": 15242,
+  "scenario": "2x_radar",
+  "scenario_topics": [
+    "sensors/raw/radar_1",
+    "sensors/raw/radar_2"
+  ],
+  "scenario_source_raw": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\raw.ndjson",
+  "topic_counts": {
+    "sensors/raw/radar_1": 5976,
+    "sensors/raw/radar_2": 11457
+  },
+  "fused_generated_offline": true,
+  "fused_publish_interval_seconds": 0.05
+}

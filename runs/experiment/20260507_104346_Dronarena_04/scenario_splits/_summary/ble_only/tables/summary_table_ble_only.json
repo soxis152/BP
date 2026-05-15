@@ -1,0 +1,78 @@
+{
+  "Phantom4": [
+    {
+      "scenario": "ble2",
+      "target": "Phantom4",
+      "tag_id": "20BA360ABBB8",
+      "matched_samples": 13333,
+      "mean_ray_distance_m": 0.31923961548169755,
+      "median_ray_distance_m": 0.28543174312970526,
+      "p95_ray_distance_m": 0.6275255848126478,
+      "max_ray_distance_m": 1.4339846300338486,
+      "rmse_ray_distance_m": 0.3747942611797199,
+      "mean_angle_error_deg": 6.384876462887319,
+      "median_angle_error_deg": 5.770666429635296,
+      "p95_angle_error_deg": 12.00711721068437,
+      "max_angle_error_deg": 33.399589002410075,
+      "status": "ok",
+      "reason": null,
+      "rank": 1
+    },
+    {
+      "scenario": "ble1",
+      "target": "Phantom4",
+      "tag_id": "20BA360ABBB8",
+      "matched_samples": 13333,
+      "mean_ray_distance_m": 0.6493781814874036,
+      "median_ray_distance_m": 0.6387025881152348,
+      "p95_ray_distance_m": 1.117083049590128,
+      "max_ray_distance_m": 2.0040182008593055,
+      "rmse_ray_distance_m": 0.7077156415644282,
+      "mean_angle_error_deg": 7.914810540024138,
+      "median_angle_error_deg": 7.57607317399078,
+      "p95_angle_error_deg": 14.474259377001466,
+      "max_angle_error_deg": 20.607434996734206,
+      "status": "ok",
+      "reason": null,
+      "rank": 2
+    }
+  ],
+  "Vysavac3": [
+    {
+      "scenario": "ble1",
+      "target": "Vysavac3",
+      "tag_id": "20BA360ABB32",
+      "matched_samples": 13333,
+      "mean_ray_distance_m": 0.2806241735983826,
+      "median_ray_distance_m": 0.24158250262631298,
+      "p95_ray_distance_m": 0.5983498229174984,
+      "max_ray_distance_m": 1.7073078737945158,
+      "rmse_ray_distance_m": 0.3309425486282945,
+      "mean_angle_error_deg": 3.745985304513137,
+      "median_angle_error_deg": 3.2220312574628327,
+      "p95_angle_error_deg": 8.691790353706164,
+      "max_angle_error_deg": 15.741817932790864,
+      "status": "ok",
+      "reason": null,
+      "rank": 1
+    },
+    {
+      "scenario": "ble2",
+      "target": "Vysavac3",
+      "tag_id": "20BA360ABB32",
+      "matched_samples": 13333,
+      "mean_ray_distance_m": 0.2669660272109966,
+      "median_ray_distance_m": 0.20046645420808953,
+      "p95_ray_distance_m": 0.7574980725400461,
+      "max_ray_distance_m": 1.1899453209288287,
+      "rmse_ray_distance_m": 0.3408316555868002,
+      "mean_angle_error_deg": 5.121538770541157,
+      "median_angle_error_deg": 3.901284788216349,
+      "p95_angle_error_deg": 13.011451263862128,
+      "max_angle_error_deg": 19.272527475156647,
+      "status": "ok",
+      "reason": null,
+      "rank": 2
+    }
+  ]
+}

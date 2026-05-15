@@ -1,0 +1,40 @@
+{
+  "rows": [
+    {
+      "scenario": "ble1",
+      "target": "Vysavac3",
+      "tag_id": "20BA360ABB32",
+      "matched_samples": 13333,
+      "mean_ray_distance_m": 0.2806241735983826,
+      "median_ray_distance_m": 0.24158250262631298,
+      "p95_ray_distance_m": 0.5983498229174984,
+      "max_ray_distance_m": 1.7073078737945158,
+      "rmse_ray_distance_m": 0.3309425486282945,
+      "mean_angle_error_deg": 3.745985304513137,
+      "median_angle_error_deg": 3.2220312574628327,
+      "p95_angle_error_deg": 8.691790353706164,
+      "max_angle_error_deg": 15.741817932790864,
+      "status": "ok",
+      "reason": null,
+      "rank": 1
+    },
+    {
+      "scenario": "ble2",
+      "target": "Vysavac3",
+      "tag_id": "20BA360ABB32",
+      "matched_samples": 13333,
+      "mean_ray_distance_m": 0.2669660272109966,
+      "median_ray_distance_m": 0.20046645420808953,
+      "p95_ray_distance_m": 0.7574980725400461,
+      "max_ray_distance_m": 1.1899453209288287,
+      "rmse_ray_distance_m": 0.3408316555868002,
+      "mean_angle_error_deg": 5.121538770541157,
+      "median_angle_error_deg": 3.901284788216349,
+      "p95_angle_error_deg": 13.011451263862128,
+      "max_angle_error_deg": 19.272527475156647,
+      "status": "ok",
+      "reason": null,
+      "rank": 2
+    }
+  ]
+}

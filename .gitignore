@@ -16,5 +16,4 @@ env/
 .env.*
 
 *.log
-runs/
 .active_run_id

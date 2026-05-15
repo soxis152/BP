@@ -1,0 +1,167 @@
+{
+  "source_raw": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\raw.ndjson",
+  "source_run_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04",
+  "scenario_root": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits",
+  "scenarios": {
+    "ble1": {
+      "dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\ble1",
+      "raw_messages": 22577,
+      "topics": [
+        "sensors/raw/ble_1"
+      ],
+      "topic_counts": {
+        "sensors/raw/ble_1": 22577
+      }
+    },
+    "ble2": {
+      "dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\ble2",
+      "raw_messages": 23039,
+      "topics": [
+        "sensors/raw/ble_2"
+      ],
+      "topic_counts": {
+        "sensors/raw/ble_2": 23039
+      }
+    },
+    "radar1": {
+      "dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar1",
+      "raw_messages": 5976,
+      "topics": [
+        "sensors/raw/radar_1"
+      ],
+      "topic_counts": {
+        "sensors/raw/radar_1": 5976
+      }
+    },
+    "radar2": {
+      "dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar2",
+      "raw_messages": 11457,
+      "topics": [
+        "sensors/raw/radar_2"
+      ],
+      "topic_counts": {
+        "sensors/raw/radar_2": 11457
+      }
+    },
+    "radar1_ble1": {
+      "dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar1_ble1",
+      "raw_messages": 28553,
+      "topics": [
+        "sensors/raw/radar_1",
+        "sensors/raw/ble_1"
+      ],
+      "topic_counts": {
+        "sensors/raw/ble_1": 22577,
+        "sensors/raw/radar_1": 5976
+      }
+    },
+    "radar2_ble2": {
+      "dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar2_ble2",
+      "raw_messages": 34496,
+      "topics": [
+        "sensors/raw/radar_2",
+        "sensors/raw/ble_2"
+      ],
+      "topic_counts": {
+        "sensors/raw/ble_2": 23039,
+        "sensors/raw/radar_2": 11457
+      }
+    },
+    "2x_radar": {
+      "dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_radar",
+      "raw_messages": 17433,
+      "topics": [
+        "sensors/raw/radar_1",
+        "sensors/raw/radar_2"
+      ],
+      "topic_counts": {
+        "sensors/raw/radar_1": 5976,
+        "sensors/raw/radar_2": 11457
+      }
+    },
+    "2x_radar_ble1": {
+      "dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_radar_ble1",
+      "raw_messages": 40010,
+      "topics": [
+        "sensors/raw/radar_1",
+        "sensors/raw/radar_2",
+        "sensors/raw/ble_1"
+      ],
+      "topic_counts": {
+        "sensors/raw/ble_1": 22577,
+        "sensors/raw/radar_1": 5976,
+        "sensors/raw/radar_2": 11457
+      }
+    },
+    "2x_radar_ble2": {
+      "dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_radar_ble2",
+      "raw_messages": 40472,
+      "topics": [
+        "sensors/raw/radar_1",
+        "sensors/raw/radar_2",
+        "sensors/raw/ble_2"
+      ],
+      "topic_counts": {
+        "sensors/raw/ble_2": 23039,
+        "sensors/raw/radar_1": 5976,
+        "sensors/raw/radar_2": 11457
+      }
+    },
+    "2x_ble": {
+      "dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\2x_ble",
+      "raw_messages": 45616,
+      "topics": [
+        "sensors/raw/ble_1",
+        "sensors/raw/ble_2"
+      ],
+      "topic_counts": {
+        "sensors/raw/ble_1": 22577,
+        "sensors/raw/ble_2": 23039
+      }
+    },
+    "radar1_2x_ble": {
+      "dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar1_2x_ble",
+      "raw_messages": 51592,
+      "topics": [
+        "sensors/raw/radar_1",
+        "sensors/raw/ble_1",
+        "sensors/raw/ble_2"
+      ],
+      "topic_counts": {
+        "sensors/raw/ble_1": 22577,
+        "sensors/raw/ble_2": 23039,
+        "sensors/raw/radar_1": 5976
+      }
+    },
+    "radar2_2x_ble": {
+      "dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\radar2_2x_ble",
+      "raw_messages": 57073,
+      "topics": [
+        "sensors/raw/radar_2",
+        "sensors/raw/ble_1",
+        "sensors/raw/ble_2"
+      ],
+      "topic_counts": {
+        "sensors/raw/ble_1": 22577,
+        "sensors/raw/ble_2": 23039,
+        "sensors/raw/radar_2": 11457
+      }
+    },
+    "fusion": {
+      "dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260507_104346_Dronarena_04\\scenario_splits\\fusion",
+      "raw_messages": 63049,
+      "topics": [
+        "sensors/raw/ble_1",
+        "sensors/raw/ble_2",
+        "sensors/raw/radar_1",
+        "sensors/raw/radar_2"
+      ],
+      "topic_counts": {
+        "sensors/raw/ble_1": 22577,
+        "sensors/raw/ble_2": 23039,
+        "sensors/raw/radar_1": 5976,
+        "sensors/raw/radar_2": 11457
+      }
+    }
+  }
+}

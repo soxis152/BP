@@ -1,0 +1,67 @@
+{
+  "input_dir": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\runs\\experiment\\20260505_094518_Dronarena_02",
+  "xlsx": "C:\\Users\\kabup\\OneDrive\\Plocha\\BP_\\KÓD\\Four\\data\\optitrack\\Take 2026-05-05 11.47.22 AM.csv",
+  "sheet": "Take 2026-05-05 11.47.22 AM.csv",
+  "axis_mapping": {
+    "x": "-x",
+    "y": "z",
+    "z": "y",
+    "yaw_deg": -89.4461
+  },
+  "offset_m": {
+    "x": 2.6268,
+    "y": 3.8304,
+    "z": -0.1569
+  },
+  "time_offset_seconds": 4.999999999999981,
+  "time_offset_source": "estimated",
+  "fused_snapshots": 17594,
+  "mapped_tags": {
+    "20BA360ABBB8": "Phantom4",
+    "20BA360ABB32": "Vysavac2"
+  },
+  "overall": {
+    "count": 31104,
+    "mean_error_3d_m": 1.0303683857291581,
+    "median_error_3d_m": 0.8790043336413056,
+    "p95_error_3d_m": 2.526306863358787,
+    "max_error_3d_m": 3.5600530334080123,
+    "rmse_3d_m": 1.233966558148085,
+    "mean_error_xy_m": 1.0028516927107791,
+    "median_error_xy_m": 0.8516343045153083,
+    "mean_abs_error_z_m": 0.13544562550780184,
+    "median_abs_error_z_m": 0.0951686510982479
+  },
+  "per_tag": {
+    "20BA360ABBB8": {
+      "count": 16090,
+      "mean_error_3d_m": 0.9854310520990897,
+      "median_error_3d_m": 0.8261094737403993,
+      "p95_error_3d_m": 2.541927983035773,
+      "max_error_3d_m": 3.5276389916055284,
+      "rmse_3d_m": 1.184703819800288,
+      "mean_error_xy_m": 0.940126279439592,
+      "median_error_xy_m": 0.7760374216578559,
+      "mean_abs_error_z_m": 0.18459461946282218,
+      "median_abs_error_z_m": 0.14458291824468406,
+      "body_name": "Phantom4",
+      "presence_ratio": 0.9926111174263954,
+      "suspected_identity_mismatches": 1443
+    },
+    "20BA360ABB32": {
+      "count": 15014,
+      "mean_error_3d_m": 1.078526218292619,
+      "median_error_3d_m": 0.9452969003190661,
+      "p95_error_3d_m": 2.517506490593416,
+      "max_error_3d_m": 3.5600530334080123,
+      "rmse_3d_m": 1.2846644981660502,
+      "mean_error_xy_m": 1.0700724133404182,
+      "median_error_xy_m": 0.9393936107097365,
+      "mean_abs_error_z_m": 0.08277429789781934,
+      "median_abs_error_z_m": 0.06495476049999993,
+      "body_name": "Vysavac2",
+      "presence_ratio": 0.9100829828350574,
+      "suspected_identity_mismatches": 1839
+    }
+  }
+}
